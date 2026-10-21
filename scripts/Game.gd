@@ -2,6 +2,7 @@ extends Node3D
 # Clean Happy Farm 3D. All gameplay is new; no legacy patches.
 const JOYSTICK = preload("res://scripts/Joystick.gd")
 const ICON = preload("res://scripts/BadgeIcon.gd")
+const SEED_ICON = preload("res://scripts/SeedIcon.gd")
 const THAI = preload("res://assets/Sarabun-Regular.ttf")
 const THAI_BOLD = preload("res://assets/Sarabun-SemiBold.ttf")
 const SAVE = "user://happy_farm_clean.json"
@@ -76,6 +77,19 @@ var shop_close: Button
 var shop_feed: Button
 var shop_scroll: ScrollContainer
 var shop_grid: GridContainer
+var bag_button: Button
+var change_seed_button: Button
+var active_seed_label: Label
+var bag_panel: Panel
+var bag_header: ColorRect
+var bag_heading: Label
+var bag_close: Button
+var bag_summary: Label
+var bag_scroll: ScrollContainer
+var bag_grid: GridContainer
+var bag_footer: Label
+var bag_cards: Array[Button] = []
+var bag_counts: Array[Label] = []
 var message: String = "เลือกเครื่องมือ แล้วแตะแปลงผัก"
 
 func _ready() -> void:
@@ -566,6 +580,12 @@ func build_ui() -> void:
     coin_icon.name = "CoinIcon"
     money_label = text_label("", 16, Color("#375c49"))
     ui_top.add_child(money_label)
+    bag_button = btn("   กระเป๋า", show_bag, Color("#426d55"))
+    ui_top.add_child(bag_button)
+    var bag_icon: Control = ICON.new()
+    bag_icon.kind = "bag"
+    bag_button.add_child(bag_icon)
+    set_box(bag_icon, 5, 6, 24, 24)
     shop_button = btn("ร้านค้า", show_shop, Color("#ad7c53"))
     ui_top.add_child(shop_button)
     feed_button = btn("ให้อาหาร", give_feed, Color("#b87b89"))
@@ -576,19 +596,11 @@ func build_ui() -> void:
     ui.add_child(ui_bottom)
     status_label = text_label("", 15, Color("#3f654b"))
     ui_bottom.add_child(status_label)
-    seed_caption = text_label("เมล็ด", 16, Color("#365c44"))
-    ui_bottom.add_child(seed_caption)
-    seed_select = OptionButton.new()
-    seed_select.focus_mode = Control.FOCUS_NONE
-    seed_select.add_theme_font_override("font", THAI)
-    seed_select.add_theme_font_size_override("font_size", 16)
-    seed_select.get_popup().add_theme_font_override("font", THAI)
-    seed_select.get_popup().add_theme_font_size_override("font_size", 16)
-    seed_select.clip_text = true
-    for i in range(CROPS.size()):
-        seed_select.add_item(str(CROPS[i]["name"]), i)
-    seed_select.item_selected.connect(select_seed)
-    ui_bottom.add_child(seed_select)
+    active_seed_label = text_label("", 16, Color("#365c44"))
+    active_seed_label.add_theme_font_override("font", THAI_BOLD)
+    ui_bottom.add_child(active_seed_label)
+    change_seed_button = btn("เลือกเมล็ด", show_bag, Color("#6a946f"))
+    ui_bottom.add_child(change_seed_button)
     for pair in [["till","พรวนดิน"],["plant","ปลูกผัก"],["water","รดน้ำ"],["harvest","เก็บเกี่ยว"]]:
         var key: String = str(pair[0])
         var button: Button = btn(str(pair[1]), pick_tool.bind(key), Color("#468566") if key != "water" else Color("#4d95ac"))
@@ -632,55 +644,113 @@ func build_ui() -> void:
     shop_feed = btn("ซื้ออาหารหมู 5 ชุด (35 เหรียญ)", buy_feed, Color("#ad7c53"))
     shop_panel.add_child(shop_feed)
 
+    # Dedicated seed inventory in the left-side area shown in the reference.
+    # The panel is a fixed-size Panel, not a PanelContainer; it cannot grow.
+    bag_panel = panel(Color("#ecf1e6fb"))
+    ui.add_child(bag_panel)
+    bag_panel.visible = false
+    bag_header = ColorRect.new()
+    bag_header.color = Color("#335b47")
+    bag_header.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    bag_panel.add_child(bag_header)
+    bag_heading = text_label("กระเป๋าเมล็ดพันธุ์", 23, Color("#ffffff"))
+    bag_heading.add_theme_font_override("font", THAI_BOLD)
+    bag_panel.add_child(bag_heading)
+    bag_close = btn("ปิด", show_bag, Color("#d4a16b"))
+    bag_panel.add_child(bag_close)
+    bag_summary = text_label("", 16, Color("#45624c"))
+    bag_panel.add_child(bag_summary)
+    bag_scroll = ScrollContainer.new()
+    bag_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    bag_scroll.clip_contents = true
+    bag_panel.add_child(bag_scroll)
+    bag_grid = GridContainer.new()
+    bag_grid.columns = 3
+    bag_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    bag_grid.add_theme_constant_override("h_separation", 8)
+    bag_grid.add_theme_constant_override("v_separation", 10)
+    bag_scroll.add_child(bag_grid)
+    for i in range(CROPS.size()):
+        var card: Button = btn("", select_seed.bind(i), Color("#fff9ec"))
+        card.custom_minimum_size = Vector2(96, 122)
+        card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        bag_grid.add_child(card)
+        bag_cards.append(card)
+        var contents: VBoxContainer = VBoxContainer.new()
+        contents.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        contents.add_theme_constant_override("separation", 0)
+        card.add_child(contents)
+        contents.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        contents.offset_left = 3
+        contents.offset_right = -3
+        contents.offset_top = 5
+        contents.offset_bottom = -3
+        var crop_image: Control = SEED_ICON.new()
+        crop_image.crop_id = i
+        crop_image.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+        contents.add_child(crop_image)
+        var crop_name: Label = text_label(str(CROPS[i]["name"]), 16, Color("#314b3a"))
+        crop_name.add_theme_font_override("font", THAI_BOLD)
+        crop_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        crop_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        contents.add_child(crop_name)
+        var count: Label = text_label("", 14, Color("#608066"))
+        count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        count.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        contents.add_child(count)
+        bag_counts.append(count)
+    bag_footer = text_label("แตะเมล็ดเพื่อเลือกไปปลูก", 15, Color("#5c715c"))
+    bag_panel.add_child(bag_footer)
+
     update_sizes()
     pick_tool("plant")
 
 func update_sizes() -> void:
     if ui_top == null:
         return
-    var viewport_size: Vector2 = get_viewport().get_visible_rect().size
-    var w: float = viewport_size.x
-    var h: float = viewport_size.y
-    var narrow: bool = w < 720.0
-    var top_width: float = minf(w - 16.0, 615.0)
-    var top_height: float = 91.0 if narrow else 57.0
-    set_box(ui_top, 8.0, 8.0, top_width, top_height)
+    var view: Vector2 = get_viewport().get_visible_rect().size
+    var w: float = view.x
+    var h: float = view.y
+    var narrow: bool = w < 760.0
+    var header_width: float = minf(w-16.0, 782.0)
+    var header_height: float = 94.0 if narrow else 56.0
+    set_box(ui_top, 8.0, 8.0, header_width, header_height)
 
     if narrow:
-        set_box(title_label, 12, 5, 125, 31)
-        set_box(ui_top.get_node("CoinIcon"), 140, 8, 24, 24)
-        set_box(money_label, 167, 7, maxf(60.0, top_width-176.0), 29)
-        var small_button_w: float = (top_width-30.0)*0.5
-        set_box(shop_button, 10, 43, small_button_w, 39)
-        set_box(feed_button, 20+small_button_w, 43, small_button_w, 39)
+        set_box(title_label, 12, 5, 118, 30)
+        set_box(ui_top.get_node("CoinIcon"), 132, 8, 24, 24)
+        set_box(money_label, 158, 7, maxf(80.0, header_width-169.0), 27)
+        var button_w: float = (header_width-32.0)/3.0
+        set_box(bag_button, 9, 44, button_w, 39)
+        set_box(shop_button, 16+button_w, 44, button_w, 39)
+        set_box(feed_button, 23+2.0*button_w, 44, button_w, 39)
     else:
-        set_box(title_label, 12, 13, 119, 32)
-        set_box(ui_top.get_node("CoinIcon"), 134, 16, 24, 24)
-        set_box(money_label, 161, 14, 235, 32)
-        set_box(shop_button, 400, 8, 90, 40)
-        set_box(feed_button, 497, 8, 108, 40)
+        set_box(title_label, 12, 12, 115, 30)
+        set_box(ui_top.get_node("CoinIcon"), 131, 15, 24, 24)
+        set_box(money_label, 158, 13, 239, 30)
+        set_box(bag_button, 402, 8, 118, 40)
+        set_box(shop_button, 527, 8, 104, 40)
+        set_box(feed_button, 638, 8, 134, 40)
 
-    var tool_width: float = minf(640.0, maxf(310.0, w - 20.0))
-    var tool_height: float = 116.0
-    var tool_x: float = (w-tool_width)*0.5
-    var tool_y: float = h-tool_height-11.0
+    # Small tool tray keeps the working 3D farm visible.
+    var toolbar_width: float = minf(650.0, maxf(300.0, w-20.0))
+    var toolbar_y: float = h-127.0
     if touch_controls:
-        if w >= 870.0:
-            tool_width = minf(625.0, w-330.0)
-            tool_x = (w-tool_width)*0.5
+        if w >= 900.0:
+            toolbar_width = minf(570.0, w-340.0)
         else:
-            tool_width = maxf(285.0, w-18.0)
-            tool_x = (w-tool_width)*0.5
-            tool_y = h-tool_height-171.0
-    set_box(ui_bottom, tool_x, tool_y, tool_width, tool_height)
-    set_box(status_label, 13, 6, tool_width-26, 25)
-    set_box(seed_caption, 13, 35, 48, 31)
-    set_box(seed_select, 64, 33, minf(222.0, tool_width-80.0), 34)
+            toolbar_width = w-18.0
+            toolbar_y = h-291.0
+    var toolbar_x: float = (w-toolbar_width)*0.5
+    set_box(ui_bottom, toolbar_x, toolbar_y, toolbar_width, 116.0)
+    set_box(status_label, 12, 7, toolbar_width-24.0, 25.0)
+    set_box(active_seed_label, 13, 37, toolbar_width-166.0, 30.0)
+    set_box(change_seed_button, toolbar_width-148.0, 33, 135.0, 35.0)
     var gap: float = 6.0
-    var button_w: float = (tool_width-24.0-3.0*gap)*0.25
-    var labels: Array[String] = ["till", "plant", "water", "harvest"]
+    var tool_button_w: float = (toolbar_width-24.0-3.0*gap)*0.25
+    var keys: Array[String] = ["till", "plant", "water", "harvest"]
     for i in range(4):
-        set_box(action_buttons[labels[i]], 12.0+float(i)*(button_w+gap), 73.0, button_w, 35.0)
+        set_box(action_buttons[keys[i]], 12.0+float(i)*(tool_button_w+gap), 75.0, tool_button_w, 34.0)
 
     set_box(stick, 18, h-158, 144, 144)
     set_box(run_button, w-139, h-151, 123, 62)
@@ -694,10 +764,31 @@ func update_sizes() -> void:
     set_box(shop_scroll, 14, 56, shop_w-28, maxf(90.0, shop_h-125.0))
     set_box(shop_feed, 14, shop_h-57, shop_w-28, 43)
     shop_grid.columns = 1 if w < 440.0 else 2
-    update_camera()
 
+    # Inventory lives on the left. Never stretch it to the full game screen.
+    var bag_top: float = 118.0 if narrow else 75.0
+    var bag_width: float = minf(440.0, w*0.43) if w >= 900.0 else minf(385.0, w-20.0)
+    var bag_x: float = 13.0 if w >= 900.0 else 9.0
+    var bag_bottom_margin: float = 155.0
+    if touch_controls and w < 900.0:
+        bag_bottom_margin = 303.0
+    var bag_height: float = maxf(182.0, h-bag_top-bag_bottom_margin)
+    set_box(bag_panel, bag_x, bag_top, bag_width, bag_height)
+    set_box(bag_header, 0, 0, bag_width, 60)
+    set_box(bag_heading, 16, 12, bag_width-104, 35)
+    set_box(bag_close, bag_width-76, 11, 63, 37)
+    set_box(bag_summary, 15, 68, bag_width-30, 27)
+    set_box(bag_scroll, 12, 103, bag_width-24, maxf(64.0, bag_height-155.0))
+    set_box(bag_footer, 14, bag_height-43, bag_width-28, 29)
+    bag_grid.columns = 3 if bag_width >= 345.0 else 2
+    for card in bag_cards:
+        card.custom_minimum_size = Vector2(95.0, 119.0)
+    update_camera()
 func point_on_ui(pos: Vector2) -> bool:
-    if shop_panel.visible: return true
+    if shop_panel.visible:
+        return true
+    if bag_panel != null and bag_panel.visible and bag_panel.get_global_rect().has_point(pos):
+        return true
     for panel_node in [ui_top,ui_bottom]:
         if panel_node != null and panel_node.get_global_rect().has_point(pos):
             return true
@@ -707,13 +798,39 @@ func point_on_ui(pos: Vector2) -> bool:
     return false
 
 func refresh_labels() -> void:
-    if money_label == null: return
-    money_label.text = "เงิน %d | หมู %d | อาหาร %d" % [coins,pigs,feed]
+    if money_label == null:
+        return
+    money_label.text = "เงิน %d  |  หมู %d  |  อาหาร %d" % [coins, pigs, feed]
     status_label.text = message
-    for i in range(CROPS.size()):
-        seed_select.set_item_text(i,"%s (%d)" % [CROPS[i]["name"],int(seeds[i])])
+    active_seed_label.text = "เมล็ดที่เลือก: %s ×%d" % [CROPS[selected_seed]["name"], int(seeds[selected_seed])]
+    refresh_bag_cards()
     for key in action_buttons.keys():
         action_buttons[key].modulate = Color.WHITE if key == tool_mode else Color("#bbcbbd")
+
+func refresh_bag_cards() -> void:
+    if bag_summary == null:
+        return
+    var total: int = 0
+    for i in range(seeds.size()):
+        total += int(seeds[i])
+    bag_summary.text = "เมล็ดพันธุ์ %d ชนิด  |  รวม %d ซอง" % [CROPS.size(), total]
+    for i in range(bag_cards.size()):
+        var count: int = int(seeds[i])
+        var selected: bool = selected_seed == i
+        bag_counts[i].text = "มี %d ซอง" % count if count > 0 else "หมดแล้ว"
+        bag_counts[i].add_theme_color_override("font_color", Color("#28774e") if count > 0 else Color("#a98c7a"))
+        var style: StyleBoxFlat = StyleBoxFlat.new()
+        style.bg_color = Color("#e0f0d8") if selected else (Color("#fffdf4") if count > 0 else Color("#edece4"))
+        style.border_color = Color("#399465") if selected else Color("#d8ddcf")
+        style.set_border_width_all(3 if selected else 1)
+        style.set_corner_radius_all(13)
+        style.set_content_margin_all(3)
+        bag_cards[i].add_theme_stylebox_override("normal", style)
+        var hover: StyleBoxFlat = style.duplicate()
+        hover.bg_color = style.bg_color.lightened(0.07)
+        bag_cards[i].add_theme_stylebox_override("hover", hover)
+        bag_cards[i].add_theme_stylebox_override("pressed", style)
+        bag_cards[i].modulate = Color.WHITE if count > 0 or selected else Color("#dddddd")
 
 func pick_tool(key: String) -> void:
     tool_mode = key
@@ -722,13 +839,27 @@ func pick_tool(key: String) -> void:
 
 func select_seed(index: int) -> void:
     selected_seed = index
+    tool_mode = "plant"
+    bag_panel.visible = false
+    if int(seeds[index]) > 0:
+        message = "เลือก%sแล้ว แตะแปลงเพื่อปลูก" % CROPS[index]["name"]
+    else:
+        message = "%sหมดแล้ว ซื้อเพิ่มได้ในร้านค้า" % CROPS[index]["name"]
     refresh_labels()
 
 func toggle_run() -> void:
     run_toggle = not run_toggle
     run_button.modulate = Color.WHITE if run_toggle else Color("#aeb9a8")
 
+func show_bag() -> void:
+    if shop_panel.visible:
+        shop_panel.visible = false
+    bag_panel.visible = not bag_panel.visible
+    refresh_bag_cards()
+
 func show_shop() -> void:
+    if bag_panel != null:
+        bag_panel.visible = false
     shop_panel.visible = not shop_panel.visible
 
 func buy_seed(index: int) -> void:
