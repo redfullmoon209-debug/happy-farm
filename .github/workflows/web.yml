@@ -37,11 +37,13 @@ jobs:
           cp -a template_unpack/templates/. "$HOME/.local/share/godot/export_templates/4.4.1.stable/"
       - name: Import assets and check project
         run: |
-          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --editor --quit
+          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --editor --quit 2>&1 | tee /tmp/godot-import.log
+          if grep -E "SCRIPT ERROR:|Parse Error:|Failed to load script|Compile Error:" /tmp/godot-import.log; then exit 1; fi
       - name: Build HTML5 single-thread
         run: |
           mkdir -p build/web
-          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --export-release "Web" build/web/index.html
+          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --export-release "Web" build/web/index.html 2>&1 | tee /tmp/godot-export.log
+          if grep -E "SCRIPT ERROR:|Parse Error:|Failed to load script|Compile Error:" /tmp/godot-export.log; then exit 1; fi
           test -s build/web/index.html
           touch build/web/.nojekyll
       - uses: actions/configure-pages@v5
