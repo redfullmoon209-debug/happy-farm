@@ -944,28 +944,169 @@ func give_feed() -> void:
         save_game()
     refresh_labels()
 
+func snapshot() -> Dictionary:
+    return {
+        "coins": coins,
+        "feed": feed,
+        "pigs": pigs,
+        "seeds": seeds.duplicate(),
+        "plots": plots.duplicate(true)
+    }
+
+func _apply_snapshot(state: Dictionary) -> void:
+    coins = int(state["coins"])
+    feed = int(state["feed"])
+    pigs = int(state["pigs"])
+    seeds = state["seeds"].duplicate()
+    plots = state["plots"].duplicate(true)
+
+func _set_save_indicator(label_text: String, is_good: bool) -> void:
+    save_status_text = label_text
+    save_status_ok = is_good
+    _refresh_save_indicator()
+
+func _refresh_save_indicator() -> void:
+    if save_status_label == null:
+        return
+    save_status_label.text = save_status_text
+    save_status_label.add_theme_color_override("font_color", Color("#317454") if save_status_ok else Color("#a46b3e"))
+    if bag_save_status != null:
+        bag_save_status.text = save_status_text + " (เฉพาะเครื่องนี้)"
+
 func load_save() -> void:
+    plots.clear()
     for i in range(24):
         plots.append({})
-    if not FileAccess.file_exists(SAVE): return
-    var file: FileAccess = FileAccess.open(SAVE,FileAccess.READ)
-    if file == null: return
-    var data: Variant = JSON.parse_string(file.get_as_text())
-    if not (data is Dictionary): return
-    coins = int(data.get("coins",250))
-    feed = int(data.get("feed",4))
-    pigs = int(data.get("pigs",1))
-    var saved_seeds: Variant = data.get("seeds",[])
-    var saved_plots: Variant = data.get("plots",[])
-    if saved_seeds is Array:
-        for i in range(mini(seeds.size(),saved_seeds.size())):
-            seeds[i] = maxi(0,int(saved_seeds[i]))
-    if saved_plots is Array:
-        for i in range(mini(plots.size(),saved_plots.size())):
-            if saved_plots[i] is Dictionary:
-                plots[i] = saved_plots[i]
+    var data: Dictionary = SAVE_DATA.load_from(SAVE)
+    if not data.is_empty():
+        _apply_snapshot(data)
+        _set_save_indicator("โหลดเซฟแล้ว", true)
+        return
+    if FileAccess.file_exists(SAVE):
+        var old_data: Dictionary = SAVE_DATA.load_from(SAVE_DATA.PREVIOUS)
+        if not old_data.is_empty():
+            _apply_snapshot(old_data)
+            _set_save_indicator("กู้เซฟเก่าแล้ว", true)
+            return
+        _set_save_indicator("เซฟอ่านไม่ได้", false)
+    else:
+        _set_save_indicator("ยังไม่มีเซฟ", false)
 
-func save_game() -> void:
-    var f: FileAccess = FileAccess.open(SAVE,FileAccess.WRITE)
-    if f != null:
-        f.store_string(JSON.stringify({"coins":coins,"feed":feed,"pigs":pigs,"seeds":seeds,"plots":plots}))
+func save_game() -> bool:
+    var okay: bool = SAVE_DATA.save_to(SAVE, snapshot())
+    if okay:
+        if OS.has_feature("web") and not OS.is_userfs_persistent():
+            _set_save_indicator("เซฟชั่วคราว", false)
+        else:
+            _set_save_indicator("บันทึกแล้ว", true)
+    else:
+        _set_save_indicator("เซฟไม่สำเร็จ", false)
+    return okay
+
+func export_save_backup() -> void:
+    var package_data: Dictionary = SAVE_DATA.package(snapshot())
+    var data_text: String = JSON.stringify(package_data, "  ")
+    var filename: String = "HappyFarm_Save_%d.json" % int(Time.get_unix_time_from_system())
+    if OS.has_feature("web"):
+        # Called synchronously from the inventory backup button.
+        JavaScriptBridge.download_buffer(data_text.to_utf8_buffer(), filename, "application/json")
+        message = "ตรวจสอบไฟล์เซฟในรายการดาวน์โหลดของเบราว์เซอร์"
+    else:
+        var native_path: String = "user://" + filename
+        var file: FileAccess = FileAccess.open(native_path, FileAccess.WRITE)
+        if file != null:
+            file.store_string(data_text)
+            file.close()
+            message = "สำรองเซฟไว้ที่ " + native_path
+        else:
+            message = "ไม่สามารถสร้างไฟล์สำรองได้"
+    refresh_labels()
+
+func request_import_backup() -> void:
+    if work_plot >= 0 or work_time > 0.0:
+        message = "รอชาวสวนทำงานเสร็จก่อนนำเข้าเซฟ"
+        refresh_labels()
+        return
+    if not OS.has_feature("web"):
+        message = "การนำเข้าเซฟรองรับ Chrome และ Safari เวอร์ชันเว็บ"
+        refresh_labels()
+        return
+    # Fixed JavaScript source; selected file content is never evaluated as code.
+    JavaScriptBridge.eval("""
+(function () {
+  var picker = document.createElement('input');
+  picker.type = 'file';
+  picker.accept = '.json,application/json';
+  picker.style.display = 'none';
+  document.body.appendChild(picker);
+  picker.onchange = function () {
+    var file = picker.files && picker.files[0];
+    if (!file) { picker.remove(); return; }
+    if (file.size > 524288) {
+      window.happyFarmReceiveSave('__HF_TOO_LARGE__');
+      picker.remove();
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function () {
+      window.happyFarmReceiveSave(String(reader.result || ''));
+      picker.remove();
+    };
+    reader.onerror = function () {
+      window.happyFarmReceiveSave('__HF_READ_ERROR__');
+      picker.remove();
+    };
+    reader.readAsText(file, 'UTF-8');
+  };
+  picker.click();
+})();
+""", true)
+
+func _on_browser_import(args: Array) -> void:
+    if args.is_empty():
+        return
+    var input_text: String = str(args[0])
+    if input_text == "__HF_TOO_LARGE__":
+        message = "ไฟล์ใหญ่เกิน 512 KB"
+        refresh_labels()
+        return
+    if input_text == "__HF_READ_ERROR__":
+        message = "อ่านไฟล์เซฟไม่สำเร็จ"
+        refresh_labels()
+        return
+    if input_text.to_utf8_buffer().size() > SAVE_DATA.MAX_BYTES:
+        message = "ไฟล์เซฟมีขนาดใหญ่เกินไป"
+        refresh_labels()
+        return
+    var state: Dictionary = SAVE_DATA.normalize(JSON.parse_string(input_text))
+    if state.is_empty():
+        message = "ไฟล์ไม่ถูกต้องหรือไม่ใช่เซฟ Happy Farm"
+        refresh_labels()
+        return
+    pending_restore = state
+    var total: int = 0
+    for value in state["seeds"]:
+        total += int(value)
+    restore_confirm.dialog_text = "ข้อมูลปัจจุบันในเครื่องนี้จะถูกแทนที่\n\nไฟล์ใหม่: %d เหรียญ / %d ซองเมล็ด\n\nแนะนำให้ดาวน์โหลดเซฟเดิมก่อน" % [state["coins"], total]
+    restore_confirm.popup_centered(Vector2i(440, 215))
+
+func _confirm_import_backup() -> void:
+    if pending_restore.is_empty():
+        return
+    if work_plot >= 0 or work_time > 0.0:
+        message = "รอชาวสวนทำงานเสร็จก่อนนำเข้าเซฟ"
+        refresh_labels()
+        return
+    var to_restore: Dictionary = pending_restore.duplicate(true)
+    pending_restore.clear()
+    _apply_snapshot(to_restore)
+    for i in range(grow_stages.size()):
+        grow_stages[i] = -1
+    refresh_plants()
+    bag_panel.visible = false
+    shop_panel.visible = false
+    if save_game():
+        message = "นำเข้าเซฟสำเร็จ! ตรวจสอบเงิน แปลง และกระเป๋าได้เลย"
+    else:
+        message = "นำเข้าข้อมูลแล้ว แต่เขียนเซฟในเครื่องไม่สำเร็จ"
+    refresh_labels()
