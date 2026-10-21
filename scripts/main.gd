@@ -3,6 +3,7 @@ extends Control
 # Happy Farm - native Godot 4 game for PC and Chrome (web export).
 const SAVE_PATH = "user://happy_farm.json"
 const ATLAS = preload("res://assets/tiny_farm.png")
+const PLOT_VIEW = preload("res://scripts/plot_view.gd")
 const FONT = preload("res://assets/NotoSansThai-Regular.ttf")
 const CROPS = [
     {"name":"แครอต", "icon":"🥕", "cost":8, "sell":18, "seconds":15},
@@ -35,6 +36,7 @@ var elapsed: float = 0.0
 var page: VBoxContainer
 var stat_label: Label
 var tab_row: HBoxContainer
+var plot_views: Array = []
 
 func _ready() -> void:
     load_state()
@@ -147,6 +149,7 @@ func render() -> void:
     if page == null:
         return
     clear_page()
+    plot_views.clear()
     label(page, "HAPPY FARM   |   ฟาร์มสุขใจ", 36, GREEN)
     label(page, "เหรียญ: %d     อาหารหมู: %d     หมู: %d ตัว" % [money, feed, pigs.size()], 22)
     var tabs := HBoxContainer.new()
@@ -199,25 +202,12 @@ func render_farm() -> void:
     page.add_child(grid)
     for i in range(plots.size()):
         var cell: Dictionary = plots[i]
-        var title := "ช่อง %02d\nว่าง" % (i + 1)
-        var color := SOIL
-        if not cell.is_empty():
-            var id := int(cell.get("seed", 0))
-            var plant: Dictionary = CROPS[id]
-            var seconds := float(plant["seconds"])
-            var age := Time.get_unix_time_from_system() - float(cell.get("time", 0))
-            var wet := bool(cell.get("wet", false))
-            if age >= seconds and wet:
-                title = "%s\nเก็บเกี่ยว!" % plant["name"]
-                color = GREEN
-            elif not wet:
-                title = "%s\nรดน้ำ!" % plant["name"]
-                color = Color("#936944")
-            else:
-                title = "%s\nรออีก %ds" % [plant["name"], int(maxf(0.0, seconds - age))]
-                color = Color("#9d7d48")
-        var b := button(grid, title, plot_pressed.bind(i), color)
-        b.custom_minimum_size.y = 92
+        var plot = PLOT_VIEW.new()
+        plot.custom_minimum_size = Vector2(120, 135)
+        plot.pressed.connect(plot_pressed.bind(i))
+        grid.add_child(plot)
+        plot.set_plot(cell, CROPS)
+        plot_views.append(plot)
     label(page, "คำแนะนำ: เมล็ดซื้อได้ที่ร้านค้า; ต้นไม้ผลไม้ในเวอร์ชันทดสอบปลูกและเก็บเกี่ยวเช่นเดียวกับผัก", 17)
 
 func change_mode(value: String) -> void:
@@ -255,6 +245,11 @@ func plot_pressed(i: int) -> void:
             status = "พืชยังไม่พร้อม ลองรดน้ำแล้วรอเติบโต"
     save_state()
     render()
+    if i < plot_views.size():
+        if mode == "water" and not plots[i].is_empty():
+            plot_views[i].animate_water()
+        else:
+            plot_views[i].animate_plant()
 
 func render_shop() -> void:
     label(page, "ร้านเมล็ดพันธุ์", 27, GREEN)
