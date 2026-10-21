@@ -18,7 +18,7 @@ const PATH = Color("#dfcf9b")
 var crop_id: int = -1
 var crop_name: String = ""
 var stage: int = 0
-var ready: bool = false
+var ripe: bool = false
 var wet: bool = false
 var progress: float = 0.0
 var water_left: float = 0.0
@@ -43,7 +43,7 @@ func set_plot(cell: Dictionary, all_crops: Array) -> void:
     var previous_stage: int = stage
     crop_id = -1
     crop_name = ""
-    ready = false
+    ripe = false
     wet = false
     progress = 0.0
     stage = 0
@@ -69,7 +69,7 @@ func set_plot(cell: Dictionary, all_crops: Array) -> void:
             stage = 4
         else:
             stage = 5
-        ready = wet and progress >= 1.0
+        ripe = wet and progress >= 1.0
     if previous_stage > 0 and stage > previous_stage:
         growth_pulse = 1.0
     queue_redraw()
@@ -122,7 +122,7 @@ func _draw() -> void:
     else:
         _draw_crop(w, h)
 
-    if ready:
+    if ripe:
         draw_rect(base.grow(-2.0), Color("#ffd65c"), false, 4.0)
         draw_circle(Vector2(w - 18.0, h - 18.0), 7.0, Color("#fff09b"))
     if water_left > 0.0:
@@ -133,7 +133,7 @@ func _draw() -> void:
     var title: String = "ว่าง" if crop_id < 0 else crop_name
     var subtitle: String = ""
     if crop_id >= 0:
-        if ready:
+        if ripe:
             subtitle = "เก็บเกี่ยว"
         elif not wet:
             subtitle = "รดน้ำ"
