@@ -1,55 +1,48 @@
-name: Export Godot Web & publish
+name: Happy Farm Clean - Godot Web
 on:
   push:
     branches: [main]
-    paths:
-      - 'project.godot'
-      - 'scripts/**'
-      - 'scenes/**'
-      - 'assets/**'
-      - 'export_presets.cfg'
-      - '.github/workflows/web.yml'
   workflow_dispatch:
 permissions:
   contents: read
   pages: write
   id-token: write
 concurrency:
-  group: pages
+  group: happy-farm-pages
   cancel-in-progress: true
 jobs:
-  export:
+  build:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Download Godot 4.4.1 editor and web templates
+      - name: Download Godot
         run: |
-          set -e
-          wget -q https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip
-          unzip -q Godot_v4.4.1-stable_linux.x86_64.zip
+          curl -fLsS --retry 3 https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o editor.zip
+          unzip -q editor.zip
           chmod +x Godot_v4.4.1-stable_linux.x86_64
-          wget -q https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz
+          curl -fLsS --retry 3 https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz -o templates.tpz
           mkdir -p "$HOME/.local/share/godot/export_templates/4.4.1.stable"
-          unzip -q Godot_v4.4.1-stable_export_templates.tpz -d template_unpack
-          cp -a template_unpack/templates/. "$HOME/.local/share/godot/export_templates/4.4.1.stable/"
-      - name: Import assets and check project
+          unzip -q templates.tpz -d downloaded_templates
+          cp -a downloaded_templates/templates/. "$HOME/.local/share/godot/export_templates/4.4.1.stable/"
+      - name: Strict GDScript validation
         run: |
-          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --editor --quit 2>&1 | tee /tmp/godot-import.log
-          if grep -E "SCRIPT ERROR:|Parse Error:|Failed to load script|Compile Error:" /tmp/godot-import.log; then exit 1; fi
-      - name: Build HTML5 single-thread
+          set -o pipefail
+          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --editor --quit 2>&1 | tee /tmp/import.log
+          if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script' /tmp/import.log; then exit 1; fi
+          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --quit-after 15 2>&1 | tee /tmp/runtime.log
+          if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|Invalid call|Invalid access|ERROR:' /tmp/runtime.log; then exit 1; fi
+      - name: Export web
         run: |
+          set -o pipefail
           mkdir -p build/web
-          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --export-release "Web" build/web/index.html 2>&1 | tee /tmp/godot-export.log
-          if grep -E "SCRIPT ERROR:|Parse Error:|Failed to load script|Compile Error:" /tmp/godot-export.log; then exit 1; fi
+          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --export-release Web build/web/index.html 2>&1 | tee /tmp/export.log
+          if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/export.log; then exit 1; fi
           test -s build/web/index.html
           touch build/web/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: build/web
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@v4
