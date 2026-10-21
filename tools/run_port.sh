@@ -42,15 +42,20 @@ fi
 echo "[3/4] Importing assets and exporting the Godot project to HTML5..."
 "$GODOT" --headless --path "$ROOT" --editor --quit
 mkdir -p "$ROOT/build/web"
-"$GODOT" --headless --path "$ROOT" --export-debug "Web" "$ROOT/build/web/index.html"
+"$GODOT" --headless --path "$ROOT" --export-release "Web" "$ROOT/build/web/index.html"
 
 if [[ ! -s "$ROOT/build/web/index.html" ]]; then
   echo "ERROR: Godot did not create build/web/index.html"
   exit 1
 fi
 
-echo "[4/4] Happy Farm is running at http://localhost:8080"
+echo "[4/4] Compressing Godot assets for faster browser loading..."
+for f in "$ROOT"/build/web/*.wasm "$ROOT"/build/web/*.pck "$ROOT"/build/web/*.js; do
+  if [[ -f "$f" ]]; then gzip -kf -1 "$f"; fi
+done
+
+echo "Happy Farm is running at http://localhost:8080"
 echo "In Codespaces, open the PORTS tab, find port 8080, and choose Open in Browser."
 echo "To test on your phone, copy the forwarded address; a private port requires GitHub sign-in."
 echo "Keep this terminal open while playing. Ctrl+C stops the test server."
-exec python3 -m http.server 8080 --bind 0.0.0.0 --directory "$ROOT/build/web"
+exec python3 "$ROOT/tools/web_server.py" "$ROOT/build/web" 8080
