@@ -3,6 +3,7 @@ extends Node3D
 const JOYSTICK = preload("res://scripts/Joystick.gd")
 const ICON = preload("res://scripts/BadgeIcon.gd")
 const SEED_ICON = preload("res://scripts/SeedIcon.gd")
+const SAVE_DATA = preload("res://scripts/SaveData.gd")
 const THAI = preload("res://assets/Sarabun-Regular.ttf")
 const THAI_BOLD = preload("res://assets/Sarabun-SemiBold.ttf")
 const SAVE = "user://happy_farm_clean.json"
@@ -88,6 +89,17 @@ var bag_summary: Label
 var bag_scroll: ScrollContainer
 var bag_grid: GridContainer
 var bag_footer: Label
+var bag_save_status: Label
+var bag_export_button: Button
+var bag_import_button: Button
+var save_chip: Panel
+var save_icon: Control
+var save_status_label: Label
+var save_status_text: String = "ยังไม่บันทึก"
+var save_status_ok: bool = false
+var restore_confirm: ConfirmationDialog
+var pending_restore: Dictionary = {}
+var browser_import_callback: JavaScriptObject
 var bag_cards: Array[Button] = []
 var bag_counts: Array[Label] = []
 var message: String = "เลือกเครื่องมือ แล้วแตะแปลงผัก"
@@ -103,6 +115,12 @@ func _ready() -> void:
     refresh_labels()
     update_camera()
     get_viewport().size_changed.connect(update_sizes)
+    if OS.has_feature("web"):
+        browser_import_callback = JavaScriptBridge.create_callback(_on_browser_import)
+        var web_window: JavaScriptObject = JavaScriptBridge.get_interface("window")
+        if web_window != null:
+            web_window.happyFarmReceiveSave = browser_import_callback
+    _refresh_save_indicator()
 
 func make_material(color: Color) -> StandardMaterial3D:
     var key: String = color.to_html()
@@ -591,6 +609,15 @@ func build_ui() -> void:
     feed_button = btn("ให้อาหาร", give_feed, Color("#b87b89"))
     ui_top.add_child(feed_button)
 
+    # Unobtrusive save indicator with a vector icon, not an emoji.
+    save_chip = panel(Color("#edf5e7f2"))
+    ui.add_child(save_chip)
+    save_icon = ICON.new()
+    save_icon.kind = "save"
+    save_chip.add_child(save_icon)
+    save_status_label = text_label("", 15, Color("#357652"))
+    save_chip.add_child(save_status_label)
+
     # Floating toolbar: only 118px tall instead of covering the farm.
     ui_bottom = panel(Color("#edf5e5f2"))
     ui.add_child(ui_bottom)
@@ -699,8 +726,22 @@ func build_ui() -> void:
         count.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         contents.add_child(count)
         bag_counts.append(count)
-    bag_footer = text_label("แตะเมล็ดเพื่อเลือกไปปลูก", 15, Color("#5c715c"))
+    bag_footer = text_label("แตะซองเมล็ดเพื่อเลือกไปปลูก", 15, Color("#5c715c"))
     bag_panel.add_child(bag_footer)
+    bag_save_status = text_label("เซฟเก็บอยู่ในเบราว์เซอร์เครื่องนี้", 14, Color("#487456"))
+    bag_panel.add_child(bag_save_status)
+    bag_export_button = btn("ดาวน์โหลดเซฟ", export_save_backup, Color("#397e62"))
+    bag_panel.add_child(bag_export_button)
+    bag_import_button = btn("นำเข้าเซฟ", request_import_backup, Color("#ab8054"))
+    bag_panel.add_child(bag_import_button)
+
+    restore_confirm = ConfirmationDialog.new()
+    restore_confirm.title = "ยืนยันนำเข้าเซฟ"
+    restore_confirm.dialog_text = "ข้อมูลปัจจุบันในเบราว์เซอร์จะถูกแทนที่"
+    restore_confirm.ok_button_text = "นำเข้าเซฟ"
+    restore_confirm.cancel_button_text = "ยกเลิก"
+    restore_confirm.confirmed.connect(_confirm_import_backup)
+    ui.add_child(restore_confirm)
 
     update_sizes()
     pick_tool("plant")
@@ -765,6 +806,12 @@ func update_sizes() -> void:
     set_box(shop_feed, 14, shop_h-57, shop_w-28, 43)
     shop_grid.columns = 1 if w < 440.0 else 2
 
+    # On narrow screens the badge sits below the header.
+    var badge_y: float = 8.0 if w > 960.0 else header_height+15.0
+    set_box(save_chip, w-171.0, badge_y, 160.0, 35.0)
+    set_box(save_icon, 7.0, 4.0, 26.0, 26.0)
+    set_box(save_status_label, 37.0, 7.0, 117.0, 25.0)
+
     # Inventory lives on the left. Never stretch it to the full game screen.
     var bag_top: float = 118.0 if narrow else 75.0
     var bag_width: float = minf(440.0, w*0.43) if w >= 900.0 else minf(385.0, w-20.0)
@@ -772,14 +819,18 @@ func update_sizes() -> void:
     var bag_bottom_margin: float = 155.0
     if touch_controls and w < 900.0:
         bag_bottom_margin = 303.0
-    var bag_height: float = maxf(182.0, h-bag_top-bag_bottom_margin)
+    var bag_height: float = maxf(278.0, minf(h-bag_top-12.0, h-bag_top-bag_bottom_margin))
     set_box(bag_panel, bag_x, bag_top, bag_width, bag_height)
     set_box(bag_header, 0, 0, bag_width, 60)
     set_box(bag_heading, 16, 12, bag_width-104, 35)
     set_box(bag_close, bag_width-76, 11, 63, 37)
     set_box(bag_summary, 15, 68, bag_width-30, 27)
-    set_box(bag_scroll, 12, 103, bag_width-24, maxf(64.0, bag_height-155.0))
-    set_box(bag_footer, 14, bag_height-43, bag_width-28, 29)
+    set_box(bag_scroll, 12, 103, bag_width-24, maxf(55.0, bag_height-220.0))
+    set_box(bag_footer, 14, bag_height-111.0, bag_width-28, 23)
+    set_box(bag_save_status, 14, bag_height-85.0, bag_width-28, 24)
+    var backup_button_width: float = (bag_width-36.0)*0.5
+    set_box(bag_export_button, 12, bag_height-54.0, backup_button_width, 41)
+    set_box(bag_import_button, 24.0+backup_button_width, bag_height-54.0, backup_button_width, 41)
     bag_grid.columns = 3 if bag_width >= 345.0 else 2
     for card in bag_cards:
         card.custom_minimum_size = Vector2(95.0, 119.0)
@@ -803,6 +854,7 @@ func refresh_labels() -> void:
     money_label.text = "เงิน %d  |  หมู %d  |  อาหาร %d" % [coins, pigs, feed]
     status_label.text = message
     active_seed_label.text = "เมล็ดที่เลือก: %s ×%d" % [CROPS[selected_seed]["name"], int(seeds[selected_seed])]
+    _refresh_save_indicator()
     refresh_bag_cards()
     for key in action_buttons.keys():
         action_buttons[key].modulate = Color.WHITE if key == tool_mode else Color("#bbcbbd")
