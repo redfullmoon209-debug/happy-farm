@@ -2,7 +2,8 @@ extends Node3D
 # Clean Happy Farm 3D. All gameplay is new; no legacy patches.
 const JOYSTICK = preload("res://scripts/Joystick.gd")
 const ICON = preload("res://scripts/BadgeIcon.gd")
-const THAI = preload("res://assets/NotoSansThai-Regular.ttf")
+const THAI = preload("res://assets/Sarabun-Regular.ttf")
+const THAI_BOLD = preload("res://assets/Sarabun-SemiBold.ttf")
 const SAVE = "user://happy_farm_clean.json"
 const CROPS = [
     {"name":"แครอต","price":8,"reward":19,"time":16.0,"tint":"#e9823d"},
@@ -69,8 +70,8 @@ var touch_controls: bool = false
 var message: String = "เลือกเครื่องมือ แล้วแตะแปลงผัก"
 
 func _ready() -> void:
-    # Noto Thai is used for Thai; default Godot font covers digits and Latin.
-    THAI.set_fallbacks([ThemeDB.fallback_font])
+    # Sarabun fully supports Thai, digits, Latin and punctuation.
+    ThemeDB.fallback_font = THAI
     load_save()
     build_scene()
     build_farmer()
@@ -523,33 +524,38 @@ func build_ui() -> void:
     ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
     layer.add_child(ui)
     ui_top = panel(Color("#e8f2e6f0"))
-    ui_top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+    ui_top.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+    ui_top.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
     ui.add_child(ui_top)
     var row: HBoxContainer = HBoxContainer.new()
     row.add_theme_constant_override("separation",6)
     ui_top.add_child(row)
-    var title: Label = text_label("ฟาร์มสุขใจ",24)
-    title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    var title: Label = text_label("ฟาร์มสุขใจ",21)
+    title.add_theme_font_override("font",THAI_BOLD)
     row.add_child(title)
-    money_label = text_label("",20)
+    money_label = text_label("",16)
     row.add_child(money_label)
     row.add_child(btn("ร้านค้า",show_shop,Color("#ae7c4f")))
-    row.add_child(btn("ให้อาหารหมู",give_feed,Color("#ae7683")))
+    row.add_child(btn("ให้อาหาร",give_feed,Color("#ae7683")))
     ui_bottom = panel(Color("#e8f2e6ed"))
-    ui_bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+    ui_bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+    ui_bottom.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
     ui.add_child(ui_bottom)
     var controls: VBoxContainer = VBoxContainer.new()
     controls.add_theme_constant_override("separation",5)
     ui_bottom.add_child(controls)
-    status_label = text_label("",17)
+    status_label = text_label("",15)
     controls.add_child(status_label)
     var seed_row: HBoxContainer = HBoxContainer.new()
-    seed_row.add_child(text_label("เมล็ดพันธุ์",17))
+    seed_row.add_child(text_label("เมล็ด",16))
     controls.add_child(seed_row)
     seed_select = OptionButton.new()
     seed_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     seed_select.add_theme_font_override("font",THAI)
-    seed_select.add_theme_font_size_override("font_size",17)
+    seed_select.add_theme_font_size_override("font_size",16)
+    seed_select.add_theme_font_override("font_selected", THAI)
+    seed_select.get_popup().add_theme_font_override("font",THAI)
+    seed_select.get_popup().add_theme_font_size_override("font_size",16)
     for i in range(CROPS.size()):
         seed_select.add_item(str(CROPS[i]["name"]),i)
     seed_select.item_selected.connect(select_seed)
@@ -577,7 +583,9 @@ func build_ui() -> void:
     jump_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
     jump_button.visible = touch_controls
     shop_panel = panel(Color("#f1f6ebfa"))
-    shop_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+    shop_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+    shop_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+    shop_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
     ui.add_child(shop_panel)
     shop_panel.visible = false
     var shop_body: VBoxContainer = VBoxContainer.new()
@@ -602,32 +610,71 @@ func build_ui() -> void:
     pick_tool("plant")
 
 func update_sizes() -> void:
-    if ui_top == null: return
+    if ui_top == null:
+        return
     var s: Vector2 = get_viewport().get_visible_rect().size
-    ui_top.offset_left = 9
-    ui_top.offset_right = -9
-    ui_top.offset_top = 8
-    ui_top.offset_bottom = 72 if s.x > 720 else 105
-    ui_bottom.offset_left = 9
-    ui_bottom.offset_right = -9
-    ui_bottom.offset_bottom = -9 if not touch_controls else -168
-    ui_bottom.offset_top = -148 if not touch_controls else -307
-    stick.offset_left = 18
-    stick.offset_right = 162
-    stick.offset_top = -158
-    stick.offset_bottom = -14
-    run_button.offset_left = -135
-    run_button.offset_right = -13
-    run_button.offset_top = -152
-    run_button.offset_bottom = -86
-    jump_button.offset_left = -135
-    jump_button.offset_right = -13
-    jump_button.offset_top = -78
-    jump_button.offset_bottom = -14
-    shop_panel.offset_left = -minf(330,s.x*0.47)
-    shop_panel.offset_right = minf(330,s.x*0.47)
-    shop_panel.offset_top = -minf(250,s.y*0.45)
-    shop_panel.offset_bottom = minf(250,s.y*0.45)
+    var narrow: bool = s.x < 760.0
+
+    # Compact floating panels: no stretched anchors, no covering the world.
+    ui_top.anchor_left = 0.0
+    ui_top.anchor_right = 0.0
+    ui_top.anchor_top = 0.0
+    ui_top.anchor_bottom = 0.0
+    ui_top.offset_left = 12.0
+    ui_top.offset_top = 12.0
+    ui_top.offset_right = minf(s.x - 12.0, 590.0)
+    ui_top.offset_bottom = 74.0
+
+    ui_bottom.anchor_left = 0.0
+    ui_bottom.anchor_right = 0.0
+    ui_bottom.anchor_top = 1.0
+    ui_bottom.anchor_bottom = 1.0
+    ui_bottom.offset_left = 12.0 if not touch_controls else 174.0
+    ui_bottom.offset_right = minf(s.x - (12.0 if not touch_controls else 144.0), 650.0)
+    ui_bottom.offset_top = -147.0
+    ui_bottom.offset_bottom = -12.0
+    if narrow:
+        ui_bottom.offset_left = 8.0
+        ui_bottom.offset_right = s.x - 8.0
+        ui_bottom.offset_top = -332.0 if touch_controls else -165.0
+        ui_bottom.offset_bottom = -172.0 if touch_controls else -8.0
+        ui_top.offset_right = s.x - 12.0
+
+    stick.anchor_left = 0.0
+    stick.anchor_right = 0.0
+    stick.anchor_top = 1.0
+    stick.anchor_bottom = 1.0
+    stick.offset_left = 18.0
+    stick.offset_right = 162.0
+    stick.offset_top = -158.0
+    stick.offset_bottom = -14.0
+
+    run_button.anchor_left = 1.0
+    run_button.anchor_right = 1.0
+    run_button.anchor_top = 1.0
+    run_button.anchor_bottom = 1.0
+    run_button.offset_left = -135.0
+    run_button.offset_right = -14.0
+    run_button.offset_top = -152.0
+    run_button.offset_bottom = -88.0
+
+    jump_button.anchor_left = 1.0
+    jump_button.anchor_right = 1.0
+    jump_button.anchor_top = 1.0
+    jump_button.anchor_bottom = 1.0
+    jump_button.offset_left = -135.0
+    jump_button.offset_right = -14.0
+    jump_button.offset_top = -80.0
+    jump_button.offset_bottom = -14.0
+
+    shop_panel.anchor_left = 0.5
+    shop_panel.anchor_right = 0.5
+    shop_panel.anchor_top = 0.5
+    shop_panel.anchor_bottom = 0.5
+    shop_panel.offset_left = -minf(310.0, s.x * 0.46)
+    shop_panel.offset_right = minf(310.0, s.x * 0.46)
+    shop_panel.offset_top = -minf(230.0, s.y * 0.43)
+    shop_panel.offset_bottom = minf(230.0, s.y * 0.43)
     update_camera()
 
 func point_on_ui(pos: Vector2) -> bool:
