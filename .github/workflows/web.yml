@@ -33,6 +33,11 @@ jobs:
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script' /tmp/import.log; then exit 1; fi
           ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --quit-after 15 2>&1 | tee /tmp/runtime.log
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|Invalid call|Invalid access|ERROR:' /tmp/runtime.log; then exit 1; fi
+      - name: Save backup regression tests
+        run: |
+          set -o pipefail
+          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_saves.gd 2>&1 | tee /tmp/save-tests.log
+          grep -q 'SAVE TESTS PASS' /tmp/save-tests.log
       - name: Export web
         run: |
           set -o pipefail
