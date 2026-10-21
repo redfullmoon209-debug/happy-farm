@@ -60,13 +60,22 @@ var ui: Control
 var status_label: Label
 var money_label: Label
 var seed_select: OptionButton
-var shop_panel: PanelContainer
+var shop_panel: Panel
 var action_buttons: Dictionary = {}
 var run_button: Button
 var jump_button: Button
-var ui_top: PanelContainer
-var ui_bottom: PanelContainer
+var ui_top: Panel
+var ui_bottom: Panel
 var touch_controls: bool = false
+var title_label: Label
+var shop_button: Button
+var feed_button: Button
+var seed_caption: Label
+var shop_heading: Label
+var shop_close: Button
+var shop_feed: Button
+var shop_scroll: ScrollContainer
+var shop_grid: GridContainer
 var message: String = "เลือกเครื่องมือ แล้วแตะแปลงผัก"
 
 func _ready() -> void:
@@ -481,200 +490,210 @@ func update_camera() -> void:
 func text_label(txt: String, font_size: int, color: Color = Color("#284c3a")) -> Label:
     var label: Label = Label.new()
     label.text = txt
-    label.add_theme_font_override("font",THAI)
-    label.add_theme_font_size_override("font_size",font_size)
-    label.add_theme_color_override("font_color",color)
-    label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    label.add_theme_font_override("font", THAI)
+    label.add_theme_font_size_override("font_size", font_size)
+    label.add_theme_color_override("font_color", color)
+    label.autowrap_mode = TextServer.AUTOWRAP_OFF
+    label.clip_text = true
+    label.mouse_filter = Control.MOUSE_FILTER_IGNORE
     return label
 
-func btn(txt: String, callback: Callable, background: Color=Color("#417c59")) -> Button:
+func btn(txt: String, callback: Callable, background: Color = Color("#417c59")) -> Button:
     var b: Button = Button.new()
     b.text = txt
     b.focus_mode = Control.FOCUS_NONE
-    b.custom_minimum_size = Vector2(88,44)
-    b.add_theme_font_override("font",THAI)
-    b.add_theme_font_size_override("font_size",18)
-    b.add_theme_color_override("font_color",Color.WHITE)
+    b.custom_minimum_size = Vector2.ZERO
+    b.add_theme_font_override("font", THAI_BOLD)
+    b.add_theme_font_size_override("font_size", 16)
+    b.add_theme_color_override("font_color", Color.WHITE)
+    b.clip_text = true
     var style: StyleBoxFlat = StyleBoxFlat.new()
     style.bg_color = background
-    style.set_corner_radius_all(13)
-    style.set_content_margin_all(6)
-    b.add_theme_stylebox_override("normal",style)
-    b.add_theme_stylebox_override("hover",style)
-    b.add_theme_stylebox_override("pressed",style)
+    style.set_corner_radius_all(10)
+    style.set_content_margin_all(3)
+    b.add_theme_stylebox_override("normal", style)
+    var hover: StyleBoxFlat = style.duplicate()
+    hover.bg_color = background.lightened(0.12)
+    b.add_theme_stylebox_override("hover", hover)
+    var down: StyleBoxFlat = style.duplicate()
+    down.bg_color = background.darkened(0.13)
+    b.add_theme_stylebox_override("pressed", down)
+    b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
     b.pressed.connect(callback)
     return b
 
-func panel(color: Color) -> PanelContainer:
-    var p: PanelContainer = PanelContainer.new()
+func panel(color: Color) -> Panel:
+    # Panel (not PanelContainer) never enlarges itself to fit its children.
+    var p: Panel = Panel.new()
     var style: StyleBoxFlat = StyleBoxFlat.new()
     style.bg_color = color
-    style.set_corner_radius_all(16)
-    style.set_content_margin_all(9)
-    p.add_theme_stylebox_override("panel",style)
+    style.set_corner_radius_all(13)
+    style.set_content_margin_all(0)
+    style.border_width_left = 1
+    style.border_width_top = 1
+    style.border_width_right = 1
+    style.border_width_bottom = 1
+    style.border_color = Color(1.0, 1.0, 1.0, 0.36)
+    p.add_theme_stylebox_override("panel", style)
+    p.mouse_filter = Control.MOUSE_FILTER_IGNORE
     return p
+
+func set_box(node: Control, x: float, y: float, w: float, h: float) -> void:
+    node.set_anchors_preset(Control.PRESET_TOP_LEFT)
+    node.position = Vector2(x, y)
+    node.size = Vector2(w, h)
 
 func build_ui() -> void:
     touch_controls = DisplayServer.is_touchscreen_available() or OS.has_feature("web_android") or OS.has_feature("web_ios")
     var layer: CanvasLayer = CanvasLayer.new()
     layer.layer = 4
     add_child(layer)
+
     ui = Control.new()
     ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
     layer.add_child(ui)
-    ui_top = panel(Color("#e8f2e6f0"))
-    ui_top.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-    ui_top.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+
+    # Compact information card: fixed dimensions, never stretched by labels.
+    ui_top = panel(Color("#edf5e5ed"))
     ui.add_child(ui_top)
-    var row: HBoxContainer = HBoxContainer.new()
-    row.add_theme_constant_override("separation",6)
-    ui_top.add_child(row)
-    var title: Label = text_label("ฟาร์มสุขใจ",21)
-    title.add_theme_font_override("font",THAI_BOLD)
-    row.add_child(title)
-    money_label = text_label("",16)
-    row.add_child(money_label)
-    row.add_child(btn("ร้านค้า",show_shop,Color("#ae7c4f")))
-    row.add_child(btn("ให้อาหาร",give_feed,Color("#ae7683")))
-    ui_bottom = panel(Color("#e8f2e6ed"))
-    ui_bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-    ui_bottom.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+    title_label = text_label("ฟาร์มสุขใจ", 20, Color("#315941"))
+    title_label.add_theme_font_override("font", THAI_BOLD)
+    ui_top.add_child(title_label)
+    var coin_icon: Control = ICON.new()
+    coin_icon.kind = "coin"
+    ui_top.add_child(coin_icon)
+    coin_icon.name = "CoinIcon"
+    money_label = text_label("", 16, Color("#375c49"))
+    ui_top.add_child(money_label)
+    shop_button = btn("ร้านค้า", show_shop, Color("#ad7c53"))
+    ui_top.add_child(shop_button)
+    feed_button = btn("ให้อาหาร", give_feed, Color("#b87b89"))
+    ui_top.add_child(feed_button)
+
+    # Floating toolbar: only 118px tall instead of covering the farm.
+    ui_bottom = panel(Color("#edf5e5f2"))
     ui.add_child(ui_bottom)
-    var controls: VBoxContainer = VBoxContainer.new()
-    controls.add_theme_constant_override("separation",5)
-    ui_bottom.add_child(controls)
-    status_label = text_label("",15)
-    controls.add_child(status_label)
-    var seed_row: HBoxContainer = HBoxContainer.new()
-    seed_row.add_child(text_label("เมล็ด",16))
-    controls.add_child(seed_row)
+    status_label = text_label("", 15, Color("#3f654b"))
+    ui_bottom.add_child(status_label)
+    seed_caption = text_label("เมล็ด", 16, Color("#365c44"))
+    ui_bottom.add_child(seed_caption)
     seed_select = OptionButton.new()
-    seed_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    seed_select.add_theme_font_override("font",THAI)
-    seed_select.add_theme_font_size_override("font_size",16)
-    seed_select.add_theme_font_override("font_selected", THAI)
-    seed_select.get_popup().add_theme_font_override("font",THAI)
-    seed_select.get_popup().add_theme_font_size_override("font_size",16)
+    seed_select.focus_mode = Control.FOCUS_NONE
+    seed_select.add_theme_font_override("font", THAI)
+    seed_select.add_theme_font_size_override("font_size", 16)
+    seed_select.get_popup().add_theme_font_override("font", THAI)
+    seed_select.get_popup().add_theme_font_size_override("font_size", 16)
+    seed_select.clip_text = true
     for i in range(CROPS.size()):
-        seed_select.add_item(str(CROPS[i]["name"]),i)
+        seed_select.add_item(str(CROPS[i]["name"]), i)
     seed_select.item_selected.connect(select_seed)
-    seed_row.add_child(seed_select)
-    var actions: GridContainer = GridContainer.new()
-    actions.columns = 4
-    actions.add_theme_constant_override("h_separation",5)
-    controls.add_child(actions)
+    ui_bottom.add_child(seed_select)
     for pair in [["till","พรวนดิน"],["plant","ปลูกผัก"],["water","รดน้ำ"],["harvest","เก็บเกี่ยว"]]:
-        var k: String = str(pair[0])
-        var button: Button = btn(str(pair[1]),pick_tool.bind(k),Color("#488765") if k!="water" else Color("#4d96af"))
-        button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        actions.add_child(button)
-        action_buttons[k] = button
+        var key: String = str(pair[0])
+        var button: Button = btn(str(pair[1]), pick_tool.bind(key), Color("#468566") if key != "water" else Color("#4d95ac"))
+        ui_bottom.add_child(button)
+        action_buttons[key] = button
+
+    # Independent phone controls: gameplay remains visible in the middle.
     stick = JOYSTICK.new()
     ui.add_child(stick)
-    stick.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
     stick.visible = touch_controls
-    run_button = btn("วิ่ง",toggle_run,Color("#518d77"))
+    run_button = btn("วิ่ง", toggle_run, Color("#538b77"))
     ui.add_child(run_button)
-    run_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
     run_button.visible = touch_controls
-    jump_button = btn("กระโดด",jump,Color("#cc9457"))
+    jump_button = btn("กระโดด", jump, Color("#ce9254"))
     ui.add_child(jump_button)
-    jump_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
     jump_button.visible = touch_controls
-    shop_panel = panel(Color("#f1f6ebfa"))
-    shop_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-    shop_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-    shop_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+
+    # Shop is an explicitly sized popup; scrolling happens inside its bounds.
+    shop_panel = panel(Color("#f4f8effa"))
     ui.add_child(shop_panel)
     shop_panel.visible = false
-    var shop_body: VBoxContainer = VBoxContainer.new()
-    shop_panel.add_child(shop_body)
-    var shop_header: HBoxContainer = HBoxContainer.new()
-    shop_body.add_child(shop_header)
-    var shop_title: Label = text_label("ร้านค้าเมล็ดพันธุ์",24)
-    shop_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    shop_header.add_child(shop_title)
-    shop_header.add_child(btn("ปิด",show_shop,Color("#787f7a")))
-    var shop_scroll: ScrollContainer = ScrollContainer.new()
-    shop_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    shop_body.add_child(shop_scroll)
-    var shop_grid: GridContainer = GridContainer.new()
+    shop_heading = text_label("ร้านค้าเมล็ดพันธุ์", 21, Color("#345841"))
+    shop_heading.add_theme_font_override("font", THAI_BOLD)
+    shop_panel.add_child(shop_heading)
+    shop_close = btn("ปิด", show_shop, Color("#73817a"))
+    shop_panel.add_child(shop_close)
+    shop_scroll = ScrollContainer.new()
+    shop_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    shop_panel.add_child(shop_scroll)
+    shop_grid = GridContainer.new()
     shop_grid.columns = 2
+    shop_grid.add_theme_constant_override("h_separation", 7)
+    shop_grid.add_theme_constant_override("v_separation", 7)
     shop_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     shop_scroll.add_child(shop_grid)
     for i in range(CROPS.size()):
-        shop_grid.add_child(btn("%s  %d" % [CROPS[i]["name"],CROPS[i]["price"]],buy_seed.bind(i)))
-    shop_body.add_child(btn("ซื้ออาหารหมู 5 ชุด ราคา 35 เหรียญ",buy_feed))
+        var buy: Button = btn("%s  %d เหรียญ" % [CROPS[i]["name"], CROPS[i]["price"]], buy_seed.bind(i))
+        buy.custom_minimum_size = Vector2(145, 39)
+        buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        shop_grid.add_child(buy)
+    shop_feed = btn("ซื้ออาหารหมู 5 ชุด (35 เหรียญ)", buy_feed, Color("#ad7c53"))
+    shop_panel.add_child(shop_feed)
+
     update_sizes()
     pick_tool("plant")
 
 func update_sizes() -> void:
     if ui_top == null:
         return
-    var s: Vector2 = get_viewport().get_visible_rect().size
-    var narrow: bool = s.x < 760.0
+    var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+    var w: float = viewport_size.x
+    var h: float = viewport_size.y
+    var narrow: bool = w < 720.0
+    var top_width: float = minf(w - 16.0, 615.0)
+    var top_height: float = 91.0 if narrow else 57.0
+    set_box(ui_top, 8.0, 8.0, top_width, top_height)
 
-    # Compact floating panels: no stretched anchors, no covering the world.
-    ui_top.anchor_left = 0.0
-    ui_top.anchor_right = 0.0
-    ui_top.anchor_top = 0.0
-    ui_top.anchor_bottom = 0.0
-    ui_top.offset_left = 12.0
-    ui_top.offset_top = 12.0
-    ui_top.offset_right = minf(s.x - 12.0, 590.0)
-    ui_top.offset_bottom = 74.0
-
-    ui_bottom.anchor_left = 0.0
-    ui_bottom.anchor_right = 0.0
-    ui_bottom.anchor_top = 1.0
-    ui_bottom.anchor_bottom = 1.0
-    ui_bottom.offset_left = 12.0 if not touch_controls else 174.0
-    ui_bottom.offset_right = minf(s.x - (12.0 if not touch_controls else 144.0), 650.0)
-    ui_bottom.offset_top = -147.0
-    ui_bottom.offset_bottom = -12.0
     if narrow:
-        ui_bottom.offset_left = 8.0
-        ui_bottom.offset_right = s.x - 8.0
-        ui_bottom.offset_top = -332.0 if touch_controls else -165.0
-        ui_bottom.offset_bottom = -172.0 if touch_controls else -8.0
-        ui_top.offset_right = s.x - 12.0
+        set_box(title_label, 12, 5, 125, 31)
+        set_box(ui_top.get_node("CoinIcon"), 140, 8, 24, 24)
+        set_box(money_label, 167, 7, maxf(60.0, top_width-176.0), 29)
+        var small_button_w: float = (top_width-30.0)*0.5
+        set_box(shop_button, 10, 43, small_button_w, 39)
+        set_box(feed_button, 20+small_button_w, 43, small_button_w, 39)
+    else:
+        set_box(title_label, 12, 13, 119, 32)
+        set_box(ui_top.get_node("CoinIcon"), 134, 16, 24, 24)
+        set_box(money_label, 161, 14, 235, 32)
+        set_box(shop_button, 400, 8, 90, 40)
+        set_box(feed_button, 497, 8, 108, 40)
 
-    stick.anchor_left = 0.0
-    stick.anchor_right = 0.0
-    stick.anchor_top = 1.0
-    stick.anchor_bottom = 1.0
-    stick.offset_left = 18.0
-    stick.offset_right = 162.0
-    stick.offset_top = -158.0
-    stick.offset_bottom = -14.0
+    var tool_width: float = minf(640.0, maxf(310.0, w - 20.0))
+    var tool_height: float = 116.0
+    var tool_x: float = (w-tool_width)*0.5
+    var tool_y: float = h-tool_height-11.0
+    if touch_controls:
+        if w >= 870.0:
+            tool_width = minf(625.0, w-330.0)
+            tool_x = (w-tool_width)*0.5
+        else:
+            tool_width = maxf(285.0, w-18.0)
+            tool_x = (w-tool_width)*0.5
+            tool_y = h-tool_height-171.0
+    set_box(ui_bottom, tool_x, tool_y, tool_width, tool_height)
+    set_box(status_label, 13, 6, tool_width-26, 25)
+    set_box(seed_caption, 13, 35, 48, 31)
+    set_box(seed_select, 64, 33, minf(222.0, tool_width-80.0), 34)
+    var gap: float = 6.0
+    var button_w: float = (tool_width-24.0-3.0*gap)*0.25
+    var labels: Array[String] = ["till", "plant", "water", "harvest"]
+    for i in range(4):
+        set_box(action_buttons[labels[i]], 12.0+float(i)*(button_w+gap), 73.0, button_w, 35.0)
 
-    run_button.anchor_left = 1.0
-    run_button.anchor_right = 1.0
-    run_button.anchor_top = 1.0
-    run_button.anchor_bottom = 1.0
-    run_button.offset_left = -135.0
-    run_button.offset_right = -14.0
-    run_button.offset_top = -152.0
-    run_button.offset_bottom = -88.0
+    set_box(stick, 18, h-158, 144, 144)
+    set_box(run_button, w-139, h-151, 123, 62)
+    set_box(jump_button, w-139, h-82, 123, 64)
 
-    jump_button.anchor_left = 1.0
-    jump_button.anchor_right = 1.0
-    jump_button.anchor_top = 1.0
-    jump_button.anchor_bottom = 1.0
-    jump_button.offset_left = -135.0
-    jump_button.offset_right = -14.0
-    jump_button.offset_top = -80.0
-    jump_button.offset_bottom = -14.0
-
-    shop_panel.anchor_left = 0.5
-    shop_panel.anchor_right = 0.5
-    shop_panel.anchor_top = 0.5
-    shop_panel.anchor_bottom = 0.5
-    shop_panel.offset_left = -minf(310.0, s.x * 0.46)
-    shop_panel.offset_right = minf(310.0, s.x * 0.46)
-    shop_panel.offset_top = -minf(230.0, s.y * 0.43)
-    shop_panel.offset_bottom = minf(230.0, s.y * 0.43)
+    var shop_w: float = minf(w-24.0, 490.0)
+    var shop_h: float = minf(h-24.0, 390.0)
+    set_box(shop_panel, (w-shop_w)*0.5, (h-shop_h)*0.5, shop_w, shop_h)
+    set_box(shop_heading, 15, 10, shop_w-105, 33)
+    set_box(shop_close, shop_w-85, 8, 73, 37)
+    set_box(shop_scroll, 14, 56, shop_w-28, maxf(90.0, shop_h-125.0))
+    set_box(shop_feed, 14, shop_h-57, shop_w-28, 43)
+    shop_grid.columns = 1 if w < 440.0 else 2
     update_camera()
 
 func point_on_ui(pos: Vector2) -> bool:
