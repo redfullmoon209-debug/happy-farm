@@ -1,0 +1,11 @@
+{
+  "name": "Happy Farm - Godot Web",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": {
+      "label": "Happy Farm (Chrome preview)",
+      "onAutoForward": "notify"
+    }
+  }
+}
