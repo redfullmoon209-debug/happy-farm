@@ -9,6 +9,11 @@ func _ready() -> void:
 func _draw() -> void:
     var c: Vector2 = size * 0.5
     match kind:
+        "save":
+            draw_rect(Rect2(c + Vector2(-10, -11), Vector2(20, 22)), Color("#3b8861"), true)
+            draw_rect(Rect2(c + Vector2(-6, -10), Vector2(11, 8)), Color("#e8f4ed"), true)
+            draw_rect(Rect2(c + Vector2(-7, 2), Vector2(14, 8)), Color("#b6d5c3"), true)
+            draw_rect(Rect2(c + Vector2(2, -9), Vector2(3, 6)), Color("#6b9c85"), true)
         "coin":
             draw_circle(c, 10, Color("#f8cc62"))
             draw_arc(c, 7.6, 0, TAU, 24, Color("#b9893e"), 2, true)
