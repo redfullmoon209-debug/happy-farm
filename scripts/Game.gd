@@ -92,6 +92,9 @@ var shop_close: Button
 var shop_feed: Button
 var shop_scroll: ScrollContainer
 var shop_grid: GridContainer
+var shop_livestock_label: Label
+var shop_pen_button: Button
+var shop_pig_button: Button
 var bag_button: Button
 var change_seed_button: Button
 var active_seed_label: Label
@@ -720,11 +723,13 @@ func build_ui() -> void:
     shop_panel = panel(Color("#f4f8effa"))
     ui.add_child(shop_panel)
     shop_panel.visible = false
-    shop_heading = text_label("ร้านค้าเมล็ดพันธุ์", 21, Color("#345841"))
+    shop_heading = text_label("ร้านค้าฟาร์มและสัตว์เลี้ยง", 21, Color("#345841"))
     shop_heading.add_theme_font_override("font", THAI_BOLD)
     shop_panel.add_child(shop_heading)
     shop_close = btn("ปิด", show_shop, Color("#73817a"))
     shop_panel.add_child(shop_close)
+    shop_livestock_label = text_label("", 15, Color("#426e55"))
+    shop_panel.add_child(shop_livestock_label)
     shop_scroll = ScrollContainer.new()
     shop_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
     shop_panel.add_child(shop_scroll)
@@ -739,8 +744,12 @@ func build_ui() -> void:
         buy.custom_minimum_size = Vector2(145, 39)
         buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         shop_grid.add_child(buy)
-    shop_feed = btn("ซื้ออาหารหมู 5 ชุด (35 เหรียญ)", buy_feed, Color("#ad7c53"))
+    shop_feed = btn("ซื้ออาหารหมู +5 (35 เหรียญ)", buy_feed, Color("#ad7c53"))
     shop_panel.add_child(shop_feed)
+    shop_pen_button = btn("ขยายคอกหมู", buy_pen, Color("#7c985d"))
+    shop_panel.add_child(shop_pen_button)
+    shop_pig_button = btn("ซื้อลูกหมู", buy_pig, Color("#bb7c91"))
+    shop_panel.add_child(shop_pig_button)
 
     # Dedicated seed inventory in the left-side area shown in the reference.
     # The panel is a fixed-size Panel, not a PanelContainer; it cannot grow.
@@ -823,8 +832,8 @@ func update_sizes() -> void:
     var view: Vector2 = get_viewport().get_visible_rect().size
     var w: float = view.x
     var h: float = view.y
-    var narrow: bool = w < 760.0
-    var header_width: float = minf(w-16.0, 782.0)
+    var narrow: bool = w < 960.0
+    var header_width: float = minf(w-16.0, 930.0)
     var header_height: float = 94.0 if narrow else 56.0
     set_box(ui_top, 8.0, 8.0, header_width, header_height)
 
@@ -839,10 +848,10 @@ func update_sizes() -> void:
     else:
         set_box(title_label, 12, 12, 115, 30)
         set_box(ui_top.get_node("CoinIcon"), 131, 15, 24, 24)
-        set_box(money_label, 158, 13, 239, 30)
-        set_box(bag_button, 402, 8, 118, 40)
-        set_box(shop_button, 527, 8, 104, 40)
-        set_box(feed_button, 638, 8, 134, 40)
+        set_box(money_label, 158, 13, 348, 30)
+        set_box(bag_button, 517, 8, 115, 40)
+        set_box(shop_button, 640, 8, 113, 40)
+        set_box(feed_button, 761, 8, 150, 40)
 
     # Small tool tray keeps the working 3D farm visible.
     var toolbar_width: float = minf(650.0, maxf(300.0, w-20.0))
@@ -869,12 +878,15 @@ func update_sizes() -> void:
     set_box(jump_button, w-139, h-82, 123, 64)
 
     var shop_w: float = minf(w-24.0, 490.0)
-    var shop_h: float = minf(h-24.0, 390.0)
+    var shop_h: float = minf(h-24.0, 490.0)
     set_box(shop_panel, (w-shop_w)*0.5, (h-shop_h)*0.5, shop_w, shop_h)
     set_box(shop_heading, 15, 10, shop_w-105, 33)
     set_box(shop_close, shop_w-85, 8, 73, 37)
-    set_box(shop_scroll, 14, 56, shop_w-28, maxf(90.0, shop_h-125.0))
-    set_box(shop_feed, 14, shop_h-57, shop_w-28, 43)
+    set_box(shop_livestock_label, 15, 48, shop_w-30, 28)
+    set_box(shop_scroll, 14, 79, shop_w-28, maxf(57.0, shop_h-260.0))
+    set_box(shop_feed, 14, shop_h-169, shop_w-28, 45)
+    set_box(shop_pen_button, 14, shop_h-116, shop_w-28, 45)
+    set_box(shop_pig_button, 14, shop_h-63, shop_w-28, 45)
     shop_grid.columns = 1 if w < 440.0 else 2
 
     # On narrow screens the badge sits below the header.
@@ -922,7 +934,17 @@ func point_on_ui(pos: Vector2) -> bool:
 func refresh_labels() -> void:
     if money_label == null:
         return
-    money_label.text = "เงิน %d  |  หมู %d  |  อาหาร %d" % [coins, pigs, feed]
+    if get_viewport().get_visible_rect().size.x < 960.0:
+        money_label.text = "เงิน %d | คอก %d | หมู %d/%d" % [coins, pens, pigs, pens*PEN_CAPACITY]
+    else:
+        money_label.text = "เงิน %d | คอก %d/%d | หมู %d/%d | อาหาร %d" % [coins, pens, MAX_PENS, pigs, pens*PEN_CAPACITY, feed]
+    money_label.add_theme_font_size_override("font_size", 14)
+    if shop_livestock_label != null:
+        shop_livestock_label.text = "คอก %d/%d  |  หมู %d/%d ตัว" % [pens, MAX_PENS, pigs, pens*PEN_CAPACITY]
+        shop_pen_button.text = "ขยายคอกหมู +1 (ราคา %d เหรียญ)" % pen_price() if pens < MAX_PENS else "คอกเต็มแล้ว (%d คอก)" % MAX_PENS
+        shop_pig_button.text = "ซื้อลูกหมู +1 (%d เหรียญ)" % PIG_PRICE if pigs < pens*PEN_CAPACITY else "คอกเต็ม! ซื้อคอกเพิ่มก่อน"
+        shop_pen_button.disabled = pens >= MAX_PENS
+        shop_pig_button.disabled = pigs >= pens*PEN_CAPACITY
     status_label.text = message
     active_seed_label.text = "เมล็ดที่เลือก: %s ×%d" % [CROPS[selected_seed]["name"], int(seeds[selected_seed])]
     _refresh_save_indicator()
@@ -1006,6 +1028,33 @@ func buy_feed() -> void:
         message = "เงินไม่พอ"
     refresh_labels()
 
+func buy_pen() -> void:
+    if pens >= MAX_PENS:
+        message = "ขยายคอกครบ %d คอกแล้ว" % MAX_PENS
+    elif coins < pen_price():
+        message = "เหรียญไม่พอสำหรับขยายคอก"
+    else:
+        var cost: int = pen_price()
+        coins -= cost
+        pens += 1
+        rebuild_livestock()
+        message = "ขยายคอกหมูสำเร็จ! มีพื้นที่เลี้ยงได้ %d ตัว" % (pens*PEN_CAPACITY)
+        save_game()
+    refresh_labels()
+
+func buy_pig() -> void:
+    if pigs >= pens*PEN_CAPACITY:
+        message = "คอกเต็มแล้ว! ขยายคอกเพิ่มก่อนซื้อหมู"
+    elif coins < PIG_PRICE:
+        message = "เหรียญไม่พอสำหรับซื้อลูกหมู"
+    else:
+        coins -= PIG_PRICE
+        pigs += 1
+        rebuild_livestock()
+        message = "มีลูกหมูตัวใหม่แล้ว! ตอนนี้เลี้ยง %d ตัว" % pigs
+        save_game()
+    refresh_labels()
+
 func give_feed() -> void:
     if feed <= 0:
         message = "อาหารหมูหมดแล้ว"
@@ -1020,6 +1069,7 @@ func snapshot() -> Dictionary:
         "coins": coins,
         "feed": feed,
         "pigs": pigs,
+        "pens": pens,
         "seeds": seeds.duplicate(),
         "plots": plots.duplicate(true)
     }
@@ -1028,6 +1078,7 @@ func _apply_snapshot(state: Dictionary) -> void:
     coins = int(state["coins"])
     feed = int(state["feed"])
     pigs = int(state["pigs"])
+    pens = int(state["pens"])
     seeds = state["seeds"].duplicate()
     plots = state["plots"].duplicate(true)
 
@@ -1046,7 +1097,7 @@ func _refresh_save_indicator() -> void:
 
 func load_save() -> void:
     plots.clear()
-    for i in range(24):
+    for i in range(FARM_ROWS*FARM_COLUMNS):
         plots.append({})
     var data: Dictionary = SAVE_DATA.load_from(SAVE)
     if not data.is_empty():
@@ -1171,6 +1222,7 @@ func _confirm_import_backup() -> void:
     var to_restore: Dictionary = pending_restore.duplicate(true)
     pending_restore.clear()
     _apply_snapshot(to_restore)
+    rebuild_livestock()
     for i in range(grow_stages.size()):
         grow_stages[i] = -1
     refresh_plants()
