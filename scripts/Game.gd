@@ -708,7 +708,8 @@ func update_camera() -> void:
     camera.position = camera_focus + offset * camera_distance
     camera.look_at(camera_focus)
     var factor: float = 0.82 if aspect > 1.3 else (1.07 if aspect > 0.82 else 1.40)
-    camera.size = clampf(camera_distance * factor, 4.0, 120.0)
+    var close_factor: float = lerpf(0.75, 1.0, smoothstep(12.0, 30.0, camera_distance))
+    camera.size = clampf(camera_distance * factor * close_factor, 3.6, 120.0)
 
 func text_label(txt: String, font_size: int, color: Color = Color("#284c3a")) -> Label:
     var label: Label = Label.new()
@@ -991,7 +992,9 @@ func update_sizes() -> void:
     var toolbar_width: float = minf(650.0, maxf(300.0, w-20.0))
     var toolbar_y: float = h-127.0
     if touch_controls:
-        if w >= 900.0:
+        # In landscape, reserve both side rails for joystick and buttons.
+        # In portrait, place the farming toolbar above the bottom controls.
+        if w >= 700.0:
             toolbar_width = minf(570.0, w-340.0)
         else:
             toolbar_width = w-18.0
@@ -1011,8 +1014,9 @@ func update_sizes() -> void:
     set_box(stick_label, 26, h-184, 128, 27)
     set_box(run_button, w-139, h-151, 123, 62)
     set_box(jump_button, w-139, h-82, 123, 64)
-    set_box(zoom_out_button, w-142, h-218, 62, 55)
-    set_box(zoom_in_button, w-73, h-218, 62, 55)
+    var zoom_buttons_y: float = h-218.0 if w >= 700.0 else h-356.0
+    set_box(zoom_out_button, w-142, zoom_buttons_y, 62, 55)
+    set_box(zoom_in_button, w-73, zoom_buttons_y, 62, 55)
     stick.queue_redraw()
 
     var shop_w: float = minf(w-24.0, 490.0)
