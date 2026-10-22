@@ -74,6 +74,7 @@ var touch_down: Vector2
 var touch_last: Vector2
 var cam_dragged: bool = false
 var stick: Control
+var stick_label: Label
 var ui: Control
 var status_label: Label
 var money_label: Label
@@ -747,6 +748,10 @@ func build_ui() -> void:
     stick = JOYSTICK.new()
     ui.add_child(stick)
     stick.visible = true
+    stick_label = text_label("เดินอิสระ", 17, Color("#23533c"))
+    stick_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    stick_label.add_theme_font_override("font", THAI_BOLD)
+    ui.add_child(stick_label)
     run_button = btn("วิ่ง", toggle_run, Color("#538b77"))
     ui.add_child(run_button)
     run_button.visible = true
@@ -909,6 +914,7 @@ func update_sizes() -> void:
         set_box(action_buttons[keys[i]], 12.0+float(i)*(tool_button_w+gap), 75.0, tool_button_w, 34.0)
 
     set_box(stick, 18, h-158, 144, 144)
+    set_box(stick_label, 26, h-184, 128, 27)
     set_box(run_button, w-139, h-151, 123, 62)
     set_box(jump_button, w-139, h-82, 123, 64)
     stick.queue_redraw()
