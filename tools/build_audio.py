@@ -62,7 +62,7 @@ def music(t):
     beat_phase = bar_phase % BEAT
     half_idx = int(bar_phase / (BEAT / 2))
     half_phase = bar_phase % (BEAT / 2)
-    eighth = min(31, int(t / (BEAT / 2)))
+    eighth = int(t / (BEAT / 2)) % len(MELODY)
     note = MELODY[eighth]
     # A warm background electric-piano pad.
     pad = 0.0
