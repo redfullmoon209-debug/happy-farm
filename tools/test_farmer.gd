@@ -14,13 +14,43 @@ func _check() -> void:
         problems.append("no joystick")
     if farm.jump_button == null or farm.run_button == null:
         problems.append("run/jump buttons missing")
+    if not farm.touch_controls or not farm.stick.is_visible_in_tree():
+        problems.append("joystick must be visible automatically on PC web")
+    if not farm.run_button.is_visible_in_tree() or not farm.jump_button.is_visible_in_tree():
+        problems.append("run and jump buttons must be visible automatically")
+    if farm.stick_label == null or not farm.stick_label.is_visible_in_tree():
+        problems.append("joystick heading is missing")
+
+    var screen: Rect2 = Rect2(Vector2.ZERO, farm.get_viewport().get_visible_rect().size)
+    if not screen.encloses(farm.stick.get_global_rect()):
+        problems.append("joystick extends beyond game viewport")
+    if not screen.encloses(farm.run_button.get_global_rect()) or not screen.encloses(farm.jump_button.get_global_rect()):
+        problems.append("run or jump button extends outside game")
+
+    # Test a real mouse drag on the on-screen joystick (Chrome desktop).
+    # ScreenTouch is supported by the same Joystick script on Android/iPhone.
+    var center: Vector2 = farm.stick.get_global_rect().get_center()
+    var press: InputEventMouseButton = InputEventMouseButton.new()
+    press.button_index = MOUSE_BUTTON_LEFT
+    press.pressed = true
+    press.position = center
+    farm.stick._input(press)
+    var motion: InputEventMouseMotion = InputEventMouseMotion.new()
+    motion.position = center + Vector2(53, -27)
+    farm.stick._input(motion)
+    if farm.stick.direction.x < 0.5 or farm.stick.direction.y > -0.25:
+        problems.append("mouse drag does not update analog joystick direction")
 
     # Emulate a held analog stick: it must translate the farm actor freely.
     var before: Vector3 = farm.farmer.position
-    farm.stick.visible = true
-    farm.stick.set("direction", Vector2(0.5, -0.75))
     farm._process(0.15)
-    farm.stick.set("direction", Vector2.ZERO)
+    var release: InputEventMouseButton = InputEventMouseButton.new()
+    release.button_index = MOUSE_BUTTON_LEFT
+    release.pressed = false
+    release.position = motion.position
+    farm.stick._input(release)
+    if farm.stick.direction.length() > 0.01:
+        problems.append("joystick did not return to center after releasing")
     var travelled: float = Vector2(
         farm.farmer.position.x - before.x,
         farm.farmer.position.z - before.z
@@ -29,9 +59,14 @@ func _check() -> void:
         problems.append("joystick movement did not move player")
 
     var jump_before: float = farm.jump_velocity
-    farm.jump()
+    farm.jump_button.pressed.emit()
     if farm.jump_velocity <= jump_before:
-        problems.append("jump input did not trigger")
+        problems.append("jump button did not trigger")
+    var initial_running: bool = farm.run_toggle
+    farm.run_button.pressed.emit()
+    if farm.run_toggle == initial_running:
+        problems.append("run button did not toggle sprint")
+    farm.run_button.pressed.emit()
     if ResourceLoader.exists("res://assets/characters/femalefarmer.fbx"):
         var meshes: Array[MeshInstance3D] = []
         _log_model_nodes(farm.farmer_visual, meshes)
