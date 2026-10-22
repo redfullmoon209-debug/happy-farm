@@ -70,3 +70,35 @@ on mobile browsers. Tap plots to walk to farming tasks.
 - The joystick does not consume right-hand touches; a second finger can
   interact with the camera and independent buttons.
 
+
+## Original music, interactive sound and Thai farmer voice
+
+Happy Farm uses a custom synthesized 8-bar background theme composed in
+`tools/build_audio.py` (no copyrighted third-party tune) and eight matching
+Foley effects for hoeing, planting, watering, harvesting, purchasing, pig oinks,
+jumping and walking. The same soundtrack automatically loops in Chrome and
+mobile browsers. The `FarmAudio.gd` controller fades the music during speech.
+
+Recorded female Thai voice lines, generated for this project and stored locally
+in `assets/audio/voice_*.mp3`, are:
+
+- Idle near empty, plantable beds: "โอ๊ย ฉันอยากปลูกผักจังเลย"
+- Immediately after planting or beside a planted but dry bed: "รดน้ำหน่อยจ้า"
+- When crops are ripe nearby or just harvested: "เก็บเกี่ยวได้แล้วจ้า เอาไปขายจ้า"
+
+Speech has per-event cooldowns to avoid repetitive announcements and clear
+on-screen subtitles. A dedicated **เปิดเสียง / เสียง: เปิด / เสียง: ปิด**
+button appears beside the save status, and audio preferences persist separately
+from farm save data in `user://happy_farm_audio.cfg`.
+
+**Browser note:** Chrome, Safari and many mobile platforms prevent background
+sound from starting without a user interaction. Tap the game, joystick,
+sound button or a farm tool to start the music. Muting stops music, voice and
+effects together, without affecting game saves or player progress.
+
+Before Godot export, `tools/prepare_audio.sh` ensures all authored assets
+are available. The first GitHub Actions build bundles the MP3 Thai recordings
+and synthesizes the original theme and Foley. The build also attempts to store
+the audio files permanently in GitHub, so future builds need no external audio
+service. Run `bash tools/prepare_audio.sh` locally when building the game
+from source for the first time.
