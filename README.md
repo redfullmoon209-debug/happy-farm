@@ -21,8 +21,10 @@ A new Godot 4.4.1 project written from scratch on 22 October 2026.
 
 - Spread two fingers on the world to zoom in; bring them together to zoom out.
   The orthographic camera and its position update together. Zoom is bounded to
-  6–78 world units: close views follow the farmer, while the far view fits all
-  50 beds at the default orbit on PC, landscape phones and portrait phones.
+  6–78 world units. The camera follows the farmer at every zoom distance,
+  including walking to a selected plot, while preserving the chosen orbit.
+  The far view fits all 50 beds from the starting area at the default orbit
+  on PC, landscape phones and portrait phones.
 - Drag one world finger to orbit. A short single tap works a plot only on
   release; a drag, pinch or canceled gesture never becomes a plot tap.
 - Each finger keeps the control it started on until release. Hold the joystick
@@ -42,8 +44,8 @@ godot --headless --path . --script res://tools/test_camera.gd
 
 The suite uses the real Input/Viewport pipeline with touch-to-mouse emulation
 enabled. It checks finger ownership, pinch direction/limits, UI/plot separation,
-interruptions, PC controls and projected bounds of all 50 beds. GitHub Actions
-runs it before Web Export.
+interruptions, PC controls, following at all zooms and projected bounds of all
+50 beds. GitHub Actions runs it before Web Export.
 
 **iPhone device checks still required:** in Safari, try both orientations,
 joystick + pinch + Run/Jump, lifting either pinch finger, and switching away

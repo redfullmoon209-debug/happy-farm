@@ -252,13 +252,33 @@ func build_scene() -> void:
     cube(self, Vector3(13.1,0,0), Vector3(1.7,0.04,21.0), Color("#d2c397"))
 
     var house: Node3D = Node3D.new()
+    house.name = "FarmHouse"
     house.position = Vector3(-19.0,0,-8.4)
     add_child(house)
     cube(house, Vector3(0,1.5,0), Vector3(4.5,3,3.9), Color("#efdebb"))
-    var roof_l: MeshInstance3D = cube(house,Vector3(-1.10,3.26,0),Vector3(3.05,0.32,4.5),Color("#a8584d"))
-    roof_l.rotation.z = -0.59
-    var roof_r: MeshInstance3D = cube(house,Vector3(1.10,3.26,0),Vector3(3.05,0.32,4.5),Color("#a8584d"))
-    roof_r.rotation.z = 0.59
+    # Both slopes meet at a raised ridge; the eaves overhang the 3m walls.
+    var roof_pitch: float = 0.59
+    var roof_half_span: float = 2.55
+    var roof_thickness: float = 0.32
+    var roof_eave_height: float = 3.12
+    var roof_center_height: float = roof_eave_height + roof_half_span * 0.5 * tan(roof_pitch)
+    var roof_dimensions: Vector3 = Vector3(roof_half_span / cos(roof_pitch), roof_thickness, 4.5)
+    var roof_l: MeshInstance3D = cube(house,Vector3(-roof_half_span * 0.5,roof_center_height,0),roof_dimensions,Color("#a8584d"))
+    roof_l.name = "RoofLeft"
+    roof_l.rotation.z = roof_pitch
+    var roof_r: MeshInstance3D = cube(house,Vector3(roof_half_span * 0.5,roof_center_height,0),roof_dimensions,Color("#a8584d"))
+    roof_r.name = "RoofRight"
+    roof_r.rotation.z = -roof_pitch
+    # Close the triangular attic ends up to the underside of the roof.
+    var gable_height: float = roof_eave_height + roof_half_span * tan(roof_pitch) - roof_thickness * 0.5 / cos(roof_pitch) - 3.0
+    var gable_mesh: PrismMesh = PrismMesh.new()
+    gable_mesh.size = Vector3(4.5,gable_height,3.9)
+    var gable: MeshInstance3D = MeshInstance3D.new()
+    gable.name = "Gable"
+    gable.mesh = gable_mesh
+    gable.position = Vector3(0,3.0 + gable_height * 0.5,0)
+    gable.material_override = make_material(Color("#efdebb"))
+    house.add_child(gable)
     cube(house, Vector3(0,1.05,2), Vector3(1.10,2.1,0.1), Color("#936e50"))
     cube(house, Vector3(-1.4,2,2.02), Vector3(0.75,0.9,0.1), Color("#7db4c3"))
     cube(house, Vector3(1.4,2,2.02), Vector3(0.75,0.9,0.1), Color("#7db4c3"))
@@ -578,9 +598,8 @@ func _process(delta: float) -> void:
             footstep_timer = 0.29 if running else 0.46
     else:
         footstep_timer = minf(footstep_timer, 0.15)
-    # On a close-up view, keep the real farmer centered while they walk.
-    if camera_distance < 30.0:
-        update_camera()
+    # Follow after every movement source, at every zoom distance.
+    update_camera()
     # Keep the skeleton animation aligned to actual movement, not just inputs:
     # keyboard, touchscreen stick and automatic farm work share this state.
     if farmer_visual != null and farmer_visual.is_model_ready():
@@ -841,13 +860,11 @@ func update_camera() -> void:
         return
     var screen: Vector2 = get_viewport().get_visible_rect().size
     var aspect: float = screen.x / maxf(1.0, screen.y)
-    # A far view shows the whole farm; close zoom focuses on the actual
-    # skinned character instead of an empty spot in the middle of the map.
-    var focus_mix: float = 1.0 - smoothstep(14.0, 31.0, camera_distance)
-    var subject: Vector3 = CENTER
+    # Orbit around the farmer at every zoom, with a steady ground-height
+    # focus so jumping and the walking bob do not shake the camera.
+    camera_focus = CENTER
     if farmer != null:
-        subject = Vector3(farmer.position.x, 1.0, farmer.position.z)
-    camera_focus = CENTER.lerp(subject, focus_mix)
+        camera_focus = Vector3(farmer.position.x, 1.0, farmer.position.z)
     var offset: Vector3 = Vector3(
         sin(camera_yaw) * cos(camera_pitch),
         -sin(camera_pitch),

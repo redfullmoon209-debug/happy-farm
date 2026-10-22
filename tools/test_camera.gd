@@ -306,6 +306,38 @@ func _check() -> void:
     mouse(MOUSE_BUTTON_LEFT, false, a)
     expect(farm.plot_taps == 1, "real PC mouse plot click must be preserved")
 
+    # Following must work at close, intermediate, default and maximum zoom,
+    # including free walking and the automatic approach to a farming task.
+    reset()
+    var starting_position: Vector3 = farm.farmer.position
+    for zoom: float in [6.0, 18.0, 39.0, 78.0]:
+        farm.farmer.position = starting_position
+        farm.set_camera_zoom(zoom)
+        var camera_before: Vector3 = farm.camera.position
+        var focus_before: Vector3 = farm.camera_focus
+        var subject_before: Vector2 = farm.camera.unproject_position(Vector3(farm.farmer.position.x, 1.0, farm.farmer.position.z))
+        farm.stick.direction = Vector2(0.8, -0.6)
+        farm._process(0.1)
+        var displacement: Vector3 = farm.farmer.position - starting_position
+        displacement.y = 0.0
+        expect(displacement.length() > 0.1, "follow fixture must actually walk: " + str(zoom))
+        expect((farm.camera.position - camera_before).is_equal_approx(displacement), "camera must follow walking at every zoom: " + str(zoom))
+        expect((farm.camera_focus - focus_before).is_equal_approx(displacement), "orbit pivot must follow the farmer: " + str(zoom))
+        var subject_after: Vector2 = farm.camera.unproject_position(Vector3(farm.farmer.position.x, 1.0, farm.farmer.position.z))
+        expect(subject_after.distance_to(subject_before) < 0.1 and is_equal_approx(farm.camera_distance, zoom), "following must preserve framing and zoom: " + str(zoom))
+        farm.stick.direction = Vector2.ZERO
+        var auto_before: Vector3 = farm.farmer.position
+        camera_before = farm.camera.position
+        farm.work_plot = 0
+        farm.actor_goal = auto_before + Vector3(2.0, 0.0, 2.0)
+        farm._process(0.1)
+        displacement = farm.farmer.position - auto_before
+        displacement.y = 0.0
+        expect(displacement.length() > 0.1 and (farm.camera.position - camera_before).is_equal_approx(displacement), "camera must follow automatic farm approach: " + str(zoom))
+        farm.work_plot = -1
+    farm.farmer.position = starting_position
+    reset()
+
     # Check projected bed corners at maximum zoom on desktop and phone aspects.
     # Camera.size alone is not enough to prove a 50-bed map fits the viewport.
     reset()
@@ -339,7 +371,7 @@ func _check() -> void:
     farm = null
     await process_frame
     if problems.is_empty():
-        print("CAMERA TESTS PASS: %d checks (multitouch ownership, emulated mouse, cancellation, PC controls, 50-bed bounds)" % checks)
+        print("CAMERA TESTS PASS: %d checks (multitouch ownership, emulated mouse, cancellation, PC controls, follow at all zooms, 50-bed bounds)" % checks)
         quit(0)
     else:
         for problem in problems:
