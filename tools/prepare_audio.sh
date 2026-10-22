@@ -6,10 +6,6 @@ if [ ! -s assets/audio/farm_theme.wav ]; then
   echo "Composing original farm background theme and action Foley."
   python3 tools/build_audio.py
 fi
-if ! command -v ffmpeg >/dev/null 2>&1; then
-  echo "ERROR: ffmpeg is required to normalize speech to Godot 16-bit WAV."
-  exit 1
-fi
 fetch_voice() {
   local name="$1"
   local url="$2"
@@ -22,7 +18,18 @@ fetch_voice() {
   temp="$(mktemp --suffix=.wav)"
   curl --fail --location --silent --show-error --retry 3 --connect-timeout 15 --max-time 120 "$url" --output "$temp"
   test -s "$temp"
-  ffmpeg -hide_banner -loglevel error -y -i "$temp" -ar 22050 -ac 1 -c:a pcm_s16le "assets/audio/$name.wav"
+  # HeyGen produces regular PCM WAV; verify its header with stdlib only.
+  python3 - "$temp" "assets/audio/$name.wav" <<'PY'
+import sys, wave, shutil
+incoming, target = sys.argv[1:3]
+with wave.open(incoming, "rb") as clip:
+    print("VOICE WAV FORMAT:", target, "channels=", clip.getnchannels(),
+          "rate=", clip.getframerate(), "bytes=", clip.getsampwidth(),
+          "frames=", clip.getnframes())
+    if clip.getsampwidth() != 2 or clip.getcomptype() != "NONE":
+        raise ValueError("Expected Godot-compatible uncompressed PCM16 WAV")
+shutil.copyfile(incoming, target)
+PY
   test -s "assets/audio/$name.wav"
   rm -f "$temp"
 }
