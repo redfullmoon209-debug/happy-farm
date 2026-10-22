@@ -16,7 +16,7 @@ func _run_checks() -> void:
     if level == null:
         quit(1)
         return
-    var game: Node3D = level.instantiate()
+    var game: Variant = level.instantiate()
     root.add_child(game)
 
     check(game.plot_places.size() == 50, "50 clickable plot coordinates")
