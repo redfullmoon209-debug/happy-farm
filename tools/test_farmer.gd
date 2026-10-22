@@ -33,6 +33,18 @@ func _check() -> void:
     if farm.jump_velocity <= jump_before:
         problems.append("jump input did not trigger")
     if ResourceLoader.exists("res://assets/characters/femalefarmer.fbx"):
+        var meshes: Array[MeshInstance3D] = []
+        _log_model_nodes(farm.farmer_visual, meshes)
+        print("MODEL DIAGNOSTIC: mesh count=", meshes.size())
+        if farm.farmer_visual != null:
+            print("MODEL DIAGNOSTIC: local visual=", farm.farmer_visual.transform)
+            print("MODEL DIAGNOSTIC: parent farmer=", farm.farmer.position)
+            print("MODEL DIAGNOSTIC: rig skeleton=", farm.farmer_visual.skeleton)
+        for obj in meshes:
+            var aabb: AABB = obj.get_aabb()
+            var transform: Transform3D = obj.global_transform
+            var bound_world: AABB = transform * aabb
+            print("MODEL DIAGNOSTIC: mesh path=", obj.get_path(), " visible=", obj.is_visible_in_tree(), " material=", obj.material_override, " aabb=", aabb, " world=", bound_world, " transform=", transform)
         if farm.farmer_visual == null or not farm.farmer_visual.is_model_ready():
             problems.append("rigged female FBX not loaded")
         else:
@@ -46,3 +58,13 @@ func _check() -> void:
         for err in problems:
             printerr("FARMER TEST FAIL: " + err)
         quit(1)
+
+func _log_model_nodes(n: Node, out_meshes: Array[MeshInstance3D], depth: int = 0) -> void:
+    if n == null or depth > 20:
+        return
+    if n is MeshInstance3D:
+        out_meshes.append(n)
+    if depth < 8 and (n is MeshInstance3D or n is Skeleton3D or n is AnimationPlayer):
+        print("MODEL DIAGNOSTIC: node=", n.get_path(), " type=", n.get_class(), " visible=", n.visible if n is Node3D else true)
+    for child in n.get_children():
+        _log_model_nodes(child, out_meshes, depth+1)
