@@ -4,6 +4,7 @@ const JOYSTICK = preload("res://scripts/Joystick.gd")
 const ICON = preload("res://scripts/BadgeIcon.gd")
 const SEED_ICON = preload("res://scripts/SeedIcon.gd")
 const SAVE_DATA = preload("res://scripts/SaveData.gd")
+const FARMER_VISUAL = preload("res://scripts/FarmerVisual.gd")
 const THAI = preload("res://assets/Sarabun-Regular.ttf")
 const THAI_BOLD = preload("res://assets/Sarabun-SemiBold.ttf")
 const SAVE = "user://happy_farm_clean.json"
@@ -46,6 +47,7 @@ var pen_locations: Array[Vector3] = [
 var selected_seed: int = 0
 var tool_mode: String = "plant"
 var farmer: Node3D
+var farmer_visual: Node3D
 var arm_l: Node3D
 var arm_r: Node3D
 var leg_l: Node3D
@@ -366,6 +368,19 @@ func build_farmer() -> void:
     hoe.visible = false
     can.visible = false
 
+    # Swap the placeholder for the player's real skinned Mixamo farmer.
+    # The old model remains a safe fallback until the FBX bundle is imported.
+    var mixamo: Node3D = FARMER_VISUAL.new()
+    mixamo.name = "MixamoFemale"
+    farmer.add_child(mixamo)
+    if mixamo.initialize():
+        farmer_visual = mixamo
+        for part in farmer.get_children():
+            if part != farmer_visual:
+                part.visible = false
+    else:
+        mixamo.queue_free()
+
 func stage(index: int) -> int:
     var cell: Dictionary = plots[index]
     if not cell.has("crop"):
@@ -464,6 +479,7 @@ func finish_work() -> void:
     save_game()
 
 func _process(delta: float) -> void:
+    var previous_position: Vector3 = farmer.position
     elapsed += delta
     animate_pigs()
     tick += delta
@@ -511,6 +527,19 @@ func _process(delta: float) -> void:
             farmer.position.y = jumping
         hoe.visible = false
         can.visible = false
+    # Keep the skeleton animation aligned to actual movement, not just inputs:
+    # keyboard, touchscreen stick and automatic farm work share this state.
+    if farmer_visual != null and farmer_visual.is_model_ready():
+        var displacement: Vector2 = Vector2(
+            farmer.position.x-previous_position.x,
+            farmer.position.z-previous_position.z
+        )
+        var pose_name: String = "Idle"
+        if jumping > 0.015 or jump_velocity > 0.0:
+            pose_name = "Jump"
+        elif displacement.length() > 0.001:
+            pose_name = "Run" if (running and work_plot < 0) else "Walk"
+        farmer_visual.set_state(pose_name)
 
 func move_actor(direction: Vector3, speed: float, delta: float) -> void:
     farmer.position += direction*speed*delta
