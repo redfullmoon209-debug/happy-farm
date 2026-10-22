@@ -14,18 +14,63 @@ func _check() -> void:
         problems.append("no joystick")
     if farm.jump_button == null or farm.run_button == null:
         problems.append("run/jump buttons missing")
+    if farm.zoom_in_button == null or farm.zoom_out_button == null:
+        problems.append("camera plus/minus buttons missing")
     if not farm.touch_controls or not farm.stick.is_visible_in_tree():
         problems.append("joystick must be visible automatically on PC web")
     if not farm.run_button.is_visible_in_tree() or not farm.jump_button.is_visible_in_tree():
         problems.append("run and jump buttons must be visible automatically")
     if farm.stick_label == null or not farm.stick_label.is_visible_in_tree():
         problems.append("joystick heading is missing")
+    if not farm.zoom_in_button.is_visible_in_tree() or not farm.zoom_out_button.is_visible_in_tree():
+        problems.append("zoom controls must be visible on mobile and PC")
 
     var screen: Rect2 = Rect2(Vector2.ZERO, farm.get_viewport().get_visible_rect().size)
     if not screen.encloses(farm.stick.get_global_rect()):
         problems.append("joystick extends beyond game viewport")
     if not screen.encloses(farm.run_button.get_global_rect()) or not screen.encloses(farm.jump_button.get_global_rect()):
         problems.append("run or jump button extends outside game")
+    if not screen.encloses(farm.zoom_in_button.get_global_rect()) or not screen.encloses(farm.zoom_out_button.get_global_rect()):
+        problems.append("zoom controls extend outside viewport")
+    if farm.run_button.get_global_rect().intersects(farm.zoom_in_button.get_global_rect()):
+        problems.append("zoom-in button overlaps Run")
+    if farm.run_button.get_global_rect().intersects(farm.zoom_out_button.get_global_rect()):
+        problems.append("zoom-out button overlaps Run")
+
+    # The real mobile zoom controls must change the orthographic camera.
+    var default_size: float = farm.camera.size
+    farm.zoom_in_button.pressed.emit()
+    var zoom_in_size: float = farm.camera.size
+    if zoom_in_size >= default_size:
+        problems.append("zoom-in button did not enlarge the character")
+    farm.zoom_out_button.pressed.emit()
+    if farm.camera.size <= zoom_in_size:
+        problems.append("zoom-out button did not restore a wider view")
+    # Pinch two fingers on empty 3D terrain, away from all UI.
+    var vp: Vector2 = farm.get_viewport().get_visible_rect().size
+    var left: InputEventScreenTouch = InputEventScreenTouch.new()
+    left.index = 3
+    left.position = Vector2(vp.x * 0.54, vp.y * 0.35)
+    left.pressed = true
+    var right: InputEventScreenTouch = InputEventScreenTouch.new()
+    right.index = 4
+    right.position = Vector2(vp.x * 0.72, vp.y * 0.35)
+    right.pressed = true
+    farm._input(left)
+    farm._input(right)
+    var before_pinch: float = farm.camera_distance
+    var spreading: InputEventScreenDrag = InputEventScreenDrag.new()
+    spreading.index = 4
+    spreading.position = right.position + Vector2(98.0, 0.0)
+    farm._input(spreading)
+    if farm.camera_distance >= before_pinch:
+        problems.append("two-finger spreading did not zoom toward farmer")
+    left.pressed = false
+    right.pressed = false
+    farm._input(right)
+    farm._input(left)
+    if not farm.camera_touches.is_empty():
+        problems.append("camera touch slots not released after pinch")
 
     # Test a real mouse drag on the on-screen joystick (Chrome desktop).
     # ScreenTouch is supported by the same Joystick script on Android/iPhone.
@@ -95,6 +140,14 @@ func _check() -> void:
         if farm.farmer_visual == null or not farm.farmer_visual.is_model_ready():
             problems.append("rigged female FBX not loaded")
         else:
+            # The original FBX faces +Z and a Godot actor moves along -Z.
+            # Check actual world-space visual heading after a sideways walk.
+            var desired: Vector3 = Vector3(0.8, 0.0, -0.6)
+            farm.move_actor(desired, 2.0, 0.12)
+            var visual_axis: Vector3 = farm.farmer_visual.imported_character.global_basis * Vector3.BACK
+            visual_axis.y = 0.0
+            if visual_axis.normalized().dot(desired) < 0.97:
+                problems.append("Mixamo character visually faces away from travel direction")
             for state in ["Idle", "Walk", "Run", "Jump"]:
                 if not farm.farmer_visual.anim_player.has_animation("Farm/" + state):
                     problems.append("missing Mixamo motion " + state)
