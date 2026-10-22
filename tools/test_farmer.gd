@@ -36,15 +36,27 @@ func _check() -> void:
         var meshes: Array[MeshInstance3D] = []
         _log_model_nodes(farm.farmer_visual, meshes)
         print("MODEL DIAGNOSTIC: mesh count=", meshes.size())
+        if meshes.is_empty():
+            problems.append("imported avatar has no renderable meshes")
         if farm.farmer_visual != null:
             print("MODEL DIAGNOSTIC: local visual=", farm.farmer_visual.transform)
             print("MODEL DIAGNOSTIC: parent farmer=", farm.farmer.position)
             print("MODEL DIAGNOSTIC: rig skeleton=", farm.farmer_visual.skeleton)
+            print("MODEL DIAGNOSTIC: fitted height=", farm.farmer_visual.display_height,
+                " auto_scale=", farm.farmer_visual.visual_scale)
+            if farm.farmer_visual.display_height < 1.5 or farm.farmer_visual.display_height > 2.4:
+                problems.append("imported model not scaled to human height")
         for obj in meshes:
             var aabb: AABB = obj.get_aabb()
             var transform: Transform3D = obj.global_transform
             var bound_world: AABB = transform * aabb
             print("MODEL DIAGNOSTIC: mesh path=", obj.get_path(), " visible=", obj.is_visible_in_tree(), " material=", obj.material_override, " aabb=", aabb, " world=", bound_world, " transform=", transform)
+            if not obj.is_visible_in_tree():
+                problems.append("avatar mesh hidden")
+            if bound_world.size.y < 1.4 or bound_world.size.y > 2.6:
+                problems.append("avatar mesh too small or too tall for farm")
+            if absf(bound_world.position.y-farm.farmer.position.y) > 1.5:
+                problems.append("avatar outside standing ground height")
         if farm.farmer_visual == null or not farm.farmer_visual.is_model_ready():
             problems.append("rigged female FBX not loaded")
         else:
