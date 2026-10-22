@@ -18,7 +18,14 @@ fetch_voice() {
   temp="$(mktemp --suffix=.wav)"
   curl --fail --location --silent --show-error --retry 3 --connect-timeout 15 --max-time 120 "$url" --output "$temp"
   test -s "$temp"
-  # HeyGen produces regular PCM WAV; verify its header with stdlib only.
+  file "$temp" || true
+  python3 - "$temp" <<'PY'
+import sys, os
+path = sys.argv[1]
+with open(path,"rb") as f:
+    print("VOICE SOURCE HEADER:", repr(f.read(80)), "TOTAL BYTES:", os.path.getsize(path))
+PY
+  # Validate the downloaded audio and copy it when it is compatible with Godot.
   python3 - "$temp" "assets/audio/$name.wav" <<'PY'
 import sys, wave, shutil
 incoming, target = sys.argv[1:3]
