@@ -47,7 +47,7 @@ var pen_locations: Array[Vector3] = [
 var selected_seed: int = 0
 var tool_mode: String = "plant"
 var farmer: Node3D
-var farmer_visual: Node3D
+var farmer_visual: Variant = null
 var arm_l: Node3D
 var arm_r: Node3D
 var leg_l: Node3D
