@@ -3,13 +3,17 @@
 A new Godot 4.4.1 project written from scratch on 22 October 2026.
 
 ## What you can play
-- Procedurally modeled, warm low-poly farm with farmer, trees, house, 24 raised garden beds and pigs.
+- Procedurally modeled, warm low-poly farm with farmer, trees, house, 50 raised garden beds (10 columns × 5 rows) plus expandable pig pens and pigs.
 - Tap/click a garden plot: the farmer walks to the plot and tills, plants, waters, or harvests.
 - Plants visibly grow over time and show splash effects.
 - WASD to move, Shift to run, Space to jump.
 - Right-mouse drag to orbit the camera, mouse wheel to zoom.
 - Mobile: drag the left joystick to move, buttons to run and jump. Swipe empty ground to orbit camera; pinch empty ground to zoom.
-- Shop to buy seeds and feed. Progress saved in your browser.
+- Shop to buy seeds and pig feed, expand pig pens (up to four pens) and buy new pigs (up to four per pen, 16 total).
+- The starter pen holds four pigs; buying more pens immediately adds a fenced 3D pen, and buying pigs adds visible animated pigs.
+- The first additional pen costs 150 coins; later pens cost more. Each pig costs 90 coins.
+- Your existing 24-plot save automatically expands to 50 without losing planted crops, seeds, money or pigs.
+- Autosaves, browser save status, downloadable JSON backup and confirmation before restoring backups.
 
 ## Preview on GitHub Codespaces
 Open this repository in Codespaces and run:
