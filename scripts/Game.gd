@@ -682,7 +682,10 @@ func set_box(node: Control, x: float, y: float, w: float, h: float) -> void:
     node.size = Vector2(w, h)
 
 func build_ui() -> void:
-    touch_controls = DisplayServer.is_touchscreen_available() or OS.has_feature("web_android") or OS.has_feature("web_ios")
+    # Players asked for the on-screen controls even when using Chrome on a PC.
+    # Godot Web can also report touchscreen availability inconsistently.
+    # Keep the analog joystick and buttons visible on every device.
+    touch_controls = true
     var layer: CanvasLayer = CanvasLayer.new()
     layer.layer = 4
     add_child(layer)
@@ -740,16 +743,16 @@ func build_ui() -> void:
         ui_bottom.add_child(button)
         action_buttons[key] = button
 
-    # Independent phone controls: gameplay remains visible in the middle.
+    # Always-visible browser joystick: mouse drag on PC or finger drag on phone.
     stick = JOYSTICK.new()
     ui.add_child(stick)
-    stick.visible = touch_controls
+    stick.visible = true
     run_button = btn("วิ่ง", toggle_run, Color("#538b77"))
     ui.add_child(run_button)
-    run_button.visible = touch_controls
+    run_button.visible = true
     jump_button = btn("กระโดด", jump, Color("#ce9254"))
     ui.add_child(jump_button)
-    jump_button.visible = touch_controls
+    jump_button.visible = true
 
     # Shop is an explicitly sized popup; scrolling happens inside its bounds.
     shop_panel = panel(Color("#f4f8effa"))
@@ -908,6 +911,7 @@ func update_sizes() -> void:
     set_box(stick, 18, h-158, 144, 144)
     set_box(run_button, w-139, h-151, 123, 62)
     set_box(jump_button, w-139, h-82, 123, 64)
+    stick.queue_redraw()
 
     var shop_w: float = minf(w-24.0, 490.0)
     var shop_h: float = minf(h-24.0, 490.0)
