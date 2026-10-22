@@ -4,7 +4,7 @@ on:
     branches: [main]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 concurrency:
@@ -17,6 +17,19 @@ jobs:
       name: github-pages
     steps:
       - uses: actions/checkout@v4
+      - name: Bundle original music, sound effects and recorded Thai voice
+        run: bash tools/prepare_audio.sh
+      - name: Store WAV sound assets permanently in the repository
+        run: |
+          git add assets/audio
+          if git diff --cached --quiet; then
+            echo "Audio assets already committed."
+          else
+            git config user.name "happy-farm-audio-bot"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git commit -m "Bundle original music, farm Foley and Thai farmer voice audio"
+            git push origin HEAD:main || echo "Audio stays in this web build; repository upload was blocked."
+          fi
       - name: Download Godot
         run: |
           curl -fLsS --retry 3 https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o editor.zip
@@ -48,6 +61,11 @@ jobs:
           set -o pipefail
           ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_farmer.gd 2>&1 | tee /tmp/farmer-test.log
           grep -q 'FARMER TESTS PASS' /tmp/farmer-test.log
+      - name: Happy Farm audio integration checks
+        run: |
+          set -o pipefail
+          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_audio.gd 2>&1 | tee /tmp/audio-tests.log
+          grep -q 'AUDIO TESTS PASS' /tmp/audio-tests.log
       - name: Export web
         run: |
           set -o pipefail
