@@ -108,7 +108,7 @@ func _apply_albedo(root: Node) -> void:
     if not (texture_res is Texture2D):
         return
     var material: StandardMaterial3D = StandardMaterial3D.new()
-    material.albedo_texture = texture_res
+    material.albedo_texture = texture_res as Texture2D
     material.roughness = 0.90
     material.metallic = 0.0
     material.cull_mode = BaseMaterial3D.CULL_DISABLED
@@ -147,11 +147,22 @@ func _load_clip(library: AnimationLibrary, state: String, fbx_path: String) -> b
         push_warning("No animations found inside " + fbx_path)
         return false
 
-    var animation: Animation = source_player.get_animation(source_player.get_animation_list()[0])
+    # Godot's importer may add RESET before the actual Mixamo clip.
+    # Choose a real motion with the greatest track count, not a reset pose.
+    var animation: Animation = null
+    var most_tracks: int = -1
+    for anim_name in source_player.get_animation_list():
+        if String(anim_name).to_upper().contains("RESET"):
+            continue
+        var candidate: Animation = source_player.get_animation(anim_name)
+        if candidate != null and candidate.get_track_count() > most_tracks:
+            animation = candidate
+            most_tracks = candidate.get_track_count()
     if animation == null:
         instance.free()
+        push_warning("No playback clip in " + fbx_path)
         return false
-    var copy: Animation = animation.duplicate(true)
+    var copy: Animation = animation.duplicate(true) as Animation
     var skeleton_path: String = String(get_path_to(skeleton))
     var animated_bone_tracks: int = 0
 
