@@ -18,7 +18,13 @@ const CROPS = [
 const SOIL = Color("#75523f")
 const WET = Color("#493a34")
 const GREEN = Color("#529964")
-const CENTER = Vector3(0,0,0)
+const CENTER = Vector3(3.5,0,0)
+const FARM_COLUMNS: int = 10
+const FARM_ROWS: int = 5
+const PEN_CAPACITY: int = 4
+const MAX_PENS: int = 4
+const PEN_BASE_PRICE: int = 150
+const PIG_PRICE: int = 90
 var materials: Dictionary = {}
 var plot_places: Array[Vector3] = []
 var plant_roots: Array[Node3D] = []
@@ -29,6 +35,14 @@ var coins: int = 250
 var seeds: Array = [4, 2, 2, 0, 0, 0]
 var feed: int = 4
 var pigs: int = 1
+var pens: int = 1
+var pen_nodes: Array[Node3D] = []
+var pig_nodes: Array[Node3D] = []
+var pig_roam_positions: Array[Vector3] = []
+var pen_locations: Array[Vector3] = [
+    Vector3(16.8, 0, -4.4), Vector3(16.8, 0, 4.2),
+    Vector3(24.0, 0, -4.4), Vector3(24.0, 0, 4.2)
+]
 var selected_seed: int = 0
 var tool_mode: String = "plant"
 var farmer: Node3D
@@ -41,7 +55,7 @@ var can: Node3D
 var camera: Camera3D
 var camera_yaw: float = 0.65
 var camera_pitch: float = -0.79
-var camera_distance: float = 29.0
+var camera_distance: float = 39.0
 var camera_focus: Vector3 = Vector3.ZERO
 var actor_goal: Vector3 = Vector3.ZERO
 var work_plot: int = -1
@@ -196,11 +210,15 @@ func build_scene() -> void:
     camera.projection = Camera3D.PROJECTION_ORTHOGONAL
     camera.current = true
     add_child(camera)
-    cube(self, Vector3(0,-0.24,0), Vector3(37,0.45,28), Color("#85ba77"))
-    cube(self, Vector3(-10,0,0), Vector3(2,0.04,22), Color("#d2c397"))
-    cube(self, Vector3(0,0,7.9), Vector3(30,0.04,1.9), Color("#d2c397"))
+
+    # Expanded grounds: 50 real clickable plots, paths and a livestock district.
+    cube(self, Vector3(0,-0.24,0), Vector3(64.0,0.45,40.0), Color("#85ba77"))
+    cube(self, Vector3(-14.5,0,0), Vector3(2.2,0.04,29.0), Color("#d2c397"))
+    cube(self, Vector3(0,0,11.8), Vector3(58.0,0.04,2.1), Color("#d2c397"))
+    cube(self, Vector3(13.1,0,0), Vector3(1.7,0.04,21.0), Color("#d2c397"))
+
     var house: Node3D = Node3D.new()
-    house.position = Vector3(-12,0,-6.8)
+    house.position = Vector3(-19.0,0,-8.4)
     add_child(house)
     cube(house, Vector3(0,1.5,0), Vector3(4.5,3,3.9), Color("#efdebb"))
     var roof_l: MeshInstance3D = cube(house,Vector3(-1.10,3.26,0),Vector3(3.05,0.32,4.5),Color("#a8584d"))
@@ -210,10 +228,10 @@ func build_scene() -> void:
     cube(house, Vector3(0,1.05,2), Vector3(1.10,2.1,0.1), Color("#936e50"))
     cube(house, Vector3(-1.4,2,2.02), Vector3(0.75,0.9,0.1), Color("#7db4c3"))
     cube(house, Vector3(1.4,2,2.02), Vector3(0.75,0.9,0.1), Color("#7db4c3"))
-    for row in range(4):
-        for col in range(6):
-            var i: int = row * 6 + col
-            var pos: Vector3 = Vector3((float(col)-2.5)*2.28, 0, (float(row)-1.5)*2.26)
+
+    for row in range(FARM_ROWS):
+        for col in range(FARM_COLUMNS):
+            var pos: Vector3 = Vector3((float(col)-4.5)*2.28, 0, (float(row)-2.0)*2.26)
             plot_places.append(pos)
             var plot: Node3D = Node3D.new()
             plot.position = pos
@@ -225,37 +243,87 @@ func build_scene() -> void:
                 cube(plot,Vector3(0,0.17,edge),Vector3(2.04,0.19,0.12),Color("#c8aa74"))
             for furrow in [-0.55,0.0,0.55]:
                 cube(plot,Vector3(furrow,0.242,0),Vector3(0.11,0.032,1.45),Color("#926b4b"))
-            var plants: Node3D = Node3D.new()
-            plants.position.y = 0.28
-            plot.add_child(plants)
-            plant_roots.append(plants)
+            var plant_holder: Node3D = Node3D.new()
+            plant_holder.position.y = 0.28
+            plot.add_child(plant_holder)
+            plant_roots.append(plant_holder)
             grow_stages.append(-1)
-    # Farm pen. Simple pig mesh; easy to swap for FBX later.
-    cube(self, Vector3(12,0.01,0),Vector3(6.8,0.07,6.8),Color("#bcbb7e"))
-    for n in range(5):
-        for side in [-1.0,1.0]:
-            var v: float = -3.1 + float(n)*1.55
-            cube(self,Vector3(12+v,0.70,side*3.25),Vector3(0.16,1.4,0.16),Color("#947253"))
-            cube(self,Vector3(12+side*3.25,0.70,v),Vector3(0.16,1.4,0.16),Color("#947253"))
-    for side in [-1.0,1.0]:
-        for h in [0.40,1.0]:
-            cube(self,Vector3(12,h,side*3.25),Vector3(6.5,0.11,0.11),Color("#be9362"))
-            cube(self,Vector3(12+side*3.25,h,0),Vector3(0.11,0.11,6.5),Color("#be9362"))
-    for k in range(mini(pigs,8)):
-        var pig: Node3D = Node3D.new()
-        pig.position = Vector3(12+(float(k%3)-1)*1.4,0.0,(float(k/3)-1)*1.4)
-        add_child(pig)
-        ball(pig,Vector3(0,0.56,0),Vector3(1.2,0.75,1),Color("#edacb8"))
-        ball(pig,Vector3(0,0.75,-0.52),Vector3(0.74,0.7,0.67),Color("#f0b0bd"))
-        ball(pig,Vector3(0,0.69,-0.84),Vector3(0.42,0.30,0.18),Color("#d98c9d"))
-        for side in [-1.0,1.0]:
-            ball(pig,Vector3(side*0.2,0.91,-0.82),Vector3(0.09,0.09,0.08),Color("#474047"))
-            ball(pig,Vector3(side*0.30,1.13,-0.5),Vector3(0.22,0.30,0.15),Color("#ef9cae"))
-            for side_z in [-0.32,0.32]:
-                ball(pig,Vector3(side*0.38,0.20,side_z),Vector3(0.25,0.4,0.25),Color("#f0adbb"))
-    for p in [Vector3(-16,0,4),Vector3(-16,0,11),Vector3(-6,0,-11),
-        Vector3(-1,0,-11),Vector3(5,0,-11),Vector3(16,0,-10),Vector3(16,0,10)]:
+
+    # All owned pens/pigs are regenerated here and after purchases/imports.
+    rebuild_livestock()
+    for p in [Vector3(-29,0,4),Vector3(-29,0,13),Vector3(-25,0,-15),
+        Vector3(-18,0,15),Vector3(-7,0,-15),Vector3(0,0,-15),
+        Vector3(9,0,-15),Vector3(27,0,-15),Vector3(29,0,15)]:
         tree(p)
+
+func pen_price() -> int:
+    return PEN_BASE_PRICE + maxi(0, pens-1)*110
+
+func rebuild_livestock() -> void:
+    for old_pen in pen_nodes:
+        if is_instance_valid(old_pen):
+            old_pen.queue_free()
+    pen_nodes.clear()
+    pig_nodes.clear()
+    pig_roam_positions.clear()
+    for pen_idx in range(pens):
+        create_pen(pen_idx)
+    for pig_idx in range(pigs):
+        create_pig(pig_idx)
+
+func create_pen(index: int) -> void:
+    var root: Node3D = Node3D.new()
+    root.position = pen_locations[index]
+    add_child(root)
+    pen_nodes.append(root)
+    cube(root,Vector3(0,0.02,0),Vector3(6.65,0.06,6.65),Color("#c7c18c"))
+    # Decorative tidy fence with a wider gate on the near side.
+    for side in [-1.0,1.0]:
+        for k in range(5):
+            var offset: float = -3.1+float(k)*1.55
+            cube(root,Vector3(offset,0.67,side*3.15),Vector3(0.16,1.34,0.16),Color("#936e50"))
+            cube(root,Vector3(side*3.15,0.67,offset),Vector3(0.16,1.34,0.16),Color("#936e50"))
+        for height in [0.40,0.95]:
+            cube(root,Vector3(0,height,side*3.15),Vector3(6.35,0.12,0.12),Color("#b88a5d"))
+            cube(root,Vector3(side*3.15,height,0),Vector3(0.12,0.12,6.35),Color("#b88a5d"))
+    cube(root,Vector3(0,0.28,-2.4),Vector3(1.55,0.53,0.7),Color("#a3744b"))
+    cube(root,Vector3(0,0.56,-2.4),Vector3(1.30,0.10,0.50),Color("#79a561"))
+    # Straw pile adds a visible distinction from the crop plots.
+    ball(root,Vector3(2.0,0.16,2.1),Vector3(0.85,0.27,0.8),Color("#e5cb77"))
+
+func create_pig(index: int) -> void:
+    var pen_index: int = index / PEN_CAPACITY
+    var slot: int = index % PEN_CAPACITY
+    if pen_index >= pen_nodes.size():
+        return
+    var root: Node3D = Node3D.new()
+    var pen_x: float = -1.05 if slot % 2 == 0 else 1.05
+    var pen_z: float = -0.65 if slot < 2 else 1.3
+    var origin: Vector3 = Vector3(pen_x, 0.0, pen_z)
+    root.position = origin
+    pen_nodes[pen_index].add_child(root)
+    pig_nodes.append(root)
+    pig_roam_positions.append(origin)
+    var pink: Color = Color("#efa7b7") if index % 3 != 1 else Color("#e5a0ae")
+    ball(root,Vector3(0,0.56,0),Vector3(1.2,0.75,1),pink)
+    ball(root,Vector3(0,0.75,-0.52),Vector3(0.74,0.7,0.67),Color("#f0b0bd"))
+    ball(root,Vector3(0,0.69,-0.84),Vector3(0.42,0.30,0.18),Color("#d98c9d"))
+    for side in [-1.0,1.0]:
+        ball(root,Vector3(side*0.2,0.91,-0.82),Vector3(0.09,0.09,0.08),Color("#474047"))
+        ball(root,Vector3(side*0.30,1.13,-0.5),Vector3(0.22,0.30,0.15),Color("#ef9cae"))
+        for side_z in [-0.32,0.32]:
+            ball(root,Vector3(side*0.38,0.20,side_z),Vector3(0.25,0.4,0.25),pink)
+    ball(root,Vector3(-0.12,0.68,-0.93),Vector3(0.065,0.065,0.04),Color("#995f72"))
+    ball(root,Vector3(0.12,0.68,-0.93),Vector3(0.065,0.065,0.04),Color("#995f72"))
+
+func animate_pigs() -> void:
+    for i in range(pig_nodes.size()):
+        var pig: Node3D = pig_nodes[i]
+        var home: Vector3 = pig_roam_positions[i]
+        var speed: float = 0.7+float(i%3)*0.12
+        var phase: float = elapsed*speed+float(i)*1.3
+        pig.position = home+Vector3(sin(phase)*0.26,absf(sin(phase*2.0))*0.027,cos(phase*0.8)*0.24)
+        pig.rotation.y = sin(phase*0.6)*0.29
 
 func build_farmer() -> void:
     farmer = Node3D.new()
@@ -394,6 +462,7 @@ func finish_work() -> void:
 
 func _process(delta: float) -> void:
     elapsed += delta
+    animate_pigs()
     tick += delta
     if tick >= 0.55:
         tick = 0
@@ -442,8 +511,8 @@ func _process(delta: float) -> void:
 
 func move_actor(direction: Vector3, speed: float, delta: float) -> void:
     farmer.position += direction*speed*delta
-    farmer.position.x = clampf(farmer.position.x,-17,17)
-    farmer.position.z = clampf(farmer.position.z,-12.5,12.5)
+    farmer.position.x = clampf(farmer.position.x,-30.0,30.0)
+    farmer.position.z = clampf(farmer.position.z,-17.0,17.0)
     farmer.position.y = jumping+absf(sin(elapsed*12))*0.035
     farmer.rotation.y = atan2(-direction.x,-direction.z)
     var wave: float = sin(elapsed*(16 if running else 10))
@@ -482,10 +551,10 @@ func _input(event: InputEvent) -> void:
         if event.button_index == MOUSE_BUTTON_RIGHT:
             drag_camera = event.pressed
         elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
-            camera_distance = maxf(15,camera_distance-1.5)
+            camera_distance = maxf(18,camera_distance-2.5)
             update_camera()
         elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-            camera_distance = minf(45,camera_distance+1.5)
+            camera_distance = minf(78,camera_distance+2.5)
             update_camera()
         elif event.pressed and event.button_index == MOUSE_BUTTON_LEFT and not point_on_ui(event.position):
             click_plot(event.position)
@@ -517,7 +586,9 @@ func update_camera() -> void:
     camera.position = CENTER+Vector3(sin(camera_yaw)*cos(camera_pitch),-sin(camera_pitch),
         cos(camera_yaw)*cos(camera_pitch))*camera_distance
     camera.look_at(CENTER)
-    camera.size = 19 if aspect > 1.3 else (26 if aspect > 0.82 else 34)
+    # Orthographic cameras zoom with size, not with distance alone.
+    var factor: float = 0.82 if aspect > 1.3 else (1.07 if aspect > 0.82 else 1.40)
+    camera.size = clampf(camera_distance*factor, 14.0, 105.0)
 
 func text_label(txt: String, font_size: int, color: Color = Color("#284c3a")) -> Label:
     var label: Label = Label.new()
