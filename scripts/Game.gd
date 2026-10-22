@@ -234,7 +234,7 @@ func build_scene() -> void:
 
     for row in range(FARM_ROWS):
         for col in range(FARM_COLUMNS):
-            var pos: Vector3 = Vector3((float(col)-4.5)*2.28, 0, (float(row)-2.0)*2.26)
+            var pos: Vector3 = Vector3((float(col)-4.5)*2.28, 0, (float(row)-1.5)*2.26)
             plot_places.append(pos)
             var plot: Node3D = Node3D.new()
             plot.position = pos
