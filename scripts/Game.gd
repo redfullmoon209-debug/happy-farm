@@ -373,13 +373,16 @@ func build_farmer() -> void:
     var mixamo: Node3D = FARMER_VISUAL.new()
     mixamo.name = "MixamoFemale"
     farmer.add_child(mixamo)
-    if mixamo.initialize():
+    if mixamo.initialize() and mixamo.has_visible_avatar():
         farmer_visual = mixamo
         for part in farmer.get_children():
             if part != farmer_visual:
                 part.visible = false
     else:
+        # Do not hide the backup actor unless a real, correctly sized
+        # skinned mesh can actually be displayed.
         mixamo.queue_free()
+        farmer_visual = null
 
 func stage(index: int) -> int:
     var cell: Dictionary = plots[index]
