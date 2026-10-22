@@ -6,9 +6,9 @@ signal subtitle(text: String)
 
 const DIRECTORY: String = "res://assets/audio/"
 const VOICES: Dictionary = {
-    "plant": "voice_plant.wav",
-    "water": "voice_water.wav",
-    "harvest": "voice_harvest.wav"
+    "plant": "voice_plant.mp3",
+    "water": "voice_water.mp3",
+    "harvest": "voice_harvest.mp3"
 }
 const PHRASES: Dictionary = {
     "plant": "โอ๊ย ฉันอยากปลูกผักจังเลย",
