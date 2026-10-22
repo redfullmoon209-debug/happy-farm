@@ -461,6 +461,8 @@ func work_on(index: int) -> void:
         refresh_labels()
         return
     work_plot = index
+    if tool_mode == "plant" and farm_audio != null:
+        farm_audio.announce("plant")
     actor_goal = plot_places[index] + Vector3(0,0,1.20)
     message = "ชาวสวนกำลังเดินไปแปลง"
     refresh_labels()
@@ -493,6 +495,12 @@ func finish_work() -> void:
         coins += int(CROPS[crop_id]["reward"])
         plots[i] = {"tilled":true}
         message = "เก็บเกี่ยวสำเร็จ ได้เหรียญเพิ่ม"
+    if farm_audio != null:
+        farm_audio.play_effect(tool_mode)
+        if tool_mode == "plant":
+            farm_audio.announce("water", true)
+        elif tool_mode == "harvest":
+            farm_audio.announce("harvest", true)
     work_plot = -1
     hoe.visible = false
     can.visible = false
@@ -504,6 +512,10 @@ func _process(delta: float) -> void:
     var previous_position: Vector3 = farmer.position
     elapsed += delta
     animate_pigs()
+    prompt_timer += delta
+    if prompt_timer >= 8.0:
+        prompt_timer = 0.0
+        _check_voice_context()
     tick += delta
     if tick >= 0.55:
         tick = 0
@@ -549,6 +561,13 @@ func _process(delta: float) -> void:
             farmer.position.y = jumping
         hoe.visible = false
         can.visible = false
+    if farmer.position.distance_to(previous_position) > 0.01:
+        footstep_timer -= delta
+        if footstep_timer <= 0.0 and farm_audio != null:
+            farm_audio.play_effect("step")
+            footstep_timer = 0.29 if running else 0.46
+    else:
+        footstep_timer = minf(footstep_timer, 0.15)
     # On a close-up view, keep the real farmer centered while they walk.
     if camera_distance < 30.0:
         update_camera()
@@ -582,6 +601,8 @@ func jump() -> void:
     if work_plot >= 0 or work_time > 0 or shop_panel.visible: return
     if jumping <= 0 and jump_velocity <= 0:
         jump_velocity = 6.2
+        if farm_audio != null:
+            farm_audio.play_effect("jump")
 
 func zoom_in() -> void:
     set_camera_zoom(camera_distance * 0.72)
@@ -663,6 +684,15 @@ func _camera_drag(event: InputEventScreenDrag) -> void:
         update_camera()
 
 func _input(event: InputEvent) -> void:
+    if farm_audio != null and not farm_audio.unlocked:
+        var is_first_gesture: bool = (
+            (event is InputEventKey and event.pressed)
+            or (event is InputEventScreenTouch and event.pressed)
+            or (event is InputEventMouseButton and event.pressed)
+        )
+        if is_first_gesture:
+            farm_audio.activate()
+            refresh_sound_button()
     if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE:
         jump()
     if event is InputEventScreenTouch:
@@ -1135,7 +1165,10 @@ func _show_voice_caption(line: String) -> void:
     voice_caption_tween = create_tween()
     voice_caption_tween.tween_interval(2.8)
     voice_caption_tween.tween_property(voice_caption, "modulate:a", 0.0, 0.65)
-    voice_caption_tween.tween_callback(func() -> void: voice_caption.visible = false)
+    voice_caption_tween.tween_callback(_hide_voice_caption)
+
+func _hide_voice_caption() -> void:
+    voice_caption.visible = false
 
 func _check_voice_context() -> void:
     if farm_audio == null or not farm_audio.unlocked or not farm_audio.enabled:
@@ -1249,6 +1282,8 @@ func buy_seed(index: int) -> void:
         coins -= price
         seeds[index] = int(seeds[index])+1
         message = "ซื้อเมล็ดพันธุ์สำเร็จ"
+        if farm_audio != null:
+            farm_audio.play_effect("buy")
         save_game()
     else:
         message = "เงินไม่พอ"
@@ -1259,6 +1294,8 @@ func buy_feed() -> void:
         coins -= 35
         feed += 5
         message = "ซื้ออาหารหมูสำเร็จ"
+        if farm_audio != null:
+            farm_audio.play_effect("buy")
         save_game()
     else:
         message = "เงินไม่พอ"
@@ -1275,6 +1312,8 @@ func buy_pen() -> void:
         pens += 1
         rebuild_livestock()
         message = "ขยายคอกหมูสำเร็จ! มีพื้นที่เลี้ยงได้ %d ตัว" % (pens*PEN_CAPACITY)
+        if farm_audio != null:
+            farm_audio.play_effect("buy")
         save_game()
     refresh_labels()
 
@@ -1288,6 +1327,8 @@ func buy_pig() -> void:
         pigs += 1
         rebuild_livestock()
         message = "มีลูกหมูตัวใหม่แล้ว! ตอนนี้เลี้ยง %d ตัว" % pigs
+        if farm_audio != null:
+            farm_audio.play_effect("pig")
         save_game()
     refresh_labels()
 
@@ -1297,6 +1338,8 @@ func give_feed() -> void:
     else:
         feed -= 1
         message = "ให้อาหารหมูแล้ว"
+        if farm_audio != null:
+            farm_audio.play_effect("pig")
         save_game()
     refresh_labels()
 
