@@ -73,6 +73,10 @@ var touch_cam: int = -1
 var touch_down: Vector2
 var touch_last: Vector2
 var cam_dragged: bool = false
+# Only touches on empty world count toward a pinch; joystick/buttons use their own fingers.
+var camera_touches: Dictionary = {}
+var pinch_last_gap: float = 0.0
+var pinch_was_active: bool = false
 var stick: Control
 var stick_label: Label
 var ui: Control
@@ -83,6 +87,8 @@ var shop_panel: Panel
 var action_buttons: Dictionary = {}
 var run_button: Button
 var jump_button: Button
+var zoom_in_button: Button
+var zoom_out_button: Button
 var ui_top: Panel
 var ui_bottom: Panel
 var touch_controls: bool = false
@@ -531,6 +537,9 @@ func _process(delta: float) -> void:
             farmer.position.y = jumping
         hoe.visible = false
         can.visible = false
+    # On a close-up view, keep the real farmer centered while they walk.
+    if camera_distance < 30.0:
+        update_camera()
     # Keep the skeleton animation aligned to actual movement, not just inputs:
     # keyboard, touchscreen stick and automatic farm work share this state.
     if farmer_visual != null and farmer_visual.is_model_ready():
@@ -562,41 +571,104 @@ func jump() -> void:
     if jumping <= 0 and jump_velocity <= 0:
         jump_velocity = 6.2
 
-func _input(event: InputEvent) -> void:
-    if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE:
-        jump()
-    if event is InputEventScreenTouch:
-        if event.pressed and touch_cam < 0 and not point_on_ui(event.position):
+func zoom_in() -> void:
+    set_camera_zoom(camera_distance * 0.72)
+
+func zoom_out() -> void:
+    set_camera_zoom(camera_distance * 1.35)
+
+func set_camera_zoom(target_distance: float) -> void:
+    # Orthographic projection changes size too, so this must change both.
+    camera_distance = clampf(target_distance, 5.0, 85.0)
+    update_camera()
+
+func _camera_touch_gap() -> float:
+    if camera_touches.size() < 2:
+        return 0.0
+    var positions: Array = camera_touches.values()
+    var left: Vector2 = positions[0]
+    var right: Vector2 = positions[1]
+    return left.distance_to(right)
+
+func _camera_touch(event: InputEventScreenTouch) -> void:
+    if event.pressed:
+        # Fingers on the joystick, zoom controls and other UI cannot start a
+        # camera gesture; other fingers can still operate those controls.
+        if point_on_ui(event.position) or camera_touches.size() >= 2:
+            return
+        camera_touches[event.index] = event.position
+        if camera_touches.size() == 1:
             touch_cam = event.index
             touch_down = event.position
             touch_last = event.position
             cam_dragged = false
-        elif not event.pressed and event.index == touch_cam:
-            if not cam_dragged:
-                click_plot(event.position)
+            pinch_was_active = false
+        else:
+            pinch_last_gap = _camera_touch_gap()
+            pinch_was_active = true
+            cam_dragged = true
             touch_cam = -1
-    elif event is InputEventScreenDrag and event.index == touch_cam:
-        var motion: Vector2 = event.position-touch_last
-        touch_last = event.position
-        if event.position.distance_to(touch_down) > 9: cam_dragged = true
-        if cam_dragged:
-            camera_yaw -= motion.x*0.006
-            camera_pitch = clampf(camera_pitch+motion.y*0.005,-1.33,-0.33)
-            update_camera()
+    elif camera_touches.has(event.index):
+        var tap_plot: bool = not pinch_was_active and not cam_dragged and camera_touches.size() == 1
+        camera_touches.erase(event.index)
+        if tap_plot:
+            click_plot(event.position)
+        if camera_touches.size() == 1:
+            # A remaining finger can pan again, but cannot accidentally plant.
+            touch_cam = int(camera_touches.keys()[0])
+            touch_down = camera_touches[touch_cam]
+            touch_last = touch_down
+            cam_dragged = true
+            pinch_last_gap = 0.0
+        else:
+            touch_cam = -1
+            pinch_last_gap = 0.0
+            if camera_touches.is_empty():
+                pinch_was_active = false
+                cam_dragged = false
+
+func _camera_drag(event: InputEventScreenDrag) -> void:
+    if not camera_touches.has(event.index):
+        return
+    camera_touches[event.index] = event.position
+    if camera_touches.size() >= 2:
+        var gap: float = _camera_touch_gap()
+        if pinch_last_gap > 10.0 and gap > 10.0:
+            set_camera_zoom(camera_distance * pinch_last_gap / gap)
+        pinch_last_gap = gap
+        pinch_was_active = true
+        cam_dragged = true
+        return
+    if event.index != touch_cam:
+        return
+    var delta_screen: Vector2 = event.position - touch_last
+    touch_last = event.position
+    if event.position.distance_to(touch_down) > 9.0:
+        cam_dragged = true
+    if cam_dragged:
+        camera_yaw -= delta_screen.x * 0.006
+        camera_pitch = clampf(camera_pitch + delta_screen.y * 0.005, -1.33, -0.28)
+        update_camera()
+
+func _input(event: InputEvent) -> void:
+    if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE:
+        jump()
+    if event is InputEventScreenTouch:
+        _camera_touch(event)
+    elif event is InputEventScreenDrag:
+        _camera_drag(event)
     elif event is InputEventMouseButton:
         if event.button_index == MOUSE_BUTTON_RIGHT:
             drag_camera = event.pressed
         elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
-            camera_distance = maxf(18,camera_distance-2.5)
-            update_camera()
+            set_camera_zoom(camera_distance * 0.87)
         elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-            camera_distance = minf(78,camera_distance+2.5)
-            update_camera()
-        elif event.pressed and event.button_index == MOUSE_BUTTON_LEFT and not point_on_ui(event.position):
+            set_camera_zoom(camera_distance * 1.15)
+        elif event.pressed and event.button_index == MOUSE_BUTTON_LEFT and not point_on_ui(event.position) and camera_touches.is_empty():
             click_plot(event.position)
     elif event is InputEventMouseMotion and drag_camera:
-        camera_yaw -= event.relative.x*0.007
-        camera_pitch = clampf(camera_pitch+event.relative.y*0.005,-1.33,-0.33)
+        camera_yaw -= event.relative.x * 0.007
+        camera_pitch = clampf(camera_pitch + event.relative.y * 0.005, -1.33, -0.28)
         update_camera()
 
 func click_plot(pixel: Vector2) -> void:
@@ -617,14 +689,26 @@ func click_plot(pixel: Vector2) -> void:
     if best >= 0: work_on(best)
 
 func update_camera() -> void:
-    if camera == null: return
-    var aspect: float = get_viewport().get_visible_rect().size.x/maxf(1,get_viewport().get_visible_rect().size.y)
-    camera.position = CENTER+Vector3(sin(camera_yaw)*cos(camera_pitch),-sin(camera_pitch),
-        cos(camera_yaw)*cos(camera_pitch))*camera_distance
-    camera.look_at(CENTER)
-    # Orthographic cameras zoom with size, not with distance alone.
+    if camera == null:
+        return
+    var screen: Vector2 = get_viewport().get_visible_rect().size
+    var aspect: float = screen.x / maxf(1.0, screen.y)
+    # A far view shows the whole farm; close zoom focuses on the actual
+    # skinned character instead of an empty spot in the middle of the map.
+    var focus_mix: float = 1.0 - smoothstep(14.0, 31.0, camera_distance)
+    var subject: Vector3 = CENTER
+    if farmer != null:
+        subject = Vector3(farmer.position.x, 1.0, farmer.position.z)
+    camera_focus = CENTER.lerp(subject, focus_mix)
+    var offset: Vector3 = Vector3(
+        sin(camera_yaw) * cos(camera_pitch),
+        -sin(camera_pitch),
+        cos(camera_yaw) * cos(camera_pitch)
+    )
+    camera.position = camera_focus + offset * camera_distance
+    camera.look_at(camera_focus)
     var factor: float = 0.82 if aspect > 1.3 else (1.07 if aspect > 0.82 else 1.40)
-    camera.size = clampf(camera_distance*factor, 14.0, 105.0)
+    camera.size = clampf(camera_distance * factor, 4.0, 120.0)
 
 func text_label(txt: String, font_size: int, color: Color = Color("#284c3a")) -> Label:
     var label: Label = Label.new()
@@ -758,6 +842,16 @@ func build_ui() -> void:
     jump_button = btn("กระโดด", jump, Color("#ce9254"))
     ui.add_child(jump_button)
     jump_button.visible = true
+    # Dedicated zoom buttons work on iPhone even if the browser does not
+    # deliver two-finger gestures to the Godot canvas.
+    zoom_out_button = btn("−", zoom_out, Color("#587e91"))
+    zoom_out_button.add_theme_font_size_override("font_size", 28)
+    zoom_out_button.tooltip_text = "ซูมออก ดูฟาร์มทั้งหมด"
+    ui.add_child(zoom_out_button)
+    zoom_in_button = btn("+", zoom_in, Color("#4f9682"))
+    zoom_in_button.add_theme_font_size_override("font_size", 28)
+    zoom_in_button.tooltip_text = "ซูมเข้า ดูตัวละครใกล้ ๆ"
+    ui.add_child(zoom_in_button)
 
     # Shop is an explicitly sized popup; scrolling happens inside its bounds.
     shop_panel = panel(Color("#f4f8effa"))
@@ -917,6 +1011,8 @@ func update_sizes() -> void:
     set_box(stick_label, 26, h-184, 128, 27)
     set_box(run_button, w-139, h-151, 123, 62)
     set_box(jump_button, w-139, h-82, 123, 64)
+    set_box(zoom_out_button, w-142, h-218, 62, 55)
+    set_box(zoom_in_button, w-73, h-218, 62, 55)
     stick.queue_redraw()
 
     var shop_w: float = minf(w-24.0, 490.0)
@@ -969,7 +1065,7 @@ func point_on_ui(pos: Vector2) -> bool:
         if panel_node != null and panel_node.get_global_rect().has_point(pos):
             return true
     if touch_controls:
-        for control in [stick,run_button,jump_button]:
+        for control in [stick,run_button,jump_button,zoom_in_button,zoom_out_button]:
             if control.visible and control.get_global_rect().has_point(pos): return true
     return false
 
