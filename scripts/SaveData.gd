@@ -7,7 +7,11 @@ const VERSION: int = 1
 const PREVIOUS: String = "user://happy_farm_previous.json"
 const MAX_BYTES: int = 524288
 const NUM_CROPS: int = 6
-const NUM_PLOTS: int = 24
+const NUM_PLOTS: int = 50
+const OLD_PLOTS: int = 24
+const PLOTS_PER_ROW: int = 10
+const PIGS_PER_PEN: int = 4
+const MAX_PENS: int = 4
 
 static func normalize(raw: Variant) -> Dictionary:
     if not (raw is Dictionary):
@@ -27,7 +31,7 @@ static func normalize(raw: Variant) -> Dictionary:
     var input_plots: Variant = data["plots"]
     if not (input_seeds is Array) or not (input_plots is Array):
         return {}
-    if input_seeds.size() != NUM_CROPS or input_plots.size() != NUM_PLOTS:
+    if input_seeds.size() != NUM_CROPS or (input_plots.size() != NUM_PLOTS and input_plots.size() != OLD_PLOTS):
         return {}
 
     for key in ["coins", "feed", "pigs"]:
@@ -37,7 +41,13 @@ static func normalize(raw: Variant) -> Dictionary:
     var balance: int = int(data["coins"])
     var stock: int = int(data["feed"])
     var animal_count: int = int(data["pigs"])
-    if balance < 0 or balance > 1000000000 or stock < 0 or stock > 100000 or animal_count < 0 or animal_count > 8:
+    var pens_value: Variant = data.get("pens", maxi(1, (animal_count + PIGS_PER_PEN - 1) / PIGS_PER_PEN))
+    if not (pens_value is int or pens_value is float):
+        return {}
+    var pen_count: int = int(pens_value)
+    if balance < 0 or balance > 1000000000 or stock < 0 or stock > 100000:
+        return {}
+    if pen_count < 1 or pen_count > MAX_PENS or animal_count < 0 or animal_count > pen_count * PIGS_PER_PEN:
         return {}
 
     var safe_seeds: Array = []
@@ -75,10 +85,24 @@ static func normalize(raw: Variant) -> Dictionary:
             cell["water_time"] = timestamp
         safe_plots.append(cell)
 
+    if input_plots.size() == OLD_PLOTS:
+        # Legacy plots were a 6x4 farm. Retain their row/column ordering
+        # inside the center columns of the new 10x5 farm.
+        var expanded: Array = []
+        for i in range(NUM_PLOTS):
+            expanded.append({})
+        for old_index in range(OLD_PLOTS):
+            var old_row: int = old_index / 6
+            var old_col: int = old_index % 6
+            var new_index: int = old_row * PLOTS_PER_ROW + old_col + 2
+            expanded[new_index] = safe_plots[old_index]
+        safe_plots = expanded
+
     return {
         "coins": balance,
         "feed": stock,
         "pigs": animal_count,
+        "pens": pen_count,
         "seeds": safe_seeds,
         "plots": safe_plots
     }
