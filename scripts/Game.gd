@@ -5,6 +5,7 @@ const ICON = preload("res://scripts/BadgeIcon.gd")
 const SEED_ICON = preload("res://scripts/SeedIcon.gd")
 const SAVE_DATA = preload("res://scripts/SaveData.gd")
 const FARMER_VISUAL = preload("res://scripts/FarmerVisual.gd")
+const FARM_AUDIO = preload("res://scripts/FarmAudio.gd")
 const THAI = preload("res://assets/Sarabun-Regular.ttf")
 const THAI_BOLD = preload("res://assets/Sarabun-SemiBold.ttf")
 const SAVE = "user://happy_farm_clean.json"
@@ -118,6 +119,13 @@ var bag_footer: Label
 var bag_save_status: Label
 var bag_export_button: Button
 var bag_import_button: Button
+var farm_audio: Node
+var audio_button: Button
+var voice_caption: Panel
+var voice_caption_label: Label
+var voice_caption_tween: Tween
+var prompt_timer: float = 0.0
+var footstep_timer: float = 0.0
 var save_chip: Panel
 var save_icon: Control
 var save_status_label: Label
@@ -136,6 +144,10 @@ func _ready() -> void:
     load_save()
     build_scene()
     build_farmer()
+    farm_audio = FARM_AUDIO.new()
+    farm_audio.name = "FarmAudio"
+    add_child(farm_audio)
+    farm_audio.subtitle.connect(_show_voice_caption)
     build_ui()
     refresh_plants()
     refresh_labels()
@@ -804,6 +816,18 @@ func build_ui() -> void:
     feed_button = btn("ให้อาหาร", give_feed, Color("#b87b89"))
     ui_top.add_child(feed_button)
 
+    # Optional sound control: one tap starts music on phones; another mutes.
+    audio_button = btn("เปิดเสียง", toggle_sound, Color("#5e817c"))
+    ui.add_child(audio_button)
+    voice_caption = panel(Color("#2d5546eb"))
+    voice_caption.visible = false
+    ui.add_child(voice_caption)
+    voice_caption_label = text_label("", 19, Color.WHITE)
+    voice_caption_label.add_theme_font_override("font", THAI_BOLD)
+    voice_caption_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    voice_caption_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    voice_caption.add_child(voice_caption_label)
+
     # Unobtrusive save indicator with a vector icon, not an emoji.
     save_chip = panel(Color("#edf5e7f2"))
     ui.add_child(save_chip)
@@ -960,6 +984,7 @@ func build_ui() -> void:
 
     update_sizes()
     pick_tool("plant")
+    refresh_sound_button()
 
 func update_sizes() -> void:
     if ui_top == null:
@@ -1037,6 +1062,12 @@ func update_sizes() -> void:
     set_box(save_chip, w-171.0, badge_y, 160.0, 35.0)
     set_box(save_icon, 7.0, 4.0, 26.0, 26.0)
     set_box(save_status_label, 37.0, 7.0, 117.0, 25.0)
+    var sound_x: float = w-290.0 if w >= 430.0 else 10.0
+    set_box(audio_button, sound_x, badge_y, 108.0, 35.0)
+    var caption_width: float = minf(w-22.0, 540.0)
+    var caption_y: float = 70.0 if not narrow else header_height+56.0
+    set_box(voice_caption, (w-caption_width)*0.5, caption_y, caption_width, 53.0)
+    set_box(voice_caption_label, 9, 7, caption_width-18.0, 37.0)
 
     # Inventory lives on the left. Never stretch it to the full game screen.
     var bag_top: float = 118.0 if narrow else 75.0
@@ -1070,9 +1101,71 @@ func point_on_ui(pos: Vector2) -> bool:
         if panel_node != null and panel_node.get_global_rect().has_point(pos):
             return true
     if touch_controls:
-        for control in [stick,run_button,jump_button,zoom_in_button,zoom_out_button]:
+        for control in [stick,run_button,jump_button,zoom_in_button,zoom_out_button,audio_button]:
             if control.visible and control.get_global_rect().has_point(pos): return true
     return false
+
+func toggle_sound() -> void:
+    if farm_audio == null:
+        return
+    if not farm_audio.unlocked:
+        farm_audio.activate()
+    else:
+        farm_audio.set_enabled(not farm_audio.enabled)
+    refresh_sound_button()
+
+func refresh_sound_button() -> void:
+    if audio_button == null or farm_audio == null:
+        return
+    if not farm_audio.enabled:
+        audio_button.text = "เสียง: ปิด"
+    elif not farm_audio.unlocked:
+        audio_button.text = "เปิดเสียง"
+    else:
+        audio_button.text = "เสียง: เปิด"
+
+func _show_voice_caption(line: String) -> void:
+    if voice_caption == null:
+        return
+    voice_caption.visible = true
+    voice_caption.modulate.a = 1.0
+    voice_caption_label.text = line
+    if voice_caption_tween != null and voice_caption_tween.is_running():
+        voice_caption_tween.kill()
+    voice_caption_tween = create_tween()
+    voice_caption_tween.tween_interval(2.8)
+    voice_caption_tween.tween_property(voice_caption, "modulate:a", 0.0, 0.65)
+    voice_caption_tween.tween_callback(func() -> void: voice_caption.visible = false)
+
+func _check_voice_context() -> void:
+    if farm_audio == null or not farm_audio.unlocked or not farm_audio.enabled:
+        return
+    if work_plot >= 0 or work_time > 0.0 or bag_panel.visible or shop_panel.visible:
+        return
+    var ready: bool = false
+    var dry: bool = false
+    var empty: bool = false
+    var enough_seeds: bool = false
+    for stock in seeds:
+        enough_seeds = enough_seeds or int(stock) > 0
+    for i in range(plots.size()):
+        var pos: Vector3 = plot_places[i]
+        if Vector2(pos.x-farmer.position.x, pos.z-farmer.position.z).length() > 3.3:
+            continue
+        if stage(i) >= 5:
+            ready = true
+            break
+        if plots[i].has("crop") and not bool(plots[i].get("wet",false)):
+            dry = true
+        elif not plots[i].has("crop"):
+            empty = true
+    # Prioritize ripe crops, then thirsty crops, then empty fields.
+    if ready:
+        farm_audio.announce("harvest")
+    elif dry:
+        farm_audio.announce("water")
+    elif empty and enough_seeds:
+        farm_audio.announce("plant")
 
 func refresh_labels() -> void:
     if money_label == null:
