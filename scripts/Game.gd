@@ -27,6 +27,12 @@ const PEN_CAPACITY: int = 4
 const MAX_PENS: int = 4
 const PEN_BASE_PRICE: int = 150
 const PIG_PRICE: int = 90
+# Close enough to inspect the farmer; wide enough for all 10 x 5 beds.
+# Every zoom input uses the same limits (orthographic size is derived below).
+const CAMERA_ZOOM_MIN: float = 6.0
+const CAMERA_ZOOM_MAX: float = 78.0
+const CAMERA_TAP_SLOP: float = 9.0
+const CAMERA_PINCH_MIN_GAP: float = 10.0
 var materials: Dictionary = {}
 var plot_places: Array[Vector3] = []
 var plant_roots: Array[Node3D] = []
@@ -78,6 +84,10 @@ var cam_dragged: bool = false
 var camera_touches: Dictionary = {}
 var pinch_last_gap: float = 0.0
 var pinch_was_active: bool = false
+var touch_button_fingers: Dictionary = {}
+# Godot emits an emulated mouse event BEFORE its corresponding touch event.
+# Keep its ownership until mouse-up, even when the finger crosses a control.
+var block_touch_mouse: bool = false
 var stick: Control
 var stick_label: Label
 var ui: Control
@@ -612,8 +622,78 @@ func zoom_out() -> void:
 
 func set_camera_zoom(target_distance: float) -> void:
     # Orthographic projection changes size too, so this must change both.
-    camera_distance = clampf(target_distance, 5.0, 85.0)
+    if not is_finite(target_distance):
+        return
+    camera_distance = clampf(target_distance, CAMERA_ZOOM_MIN, CAMERA_ZOOM_MAX)
     update_camera()
+
+func _camera_overlay_at(pos: Vector2) -> bool:
+    return (shop_panel != null and shop_panel.visible
+        or restore_confirm != null and restore_confirm.visible
+        or bag_panel != null and bag_panel.visible and bag_panel.get_global_rect().has_point(pos))
+
+func _camera_action_at(pos: Vector2) -> Button:
+    if _camera_overlay_at(pos):
+        return null
+    for button: Button in [run_button, jump_button, zoom_in_button, zoom_out_button]:
+        if button != null and button.is_visible_in_tree() and not button.disabled and button.get_global_rect().has_point(pos):
+            return button
+    return null
+
+func _joystick_at(pos: Vector2) -> bool:
+    return stick != null and stick.is_visible_in_tree() and not _camera_overlay_at(pos) and stick.get_global_rect().has_point(pos)
+
+func _control_touch(event: InputEventScreenTouch) -> bool:
+    # Ownership is decided at touch-down, never by the finger's drag position.
+    if event.pressed and not event.canceled:
+        if _joystick_at(event.position):
+            stick._input(event)
+            return true
+        var button: Button = _camera_action_at(event.position)
+        if button != null:
+            if not touch_button_fingers.values().has(button):
+                touch_button_fingers[event.index] = button
+                button.modulate = Color(0.8, 0.8, 0.8)
+            return true
+    elif stick != null and event.index == stick.finger_id:
+        stick._input(event)
+        return true
+    elif touch_button_fingers.has(event.index):
+        var button: Button = touch_button_fingers[event.index]
+        touch_button_fingers.erase(event.index)
+        button.modulate = Color.WHITE
+        if not event.canceled and _camera_action_at(event.position) == button:
+            button.pressed.emit()
+        return true
+    return false
+
+func _control_drag(event: InputEventScreenDrag) -> bool:
+    if stick != null and event.index == stick.finger_id:
+        stick._input(event)
+        return true
+    if touch_button_fingers.has(event.index):
+        var button: Button = touch_button_fingers[event.index]
+        button.modulate = Color(0.8, 0.8, 0.8) if _camera_action_at(event.position) == button else Color.WHITE
+        return true
+    return false
+
+func _reset_camera_input() -> void:
+    camera_touches.clear()
+    touch_cam = -1
+    pinch_last_gap = 0.0
+    pinch_was_active = false
+    cam_dragged = false
+    drag_camera = false
+    block_touch_mouse = true
+    for button: Button in touch_button_fingers.values():
+        button.modulate = Color.WHITE
+    touch_button_fingers.clear()
+    if stick != null:
+        stick.reset_input()
+
+func _notification(what: int) -> void:
+    if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT or what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_APPLICATION_PAUSED:
+        _reset_camera_input()
 
 func _camera_touch_gap() -> float:
     if camera_touches.size() < 2:
@@ -624,7 +704,7 @@ func _camera_touch_gap() -> float:
     return left.distance_to(right)
 
 func _camera_touch(event: InputEventScreenTouch) -> void:
-    if event.pressed:
+    if event.pressed and not event.canceled:
         # Fingers on the joystick, zoom controls and other UI cannot start a
         # camera gesture; other fingers can still operate those controls.
         if point_on_ui(event.position) or camera_touches.size() >= 2:
@@ -642,7 +722,9 @@ func _camera_touch(event: InputEventScreenTouch) -> void:
             cam_dragged = true
             touch_cam = -1
     elif camera_touches.has(event.index):
-        var tap_plot: bool = not pinch_was_active and not cam_dragged and camera_touches.size() == 1
+        var tap_plot: bool = (not event.canceled and not pinch_was_active and not cam_dragged
+            and camera_touches.size() == 1 and not point_on_ui(event.position)
+            and event.position.distance_to(touch_down) <= CAMERA_TAP_SLOP)
         camera_touches.erase(event.index)
         if tap_plot:
             click_plot(event.position)
@@ -666,7 +748,7 @@ func _camera_drag(event: InputEventScreenDrag) -> void:
     camera_touches[event.index] = event.position
     if camera_touches.size() >= 2:
         var gap: float = _camera_touch_gap()
-        if pinch_last_gap > 10.0 and gap > 10.0:
+        if pinch_last_gap > CAMERA_PINCH_MIN_GAP and gap > CAMERA_PINCH_MIN_GAP:
             set_camera_zoom(camera_distance * pinch_last_gap / gap)
         pinch_last_gap = gap
         pinch_was_active = true
@@ -676,7 +758,7 @@ func _camera_drag(event: InputEventScreenDrag) -> void:
         return
     var delta_screen: Vector2 = event.position - touch_last
     touch_last = event.position
-    if event.position.distance_to(touch_down) > 9.0:
+    if event.position.distance_to(touch_down) > CAMERA_TAP_SLOP:
         cam_dragged = true
     if cam_dragged:
         camera_yaw -= delta_screen.x * 0.006
@@ -695,11 +777,32 @@ func _input(event: InputEvent) -> void:
             refresh_sound_button()
     if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE:
         jump()
+    if event is InputEventMouse and event.device == InputEvent.DEVICE_ID_EMULATION:
+        # Native shop/inventory GUI still receives its emulated mouse. World,
+        # joystick and action touches are handled exactly once as raw touches.
+        if event is InputEventMouseButton and event.pressed:
+            block_touch_mouse = not point_on_ui(event.position) or _joystick_at(event.position) or _camera_action_at(event.position) != null
+        if block_touch_mouse:
+            get_viewport().set_input_as_handled()
+        return
     if event is InputEventScreenTouch:
+        if _control_touch(event):
+            get_viewport().set_input_as_handled()
+            return
+        var owned: bool = camera_touches.has(event.index)
         _camera_touch(event)
+        if owned or camera_touches.has(event.index):
+            get_viewport().set_input_as_handled()
     elif event is InputEventScreenDrag:
-        _camera_drag(event)
+        if _control_drag(event):
+            get_viewport().set_input_as_handled()
+        elif camera_touches.has(event.index):
+            _camera_drag(event)
+            get_viewport().set_input_as_handled()
     elif event is InputEventMouseButton:
+        if event.button_index == MOUSE_BUTTON_LEFT and (stick.mouse_drag or event.pressed and _joystick_at(event.position)):
+            stick._input(event)
+            return
         if event.button_index == MOUSE_BUTTON_RIGHT:
             drag_camera = event.pressed
         elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -708,10 +811,13 @@ func _input(event: InputEvent) -> void:
             set_camera_zoom(camera_distance * 1.15)
         elif event.pressed and event.button_index == MOUSE_BUTTON_LEFT and not point_on_ui(event.position) and camera_touches.is_empty():
             click_plot(event.position)
-    elif event is InputEventMouseMotion and drag_camera:
-        camera_yaw -= event.relative.x * 0.007
-        camera_pitch = clampf(camera_pitch + event.relative.y * 0.005, -1.33, -0.28)
-        update_camera()
+    elif event is InputEventMouseMotion:
+        if stick.mouse_drag:
+            stick._input(event)
+        elif drag_camera:
+            camera_yaw -= event.relative.x * 0.007
+            camera_pitch = clampf(camera_pitch + event.relative.y * 0.005, -1.33, -0.28)
+            update_camera()
 
 func click_plot(pixel: Vector2) -> void:
     if shop_panel.visible: return
@@ -886,6 +992,9 @@ func build_ui() -> void:
     # Always-visible browser joystick: mouse drag on PC or finger drag on phone.
     stick = JOYSTICK.new()
     ui.add_child(stick)
+    # Game routes owned fingers and real mouse events to this control so
+    # sibling _input ordering cannot steal a camera/UI finger.
+    stick.set_process_input(false)
     stick.visible = true
     stick_label = text_label("เดินอิสระ", 17, Color("#23533c"))
     stick_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1011,6 +1120,9 @@ func build_ui() -> void:
     restore_confirm.cancel_button_text = "ยกเลิก"
     restore_confirm.confirmed.connect(_confirm_import_backup)
     ui.add_child(restore_confirm)
+    shop_panel.visibility_changed.connect(_reset_camera_input)
+    bag_panel.visibility_changed.connect(_reset_camera_input)
+    restore_confirm.visibility_changed.connect(_reset_camera_input)
 
     update_sizes()
     pick_tool("plant")
@@ -1019,6 +1131,8 @@ func build_ui() -> void:
 func update_sizes() -> void:
     if ui_top == null:
         return
+    # Rotation/resizing changes viewport coordinates: cancel old gestures.
+    _reset_camera_input()
     var view: Vector2 = get_viewport().get_visible_rect().size
     var w: float = view.x
     var h: float = view.y
@@ -1123,12 +1237,10 @@ func update_sizes() -> void:
         card.custom_minimum_size = Vector2(95.0, 119.0)
     update_camera()
 func point_on_ui(pos: Vector2) -> bool:
-    if shop_panel.visible:
+    if _camera_overlay_at(pos):
         return true
-    if bag_panel != null and bag_panel.visible and bag_panel.get_global_rect().has_point(pos):
-        return true
-    for panel_node in [ui_top,ui_bottom]:
-        if panel_node != null and panel_node.get_global_rect().has_point(pos):
+    for panel_node in [ui_top,ui_bottom,save_chip,stick_label,voice_caption]:
+        if panel_node != null and panel_node.is_visible_in_tree() and panel_node.get_global_rect().has_point(pos):
             return true
     if touch_controls:
         for control in [stick,run_button,jump_button,zoom_in_button,zoom_out_button,audio_button]:

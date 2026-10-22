@@ -17,6 +17,40 @@ A new Godot 4.4.1 project written from scratch on 22 October 2026.
 - Your existing 24-plot save automatically expands to 50 without losing planted crops, seeds, money or pigs.
 - Autosaves, browser save status, downloadable JSON backup and confirmation before restoring backups.
 
+## Camera and multitouch
+
+- Spread two fingers on the world to zoom in; bring them together to zoom out.
+  The orthographic camera and its position update together. Zoom is bounded to
+  6–78 world units: close views follow the farmer, while the far view fits all
+  50 beds at the default orbit on PC, landscape phones and portrait phones.
+- Drag one world finger to orbit. A short single tap works a plot only on
+  release; a drag, pinch or canceled gesture never becomes a plot tap.
+- Each finger keeps the control it started on until release. Hold the joystick
+  to walk while another finger orbits, or use two other fingers to pinch.
+  Run, Jump and +/− accept their own fingers, including secondary touches.
+- Touches starting on UI stay out of camera gestures. Shop/restore dialogs,
+  inventory visibility changes, focus loss and screen resizing cancel active
+  gestures so late releases cannot trigger farm work or leave the stick held.
+- PC mouse wheel, right-button orbit, mouse joystick and +/− remain available.
+
+Run the regression suite with Godot **4.4.1**, after importing the project:
+
+```bash
+godot --headless --path . --editor --quit
+godot --headless --path . --script res://tools/test_camera.gd
+```
+
+The suite uses the real Input/Viewport pipeline with touch-to-mouse emulation
+enabled. It checks finger ownership, pinch direction/limits, UI/plot separation,
+interruptions, PC controls and projected bounds of all 50 beds. GitHub Actions
+runs it before Web Export.
+
+**iPhone device checks still required:** in Safari, try both orientations,
+joystick + pinch + Run/Jump, lifting either pinch finger, and switching away
+from Safari while fingers are down. Confirm the game zooms without page zoom
+or accidental planting, and that the +/− fallback works. Automated/headless
+tests and a successful Web Export do not establish real iPhone behavior.
+
 ## Preview on GitHub Codespaces
 Open this repository in Codespaces and run:
 

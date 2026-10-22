@@ -66,6 +66,12 @@ jobs:
           set -o pipefail
           ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_audio.gd 2>&1 | tee /tmp/audio-tests.log
           grep -q 'AUDIO TESTS PASS' /tmp/audio-tests.log
+      - name: Camera and multitouch regression tests
+        run: |
+          set -o pipefail
+          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_camera.gd 2>&1 | tee /tmp/camera-tests.log
+          grep -q 'CAMERA TESTS PASS' /tmp/camera-tests.log
+          if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/camera-tests.log; then exit 1; fi
       - name: Export web
         run: |
           set -o pipefail

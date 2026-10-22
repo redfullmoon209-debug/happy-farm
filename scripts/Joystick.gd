@@ -9,10 +9,15 @@ func _ready() -> void:
     custom_minimum_size = Vector2(144, 144)
 
 func _input(event: InputEvent) -> void:
-    if not visible:
+    if not is_visible_in_tree():
+        return
+    if event is InputEventMouse and event.device == InputEvent.DEVICE_ID_EMULATION:
         return
     if event is InputEventScreenTouch:
-        if event.pressed and finger_id < 0 and get_global_rect().has_point(event.position):
+        if event.canceled and event.index == finger_id:
+            reset_input()
+            get_viewport().set_input_as_handled()
+        elif event.pressed and not event.canceled and finger_id < 0 and get_global_rect().has_point(event.position):
             mouse_drag = false
             finger_id = event.index
             _move_stick(event.position)
@@ -42,6 +47,12 @@ func _input(event: InputEvent) -> void:
     elif event is InputEventMouseMotion and mouse_drag and finger_id < 0:
         _move_stick(event.position)
         get_viewport().set_input_as_handled()
+
+func reset_input() -> void:
+    finger_id = -1
+    mouse_drag = false
+    direction = Vector2.ZERO
+    queue_redraw()
 
 func _move_stick(screen: Vector2) -> void:
     var center: Vector2 = global_position + size * 0.5
