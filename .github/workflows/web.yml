@@ -43,6 +43,11 @@ jobs:
           set -o pipefail
           ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_farm.gd 2>&1 | tee /tmp/farm-tests.log
           grep -q 'FARM TESTS PASS' /tmp/farm-tests.log
+      - name: Character movement and animations
+        run: |
+          set -o pipefail
+          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_farmer.gd 2>&1 | tee /tmp/farmer-test.log
+          grep -q 'FARMER TESTS PASS' /tmp/farmer-test.log
       - name: Export web
         run: |
           set -o pipefail
