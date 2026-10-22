@@ -21,7 +21,9 @@ var visual_scale: float = 1.0
 var display_height: float = 0.0
 var mesh_count: int = 0
 const TARGET_HEIGHT: float = 1.90
-var visual_rotation_y: float = 0.0
+# Mixamo source meshes face local +Z; the farm controller uses -Z as forward.
+# Rotate only the imported visual (not the movement controller or the rig).
+var visual_rotation_y: float = PI
 
 func initialize() -> bool:
     if not ResourceLoader.exists(BASE_PATH):
