@@ -17,7 +17,10 @@ var anim_player: AnimationPlayer
 var skeleton: Skeleton3D
 var current_state: String = ""
 var imported_character: Node3D
-var visual_scale: float = 1.65
+var visual_scale: float = 1.0
+var display_height: float = 0.0
+var mesh_count: int = 0
+const TARGET_HEIGHT: float = 1.90
 var visual_rotation_y: float = 0.0
 
 func initialize() -> bool:
@@ -39,9 +42,17 @@ func initialize() -> bool:
 
     imported_character = created
     imported_character.name = "FemaleFarmerMixamo"
-    imported_character.scale = Vector3.ONE * visual_scale
+    # FBX conversion can shrink geometry 100x. Measure the imported mesh,
+    # not the original FBX units, before hiding the procedural character.
+    imported_character.scale = Vector3.ONE
     imported_character.rotation.y = visual_rotation_y
     add_child(imported_character)
+
+    if not _fit_imported_mesh(imported_character):
+        push_warning("Rigged FBX has no usable mesh bounds; use placeholder.")
+        imported_character.queue_free()
+        imported_character = null
+        return false
 
     skeleton = _first_skeleton(imported_character)
     if skeleton == null:
@@ -82,6 +93,51 @@ func initialize() -> bool:
     ready_to_animate = true
     set_state("Idle")
     return true
+
+func _collect_meshes(node: Node, found: Array[MeshInstance3D]) -> void:
+    if node is MeshInstance3D:
+        var surface: MeshInstance3D = node as MeshInstance3D
+        if surface.mesh != null and surface.mesh.get_surface_count() > 0:
+            found.append(surface)
+    for child in node.get_children():
+        _collect_meshes(child, found)
+
+func _fit_imported_mesh(avatar: Node3D) -> bool:
+    var meshes: Array[MeshInstance3D] = []
+    _collect_meshes(avatar, meshes)
+    mesh_count = meshes.size()
+    if mesh_count == 0:
+        return false
+
+    var low: Vector3 = Vector3(INF, INF, INF)
+    var high: Vector3 = Vector3(-INF, -INF, -INF)
+    var inverse_root: Transform3D = avatar.global_transform.affine_inverse()
+    for obj in meshes:
+        var bounds: AABB = (inverse_root * obj.global_transform) * obj.get_aabb()
+        low = low.min(bounds.position)
+        high = high.max(bounds.end)
+    var imported_height: float = high.y - low.y
+    if not is_finite(imported_height) or imported_height < 0.00001:
+        return false
+
+    # This FBX imports around 0.0118 units high in Godot, although its
+    # source mesh is about 1.18 m. The previous scale 1.65 left it invisible.
+    visual_scale = TARGET_HEIGHT / imported_height
+    if visual_scale < 0.01 or visual_scale > 10000.0:
+        return false
+    avatar.scale = Vector3.ONE * visual_scale
+    avatar.position = -Vector3(
+        (low.x + high.x) * 0.5, low.y, (low.z + high.z) * 0.5
+    ) * visual_scale
+    display_height = imported_height * visual_scale
+    print("FARMER VISUAL: meshes=", mesh_count,
+        " raw_height=", imported_height,
+        " fitted_height=", display_height,
+        " scale=", visual_scale)
+    return display_height >= 1.5 and display_height <= 2.4
+
+func has_visible_avatar() -> bool:
+    return mesh_count > 0 and display_height >= 1.5 and display_height <= 2.4
 
 func _first_skeleton(node: Node) -> Skeleton3D:
     if node is Skeleton3D:
