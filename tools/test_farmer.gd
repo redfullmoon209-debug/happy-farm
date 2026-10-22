@@ -32,6 +32,10 @@ func _check() -> void:
         problems.append("run or jump button extends outside game")
     if not screen.encloses(farm.zoom_in_button.get_global_rect()) or not screen.encloses(farm.zoom_out_button.get_global_rect()):
         problems.append("zoom controls extend outside viewport")
+    print("ZOOM CONTROL RECTS: window=", farm.get_viewport().get_visible_rect().size,
+        " run=", farm.run_button.get_global_rect(),
+        " plus=", farm.zoom_in_button.get_global_rect(),
+        " minus=", farm.zoom_out_button.get_global_rect())
     if farm.run_button.get_global_rect().intersects(farm.zoom_in_button.get_global_rect()):
         problems.append("zoom-in button overlaps Run")
     if farm.run_button.get_global_rect().intersects(farm.zoom_out_button.get_global_rect()):
