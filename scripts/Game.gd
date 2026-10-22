@@ -1014,9 +1014,10 @@ func update_sizes() -> void:
     set_box(stick_label, 26, h-184, 128, 27)
     set_box(run_button, w-139, h-151, 123, 62)
     set_box(jump_button, w-139, h-82, 123, 64)
-    var zoom_buttons_y: float = h-218.0 if w >= 700.0 else h-356.0
-    set_box(zoom_out_button, w-142, zoom_buttons_y, 62, 55)
-    set_box(zoom_in_button, w-73, zoom_buttons_y, 62, 55)
+    # Keep zoom entirely above the Run/Jump rail, with room for fonts.
+    var zoom_buttons_y: float = h-264.0 if w >= 700.0 else h-408.0
+    set_box(zoom_out_button, w-142, zoom_buttons_y, 62, 52)
+    set_box(zoom_in_button, w-73, zoom_buttons_y, 62, 52)
     stick.queue_redraw()
 
     var shop_w: float = minf(w-24.0, 490.0)
