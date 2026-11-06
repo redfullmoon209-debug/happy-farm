@@ -216,10 +216,105 @@ func stalk(root: Node3D, pos: Vector3, height: float, radius: float, color: Colo
     root.add_child(obj)
     return obj
 
-func tree(pos: Vector3) -> void:
+# Use the owner's actual Stylized Trees FBX files and matching texture atlases.
+# Models use old Windows texture paths, so explicitly rebind their materials here.
+func _tree_material(variant: String, foliage: bool) -> StandardMaterial3D:
+    var family: String = "STColumnar"
+    if variant.begins_with("STOak"):
+        family = "STOak"
+    elif variant.begins_with("STPine"):
+        family = "STPine"
+    elif variant.begins_with("STSwiggly"):
+        family = "STSwiggly"
+    elif variant.begins_with("STWillow"):
+        family = "STWillow"
+    var key: String = "tree:%s:%s" % [family, "leaf" if foliage else "trunk"]
+    if materials.has(key):
+        return materials[key] as StandardMaterial3D
+    var atlases: Dictionary = {
+        "STColumnar": ["STLeafTexture1.png", "STColumnarTrunkTexture.png"],
+        "STOak": ["STOakLeafTexture1.png", "STOakTrunkTexture.png"],
+        "STPine": ["STPineLeafTexture.png", "STPineTrunkTexture.png"],
+        "STSwiggly": ["STAltLeafTexture.png", "STSwigglyTrunkTexture.png"],
+        "STWillow": ["STWillowLeafTexture.png", "STWillowTrunkTexture.png"]
+    }
+    var atlas_files: Array = atlases[family]
+    var atlas: String = str(atlas_files[0 if foliage else 1])
+    var result: StandardMaterial3D = StandardMaterial3D.new()
+    result.albedo_texture = load("res://assets/trees/Textures/" + atlas) as Texture2D
+    result.roughness = 0.94
+    if foliage:
+        result.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+        result.alpha_scissor_threshold = 0.3
+        result.cull_mode = BaseMaterial3D.CULL_DISABLED
+    materials[key] = result
+    return result
+
+func _prepare_tree_model(model: Node3D, variant: String, target_height: float) -> bool:
+    # Traverse the imported FBX hierarchy. Fit every variant to the farm's
+    # meter-scale world while putting the lowest point on the terrain.
+    var nodes: Array[Node] = [model]
+    var bounds: AABB = AABB()
+    var has_geometry: bool = false
+    while not nodes.is_empty():
+        var candidate: Node = nodes.pop_back()
+        for child in candidate.get_children():
+            nodes.append(child)
+        if not (candidate is MeshInstance3D):
+            continue
+        var mesh_node: MeshInstance3D = candidate as MeshInstance3D
+        if mesh_node.mesh == null:
+            continue
+        for surface in range(mesh_node.mesh.get_surface_count()):
+            var source_material: Material = mesh_node.mesh.surface_get_material(surface)
+            var material_name: String = ""
+            if source_material != null:
+                material_name = source_material.resource_name.to_lower()
+            if material_name.is_empty():
+                material_name = mesh_node.mesh.surface_get_name(surface).to_lower()
+            if material_name.is_empty():
+                material_name = mesh_node.name.to_lower()
+            var foliage: bool = material_name.contains("leaf") or material_name.contains("leaves") or material_name.contains("needle")
+            if material_name.contains("trunk") or material_name.contains("bark"):
+                foliage = false
+            mesh_node.set_surface_override_material(surface, _tree_material(variant, foliage))
+        var mesh_bounds: AABB = mesh_node.mesh.get_aabb()
+        for x in [0.0, 1.0]:
+            for y in [0.0, 1.0]:
+                for z in [0.0, 1.0]:
+                    var corner: Vector3 = mesh_bounds.position + mesh_bounds.size * Vector3(x, y, z)
+                    var local_point: Vector3 = model.to_local(mesh_node.to_global(corner))
+                    if not has_geometry:
+                        bounds = AABB(local_point, Vector3.ZERO)
+                        has_geometry = true
+                    else:
+                        bounds = bounds.expand(local_point)
+    if not has_geometry or bounds.size.y <= 0.001:
+        return false
+    var max_width: float = maxf(bounds.size.x, bounds.size.z)
+    var fit: float = minf(target_height / bounds.size.y, 5.6 / maxf(max_width, 0.001))
+    model.scale = Vector3.ONE * fit
+    model.position.y = -bounds.position.y * fit
+    return true
+
+func tree(pos: Vector3, variant: String = "STOak2", target_height: float = 4.7, yaw: float = 0.0) -> void:
     var group: Node3D = Node3D.new()
-    add_child(group)
+    group.name = "Tree_%s" % variant
     group.position = pos
+    group.rotation_degrees = Vector3(0, yaw, 0)
+    add_child(group)
+    var resource: PackedScene = load("res://assets/trees/Models/%s.fbx" % variant) as PackedScene
+    if resource != null:
+        var instance: Node = resource.instantiate()
+        if instance is Node3D:
+            var model: Node3D = instance as Node3D
+            group.add_child(model)
+            if _prepare_tree_model(model, variant, target_height):
+                group.add_to_group("farm_imported_trees")
+                return
+            group.remove_child(model)
+            model.queue_free()
+    # Fall back to the old lightweight tree if an FBX is unavailable.
     stalk(group, Vector3(0,1.15,0), 2.25, 0.20, Color("#86654b"))
     ball(group, Vector3(0,2.65,0), Vector3(2.2,1.75,2.05), Color("#528f61"))
     ball(group, Vector3(-0.6,2.4,0.1), Vector3(1.5,1.4,1.4), Color("#72b16f"))
@@ -305,10 +400,26 @@ func build_scene() -> void:
 
     # All owned pens/pigs are regenerated here and after purchases/imports.
     rebuild_livestock()
-    for p in [Vector3(-29,0,4),Vector3(-29,0,13),Vector3(-25,0,-15),
-        Vector3(-18,0,15),Vector3(-7,0,-15),Vector3(0,0,-15),
-        Vector3(9,0,-15),Vector3(27,0,-15),Vector3(29,0,15)]:
-        tree(p)
+    # A border of owner-supplied trees leaves the 50 plots, paths and pens open.
+    # Each row is [position, FBX variant, height in world units, yaw in degrees].
+    for planting in [
+        [Vector3(-29,0,4), "STOak2", 4.9, 22.0],
+        [Vector3(-29,0,13), "STWillow2", 5.0, 85.0],
+        [Vector3(-25,0,-15), "STPine3", 5.4, 170.0],
+        [Vector3(-18,0,15), "STSwiggly1", 4.8, 36.0],
+        [Vector3(-7,0,-15), "STColumnar1", 4.9, 140.0],
+        [Vector3(0,0,-15), "STOak1", 5.0, 55.0],
+        [Vector3(9,0,-15), "STPine2", 5.3, 11.0],
+        [Vector3(27,0,-15), "STWillow1", 5.2, 102.0],
+        [Vector3(29,0,15), "STColumnar2", 4.9, 65.0],
+        [Vector3(-29,0,-10), "STOak3", 4.8, 204.0],
+        [Vector3(-13,0,16), "STWillow3", 4.9, 46.0],
+        [Vector3(2,0,17), "STPine4", 5.2, 267.0],
+        [Vector3(17,0,17), "STSwiggly2", 4.6, 156.0],
+        [Vector3(29,0,-3), "STPine1", 5.2, 23.0],
+        [Vector3(28,0,7), "STOak4", 4.9, 290.0]
+    ]:
+        tree(planting[0], str(planting[1]), float(planting[2]), float(planting[3]))
 
 func pen_price() -> int:
     return PEN_BASE_PRICE + maxi(0, pens-1)*110
