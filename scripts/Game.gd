@@ -44,6 +44,23 @@ const TREE_NAMES = ["โอ๊ก", "สน", "วิลโลว์", "ทร�
 const TREE_PRICES = [65, 75, 80, 75, 90]
 const MAX_EXTRA_PLOTS: int = 120
 const MAX_PLANTED_TREES: int = 80
+const WORLD_SIZE: float = 400.0
+const WORLD_HALF: float = 200.0
+const ZONE_SIZE: float = 40.0
+const ZONE_COLUMNS: int = 10
+const STARTER_ZONES = [44, 45, 54, 55]
+const MAX_DECORATIONS: int = 260
+const DECOR_NAMES = [
+    "ม้านั่งไม้", "รั้วไม้", "กระถางดอกไม้", "โคมไฟสวน",
+    "น้ำพุ", "หุ่นไล่กา", "ป้ายไม้", "กองฟาง",
+    "โต๊ะปิกนิก", "บ่อน้ำ", "พุ่มไม้", "ทางเดินหิน",
+    "ตู้จดหมาย", "ศาลาพัก", "สวนหิน", "ตะเกียง"
+]
+const DECOR_PRICES = [110, 35, 45, 120, 600, 175, 80, 45, 220, 320, 35, 25, 70, 850, 95, 55]
+const DECOR_RADII = [1.1, 0.7, 0.9, 0.9, 2.1, 1.0, 0.7, 1.1, 1.8, 1.6, 1.1, 0.9, 0.7, 2.8, 1.5, 0.8]
+# Temporary browser playtest only. Set false AND remove the GM tool before launch.
+# Client-side currency is not secure for real-money or competitive economies.
+const GM_TEST_MODE: bool = true
 # Close enough to inspect the farmer; wide enough for all 10 x 5 beds.
 # Every zoom input uses the same limits (orthographic size is derived below).
 const CAMERA_ZOOM_MIN: float = 6.0
@@ -67,6 +84,14 @@ var removed_trees: Array = []
 var extra_plot_nodes: Array[Node3D] = []
 var base_tree_nodes: Array[Node3D] = []
 var placed_tree_nodes: Array[Node3D] = []
+var unlocked_zones: Array = [44, 45, 54, 55]
+var zone_covers: Array[MeshInstance3D] = []
+var zone_signs: Array[Label3D] = []
+var pending_zone_id: int = -1
+var decor_kits: Array = []
+var selected_decor: int = 0
+var placed_decor_data: Array = []
+var decor_nodes: Array[Node3D] = []
 var placement_preview: MeshInstance3D
 var landscaping_mode: bool = false
 var farm_level: int = 1
@@ -133,6 +158,11 @@ var landscape_button: Button
 var landscape_shop_button: Button
 var shop_plot_button: Button
 var shop_tree_buttons: Array[Button] = []
+var shop_decor_buttons: Array[Button] = []
+var gm_button: Button
+var gm_panel: Panel
+var gm_title: Label
+var land_confirm: ConfirmationDialog
 var run_button: Button
 var jump_button: Button
 var zoom_in_button: Button
@@ -378,8 +408,9 @@ func build_scene() -> void:
     camera.current = true
     add_child(camera)
 
-    # Expanded grounds: 50 real clickable plots, paths and a livestock district.
-    cube(self, Vector3(0,-0.24,0), Vector3(64.0,0.45,40.0), Color("#85ba77"))
+    # 400x400 playable surface. 40x40 zones hide until bought with farm coins.
+    cube(self, Vector3(0,-0.24,0), Vector3(WORLD_SIZE,0.45,WORLD_SIZE), Color("#85ba77"))
+    _build_land_zones()
     cube(self, Vector3(-14.5,0,0), Vector3(2.2,0.04,29.0), Color("#d2c397"))
     cube(self, Vector3(0,0,11.8), Vector3(58.0,0.04,2.1), Color("#d2c397"))
     cube(self, Vector3(13.1,0,0), Vector3(1.7,0.04,21.0), Color("#d2c397"))
@@ -484,6 +515,124 @@ func build_scene() -> void:
     _rebuild_placed_world()
     _build_placement_preview()
 
+
+
+# Land ownership is a separate progression from the first 50 level-gated beds.
+# The starting four 40x40 parcels preserve the existing farm in the center.
+func zone_for_position(pos: Vector3) -> int:
+    if not is_finite(pos.x) or not is_finite(pos.z):
+        return -1
+    if pos.x < -WORLD_HALF or pos.x >= WORLD_HALF or pos.z < -WORLD_HALF or pos.z >= WORLD_HALF:
+        return -1
+    var col: int = floori((pos.x + WORLD_HALF) / ZONE_SIZE)
+    var row: int = floori((pos.z + WORLD_HALF) / ZONE_SIZE)
+    return row * ZONE_COLUMNS + col
+
+func is_land_owned(pos: Vector3) -> bool:
+    var id: int = zone_for_position(pos)
+    return id >= 0 and unlocked_zones.has(id)
+
+func zone_can_be_bought(id: int) -> bool:
+    if id < 0 or id >= ZONE_COLUMNS * ZONE_COLUMNS or unlocked_zones.has(id):
+        return false
+    var col: int = id % ZONE_COLUMNS
+    var row: int = id / ZONE_COLUMNS
+    if col > 0 and unlocked_zones.has(id - 1):
+        return true
+    if col < ZONE_COLUMNS - 1 and unlocked_zones.has(id + 1):
+        return true
+    if row > 0 and unlocked_zones.has(id - ZONE_COLUMNS):
+        return true
+    if row < ZONE_COLUMNS - 1 and unlocked_zones.has(id + ZONE_COLUMNS):
+        return true
+    return false
+
+func zone_price(id: int) -> int:
+    if id < 0 or id >= ZONE_COLUMNS * ZONE_COLUMNS:
+        return 0
+    # The price rises gradually with farm expansion; the player earns coins
+    # from harvests and livestock before unlocking the next parcel.
+    return 300 + maxi(0, unlocked_zones.size() - STARTER_ZONES.size()) * 125
+
+func _build_land_zones() -> void:
+    var root: Node3D = Node3D.new()
+    root.name = "LandExpansionGrid"
+    add_child(root)
+    for id in range(ZONE_COLUMNS * ZONE_COLUMNS):
+        var col: int = id % ZONE_COLUMNS
+        var row: int = id / ZONE_COLUMNS
+        var x: float = -WORLD_HALF + (float(col) + 0.5) * ZONE_SIZE
+        var z: float = -WORLD_HALF + (float(row) + 0.5) * ZONE_SIZE
+        var shade: Color = Color("#577966") if (col + row) % 2 == 0 else Color("#61806b")
+        var cover: MeshInstance3D = cube(root, Vector3(x,0.04,z), Vector3(ZONE_SIZE-0.22,0.06,ZONE_SIZE-0.22), shade)
+        cover.name = "LockedZone_%02d" % id
+        zone_covers.append(cover)
+        var sign: Label3D = Label3D.new()
+        sign.name = "ZonePrice_%02d" % id
+        sign.font = THAI_BOLD
+        sign.font_size = 70
+        sign.pixel_size = 0.025
+        sign.outline_size = 10
+        sign.modulate = Color("#fff3d1")
+        sign.rotation_degrees.x = -90
+        sign.position = Vector3(x,0.20,z)
+        root.add_child(sign)
+        zone_signs.append(sign)
+    _refresh_land_zones()
+
+func _refresh_land_zones() -> void:
+    for i in range(zone_covers.size()):
+        var open: bool = unlocked_zones.has(i)
+        zone_covers[i].visible = not open
+        var frontier: bool = not open and zone_can_be_bought(i)
+        zone_signs[i].visible = frontier
+        if frontier:
+            zone_signs[i].text = "ที่ดิน %d เหรียญ" % zone_price(i)
+
+func buy_land_zone(id: int) -> bool:
+    if id < 0 or id >= ZONE_COLUMNS * ZONE_COLUMNS:
+        message = "ตำแหน่งอยู่นอกแมพ"
+    elif unlocked_zones.has(id):
+        message = "พื้นที่นี้เป็นของฟาร์มแล้ว"
+    elif not zone_can_be_bought(id):
+        message = "ต้องซื้อโซนที่ติดกับที่ดินของตัวเองก่อน"
+    elif coins < zone_price(id):
+        message = "เหรียญไม่พอซื้อที่ดิน ต้องใช้ %d เหรียญ" % zone_price(id)
+    else:
+        var price: int = zone_price(id)
+        coins -= price
+        unlocked_zones.append(id)
+        _refresh_land_zones()
+        message = "ปลดล็อกที่ดิน 40×40 สำเร็จ! พื้นที่ %d/100" % unlocked_zones.size()
+        if farm_audio != null:
+            farm_audio.play_effect("buy")
+        save_game()
+        refresh_labels()
+        return true
+    refresh_labels()
+    return false
+
+func _request_land_purchase(pos: Vector3) -> void:
+    var id: int = zone_for_position(pos)
+    if id < 0:
+        message = "แตะภายในแผนที่ 400×400 เท่านั้น"
+    elif unlocked_zones.has(id):
+        message = "ที่ดินนี้เปิดใช้งานแล้ว"
+    elif not zone_can_be_bought(id):
+        message = "ต้องปลดล็อกโซนที่อยู่ติดกันก่อน"
+    elif coins < zone_price(id):
+        message = "พื้นที่นี้ราคา %d เหรียญ (มี %d)" % [zone_price(id), coins]
+    else:
+        pending_zone_id = id
+        land_confirm.dialog_text = "ซื้อพื้นที่ใหม่ 40×40 หน่วย ราคา %d เหรียญ?\\nเหลือเงิน %d เหรียญ" % [zone_price(id), coins]
+        land_confirm.popup_centered(Vector2i(450, 205))
+        return
+    refresh_labels()
+
+func _confirm_land_purchase() -> void:
+    if pending_zone_id >= 0:
+        buy_land_zone(pending_zone_id)
+    pending_zone_id = -1
 
 # Freely placed crop beds are separate from the original 50 level-gated beds.
 # Saved world coordinates are never snapped onto the original plot grid.
