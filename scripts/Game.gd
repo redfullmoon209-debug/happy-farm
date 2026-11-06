@@ -23,6 +23,17 @@ const GREEN = Color("#529964")
 const CENTER = Vector3(3.5,0,0)
 const FARM_COLUMNS: int = 10
 const FARM_ROWS: int = 5
+const PLOTS_PER_LEVEL: int = 5
+const MAX_FARM_LEVEL: int = 10
+# Begin with the five central beds closest to the farmer's spawn.
+# Unlock adjacent beds first, then move toward the opposite end of the farm.
+const PLOT_UNLOCK_ORDER = [
+    43, 44, 45, 46, 47, 40, 41, 42, 48, 49,
+    33, 34, 35, 36, 37, 30, 31, 32, 38, 39,
+    23, 24, 25, 26, 27, 20, 21, 22, 28, 29,
+    13, 14, 15, 16, 17, 10, 11, 12, 18, 19,
+    3, 4, 5, 6, 7, 0, 1, 2, 8, 9
+]
 const PEN_CAPACITY: int = 4
 const MAX_PENS: int = 4
 const PEN_BASE_PRICE: int = 150
@@ -38,7 +49,10 @@ var plot_places: Array[Vector3] = []
 var plant_roots: Array[Node3D] = []
 var dirt_meshes: Array[MeshInstance3D] = []
 var grow_stages: Array[int] = []
+var plot_locks: Array[Node3D] = []
 var plots: Array = []
+var farm_level: int = 1
+var farm_xp: int = 0
 var coins: int = 250
 var seeds: Array = [4, 2, 2, 0, 0, 0]
 var feed: int = 4
@@ -92,6 +106,7 @@ var stick: Control
 var stick_label: Label
 var ui: Control
 var status_label: Label
+var farm_level_label: Label
 var money_label: Label
 var seed_select: OptionButton
 var shop_panel: Panel
@@ -397,6 +412,29 @@ func build_scene() -> void:
             plot.add_child(plant_holder)
             plant_roots.append(plant_holder)
             grow_stages.append(-1)
+            # Visible but unavailable plots show the required farm level.
+            var plot_lock: Node3D = Node3D.new()
+            plot_lock.name = "LevelLock"
+            plot_lock.position.y = 0.27
+            plot.add_child(plot_lock)
+            cube(plot_lock, Vector3.ZERO, Vector3(1.78, 0.045, 1.78), Color("#55615c"))
+            cube(plot_lock, Vector3(0, 0.21, 0), Vector3(0.38, 0.27, 0.23), Color("#e5c783"))
+            for side in [-1.0, 1.0]:
+                cube(plot_lock, Vector3(side * 0.13, 0.40, 0), Vector3(0.09, 0.18, 0.09), Color("#e5c783"))
+            cube(plot_lock, Vector3(0, 0.49, 0), Vector3(0.35, 0.08, 0.09), Color("#e5c783"))
+            var lock_label: Label3D = Label3D.new()
+            lock_label.name = "RequiredLevel"
+            lock_label.text = "Lv.%d" % required_farm_level(row * FARM_COLUMNS + col)
+            lock_label.font = THAI_BOLD
+            lock_label.font_size = 50
+            lock_label.pixel_size = 0.008
+            lock_label.outline_size = 7
+            lock_label.modulate = Color("#fff1d0")
+            lock_label.rotation_degrees.x = -90.0
+            lock_label.position = Vector3(0, 0.07, 0.49)
+            plot_lock.add_child(lock_label)
+            plot_locks.append(plot_lock)
+    update_plot_locks()
 
     # All owned pens/pigs are regenerated here and after purchases/imports.
     rebuild_livestock()
@@ -544,6 +582,51 @@ func build_farmer() -> void:
         mixamo.queue_free()
         farmer_visual = null
 
+func required_farm_level(index: int) -> int:
+    var place: int = PLOT_UNLOCK_ORDER.find(index)
+    if place < 0:
+        return MAX_FARM_LEVEL
+    return mini(MAX_FARM_LEVEL, 1 + int(place / PLOTS_PER_LEVEL))
+
+func is_plot_unlocked(index: int) -> bool:
+    if index < 0 or index >= plots.size():
+        return false
+    if required_farm_level(index) <= farm_level:
+        return true
+    # Grandfather existing planted/tilled beds from saves made before levels
+    # were introduced. An unused locked bed still cannot be tilled.
+    return bool(plots[index].get("tilled", false)) or plots[index].has("crop")
+
+func unlocked_plot_count() -> int:
+    var total: int = 0
+    for i in range(plots.size()):
+        if is_plot_unlocked(i):
+            total += 1
+    return total
+
+func xp_to_next_level() -> int:
+    if farm_level >= MAX_FARM_LEVEL:
+        return 0
+    return 75 + 55 * (farm_level - 1)
+
+func update_plot_locks() -> void:
+    for i in range(plot_locks.size()):
+        plot_locks[i].visible = not is_plot_unlocked(i)
+
+func gain_farm_xp(amount: int) -> bool:
+    if amount <= 0 or farm_level >= MAX_FARM_LEVEL:
+        return false
+    var old_level: int = farm_level
+    farm_xp += amount
+    while farm_level < MAX_FARM_LEVEL and farm_xp >= xp_to_next_level():
+        farm_xp -= xp_to_next_level()
+        farm_level += 1
+    if farm_level >= MAX_FARM_LEVEL:
+        farm_xp = 0
+    if farm_level != old_level:
+        update_plot_locks()
+    return farm_level != old_level
+
 func stage(index: int) -> int:
     var cell: Dictionary = plots[index]
     if not cell.has("crop"):
@@ -588,13 +671,25 @@ func refresh_plants() -> void:
 func work_on(index: int) -> void:
     if index < 0 or index >= plots.size() or work_plot >= 0 or work_time > 0:
         return
+    if not is_plot_unlocked(index):
+        message = "แปลงนี้ต้องใช้ฟาร์ม Lv.%d (ปัจจุบัน Lv.%d)" % [required_farm_level(index), farm_level]
+        refresh_labels()
+        return
     var c: Dictionary = plots[index]
+    if tool_mode == "till" and bool(c.get("tilled", false)):
+        message = "พรวนดินแปลงนี้แล้ว"
+        refresh_labels()
+        return
     if tool_mode == "plant" and (c.has("crop") or int(seeds[selected_seed]) == 0):
         message = "แปลงเต็มหรือเมล็ดหมด"
         refresh_labels()
         return
     if tool_mode == "water" and not c.has("crop"):
         message = "ต้องปลูกผักก่อน"
+        refresh_labels()
+        return
+    if tool_mode == "water" and bool(c.get("wet", false)):
+        message = "แปลงนี้รดน้ำแล้ว รอผักเติบโต"
         refresh_labels()
         return
     if tool_mode == "harvest" and stage(index) < 5:
@@ -612,14 +707,20 @@ func finish_work() -> void:
     if work_plot < 0:
         return
     var i: int = work_plot
+    var gained_xp: int = 0
     if tool_mode == "till":
+        if not bool(plots[i].get("tilled", false)):
+            gained_xp = 2
         plots[i]["tilled"] = true
         message = "พรวนดินเรียบร้อย"
     elif tool_mode == "plant":
         plots[i] = {"crop":selected_seed,"tilled":true,"wet":false,"water_time":0.0}
         seeds[selected_seed] = int(seeds[selected_seed])-1
+        gained_xp = 8
         message = "ปลูกสำเร็จ กดรดน้ำแล้วแตะแปลงเดิม"
     elif tool_mode == "water":
+        if not bool(plots[i].get("wet", false)):
+            gained_xp = 4
         plots[i]["wet"] = true
         if float(plots[i].get("water_time",0.0)) == 0.0:
             plots[i]["water_time"] = Time.get_unix_time_from_system()
@@ -635,6 +736,7 @@ func finish_work() -> void:
         var crop_id: int = int(plots[i].get("crop",0))
         coins += int(CROPS[crop_id]["reward"])
         plots[i] = {"tilled":true}
+        gained_xp = 25
         message = "เก็บเกี่ยวสำเร็จ ได้เหรียญเพิ่ม"
     if farm_audio != null:
         farm_audio.play_effect(tool_mode)
@@ -643,6 +745,8 @@ func finish_work() -> void:
         elif tool_mode == "harvest":
             farm_audio.announce("harvest", true)
     work_plot = -1
+    if gain_farm_xp(gained_xp):
+        message = "ฟาร์ม Lv.%d! ปลดล็อกแปลงผักเพิ่ม 5 แปลง" % farm_level
     hoe.visible = false
     can.visible = false
     refresh_plants()
@@ -1106,6 +1210,9 @@ func build_ui() -> void:
     ui.add_child(ui_bottom)
     status_label = text_label("", 15, Color("#3f654b"))
     ui_bottom.add_child(status_label)
+    farm_level_label = text_label("", 15, Color("#7a643c"))
+    farm_level_label.add_theme_font_override("font", THAI_BOLD)
+    ui_bottom.add_child(farm_level_label)
     active_seed_label = text_label("", 16, Color("#365c44"))
     active_seed_label.add_theme_font_override("font", THAI_BOLD)
     ui_bottom.add_child(active_seed_label)
@@ -1287,7 +1394,7 @@ func update_sizes() -> void:
 
     # Small tool tray keeps the working 3D farm visible.
     var toolbar_width: float = minf(650.0, maxf(300.0, w-20.0))
-    var toolbar_y: float = h-127.0
+    var toolbar_y: float = h-150.0
     if touch_controls:
         # In landscape, reserve both side rails for joystick and buttons.
         # In portrait, place the farming toolbar above the bottom controls.
@@ -1295,17 +1402,18 @@ func update_sizes() -> void:
             toolbar_width = minf(570.0, w-340.0)
         else:
             toolbar_width = w-18.0
-            toolbar_y = h-291.0
+            toolbar_y = h-316.0
     var toolbar_x: float = (w-toolbar_width)*0.5
-    set_box(ui_bottom, toolbar_x, toolbar_y, toolbar_width, 116.0)
-    set_box(status_label, 12, 7, toolbar_width-24.0, 25.0)
-    set_box(active_seed_label, 13, 37, toolbar_width-166.0, 30.0)
-    set_box(change_seed_button, toolbar_width-148.0, 33, 135.0, 35.0)
+    set_box(ui_bottom, toolbar_x, toolbar_y, toolbar_width, 140.0)
+    set_box(status_label, 12, 5, toolbar_width-24.0, 25.0)
+    set_box(farm_level_label, 12, 32, toolbar_width-24.0, 22.0)
+    set_box(active_seed_label, 13, 58, toolbar_width-166.0, 30.0)
+    set_box(change_seed_button, toolbar_width-148.0, 55, 135.0, 34.0)
     var gap: float = 6.0
     var tool_button_w: float = (toolbar_width-24.0-3.0*gap)*0.25
     var keys: Array[String] = ["till", "plant", "water", "harvest"]
     for i in range(4):
-        set_box(action_buttons[keys[i]], 12.0+float(i)*(tool_button_w+gap), 75.0, tool_button_w, 34.0)
+        set_box(action_buttons[keys[i]], 12.0+float(i)*(tool_button_w+gap), 98.0, tool_button_w, 34.0)
 
     set_box(stick, 18, h-158, 144, 144)
     set_box(stick_label, 26, h-184, 128, 27)
@@ -1422,6 +1530,8 @@ func _check_voice_context() -> void:
     for stock in seeds:
         enough_seeds = enough_seeds or int(stock) > 0
     for i in range(plots.size()):
+        if not is_plot_unlocked(i):
+            continue
         var pos: Vector3 = plot_places[i]
         if Vector2(pos.x-farmer.position.x, pos.z-farmer.position.z).length() > 3.3:
             continue
@@ -1455,6 +1565,12 @@ func refresh_labels() -> void:
         shop_pen_button.disabled = pens >= MAX_PENS
         shop_pig_button.disabled = pigs >= pens*PEN_CAPACITY
     status_label.text = message
+    if farm_level >= MAX_FARM_LEVEL:
+        farm_level_label.text = "ฟาร์ม Lv.10 MAX  |  เปิดครบ 50 แปลง"
+    else:
+        farm_level_label.text = "ฟาร์ม Lv.%d  |  EXP %d/%d  |  เปิดแปลง %d/50" % [
+            farm_level, farm_xp, xp_to_next_level(), unlocked_plot_count()
+        ]
     active_seed_label.text = "เมล็ดที่เลือก: %s ×%d" % [CROPS[selected_seed]["name"], int(seeds[selected_seed])]
     _refresh_save_indicator()
     refresh_bag_cards()
@@ -1487,11 +1603,19 @@ func refresh_bag_cards() -> void:
         bag_cards[i].modulate = Color.WHITE if count > 0 or selected else Color("#dddddd")
 
 func pick_tool(key: String) -> void:
+    if work_plot >= 0 or work_time > 0.0:
+        message = "รอชาวสวนทำแปลงปัจจุบันให้เสร็จก่อน"
+        refresh_labels()
+        return
     tool_mode = key
     message = "เลือกแปลงผักที่ต้องการ"
     refresh_labels()
 
 func select_seed(index: int) -> void:
+    if work_plot >= 0 or work_time > 0.0:
+        message = "รอชาวสวนทำแปลงปัจจุบันให้เสร็จก่อน"
+        refresh_labels()
+        return
     selected_seed = index
     tool_mode = "plant"
     bag_panel.visible = false
@@ -1589,6 +1713,8 @@ func snapshot() -> Dictionary:
         "feed": feed,
         "pigs": pigs,
         "pens": pens,
+        "farm_level": farm_level,
+        "farm_xp": farm_xp,
         "seeds": seeds.duplicate(),
         "plots": plots.duplicate(true)
     }
@@ -1598,6 +1724,8 @@ func _apply_snapshot(state: Dictionary) -> void:
     feed = int(state["feed"])
     pigs = int(state["pigs"])
     pens = int(state["pens"])
+    farm_level = int(state.get("farm_level", 1))
+    farm_xp = int(state.get("farm_xp", 0))
     seeds = state["seeds"].duplicate()
     plots = state["plots"].duplicate(true)
 
@@ -1741,6 +1869,7 @@ func _confirm_import_backup() -> void:
     var to_restore: Dictionary = pending_restore.duplicate(true)
     pending_restore.clear()
     _apply_snapshot(to_restore)
+    update_plot_locks()
     rebuild_livestock()
     for i in range(grow_stages.size()):
         grow_stages[i] = -1
