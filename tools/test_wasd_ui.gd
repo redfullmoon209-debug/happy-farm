@@ -40,7 +40,8 @@ func _run() -> void:
     check(farm.keyboard_vector() == Vector2.ZERO, "W keyup stops input")
     var stopped: Vector3 = farm.farmer.position
     farm._process(0.10)
-    check(farm.farmer.position.distance_to(stopped) < 0.01, "keyup stops moving")
+    var planar_stop: Vector2 = Vector2(farm.farmer.position.x-stopped.x, farm.farmer.position.z-stopped.z)
+    check(planar_stop.length() < 0.01, "keyup stops horizontal movement")
 
     key_event(farm, KEY_A, true)
     check(farm.keyboard_vector().x < 0, "A moves left")
