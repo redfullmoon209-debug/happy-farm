@@ -68,6 +68,12 @@ jobs:
           ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_landscaping.gd 2>&1 | tee /tmp/landscaping-tests.log
           grep -q 'LANDSCAPING TESTS PASS' /tmp/landscaping-tests.log
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/landscaping-tests.log; then exit 1; fi
+      - name: Large world, land expansion, decoration shop and GM tests
+        run: |
+          set -o pipefail
+          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_world.gd 2>&1 | tee /tmp/world-tests.log
+          grep -q 'WORLD TESTS PASS' /tmp/world-tests.log
+          if grep -E 'WORLD TEST FAIL:|SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/world-tests.log; then exit 1; fi
       - name: Character movement and animations
         run: |
           set -o pipefail
