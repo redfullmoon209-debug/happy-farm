@@ -62,6 +62,12 @@ jobs:
           ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_levels.gd 2>&1 | tee /tmp/level-tests.log
           grep -q 'LEVEL TESTS PASS' /tmp/level-tests.log
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/level-tests.log; then exit 1; fi
+      - name: Free-form plot building, tree shopping and chopping
+        run: |
+          set -o pipefail
+          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_landscaping.gd 2>&1 | tee /tmp/landscaping-tests.log
+          grep -q 'LANDSCAPING TESTS PASS' /tmp/landscaping-tests.log
+          if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/landscaping-tests.log; then exit 1; fi
       - name: Character movement and animations
         run: |
           set -o pipefail
