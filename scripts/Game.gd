@@ -1727,9 +1727,10 @@ func _fit_button_caption(button: Button) -> void:
         original_icon = button.get_meta("happy_icon_texture") as Texture2D
     var icon_width: int = mini(24, maxi(16, int(height * 0.43)))
     var free_space: float = width - 24.0
-    var first_line: String = button.text.replace("\n", " ")
-    var preferred_text_width: float = THAI_BOLD.get_string_size(first_line,
-        HORIZONTAL_ALIGNMENT_LEFT, -1.0, preferred).x
+    var preferred_text_width: float = 0.0
+    for caption_line in button.text.split("\n"):
+        preferred_text_width = maxf(preferred_text_width, THAI_BOLD.get_string_size(
+            caption_line, HORIZONTAL_ALIGNMENT_LEFT, -1.0, preferred).x)
     # Prioritize complete readable words over decoration on small controls.
     var show_icon: bool = original_icon != null and width >= 140.0 and (
         preferred_text_width + float(icon_width) + 12.0 <= free_space)
@@ -1739,8 +1740,11 @@ func _fit_button_caption(button: Button) -> void:
     button.add_theme_constant_override("icon_max_width", icon_width)
     var font_size: int = preferred
     while font_size > min_size:
-        if THAI_BOLD.get_string_size(first_line,
-            HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x <= free_space:
+        var longest_line_width: float = 0.0
+        for caption_line in button.text.split("\n"):
+            longest_line_width = maxf(longest_line_width, THAI_BOLD.get_string_size(
+                caption_line, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x)
+        if longest_line_width <= free_space:
             break
         font_size -= 1
     button.add_theme_font_size_override("font_size", font_size)
@@ -1773,7 +1777,11 @@ func _fit_all_ui_text() -> void:
     _fit_title_caption(gm_title, 19, 15)
     _fit_title_caption(title_label, 20, 16)
     _fit_title_caption(money_label, 17, 14)
-    _fit_title_caption(shop_livestock_label, 16, 14)
+    _fit_title_caption(shop_livestock_label, 17, 14)
+    _fit_title_caption(farm_level_label, 16, 14)
+    _fit_title_caption(active_seed_label, 17, 14)
+    _fit_title_caption(bag_footer, 16, 14)
+    _fit_title_caption(bag_save_status, 16, 14)
 
 func panel(color: Color) -> Panel:
     # Panel (not PanelContainer) never enlarges itself to fit its children.
@@ -1930,23 +1938,23 @@ func build_ui() -> void:
     shop_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     shop_scroll.add_child(shop_grid)
     for i in range(CROPS.size()):
-        var buy: Button = btn("%s  %d เหรียญ" % [CROPS[i]["name"], CROPS[i]["price"]], buy_seed.bind(i))
-        buy.custom_minimum_size = Vector2(145, 39)
+        var buy: Button = btn("%s\n%d เหรียญ" % [CROPS[i]["name"], CROPS[i]["price"]], buy_seed.bind(i))
+        buy.custom_minimum_size = Vector2(145, 55)
         buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         shop_grid.add_child(buy)
-    shop_plot_button = btn("ชุดแปลงปลูก 75 เหรียญ", buy_plot_kit, Color("#5d9d75"))
-    shop_plot_button.custom_minimum_size = Vector2(145, 40)
+    shop_plot_button = btn("ชุดแปลงปลูก\n75 เหรียญ", buy_plot_kit, Color("#5d9d75"))
+    shop_plot_button.custom_minimum_size = Vector2(145, 55)
     shop_plot_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     shop_grid.add_child(shop_plot_button)
     for i in range(TREE_VARIANTS.size()):
-        var tree_buy: Button = btn("ต้น%s %d เหรียญ" % [TREE_NAMES[i], TREE_PRICES[i]], buy_tree_kit.bind(i), Color("#568768"))
-        tree_buy.custom_minimum_size = Vector2(145, 40)
+        var tree_buy: Button = btn("ต้น%s\n%d เหรียญ" % [TREE_NAMES[i], TREE_PRICES[i]], buy_tree_kit.bind(i), Color("#568768"))
+        tree_buy.custom_minimum_size = Vector2(145, 55)
         tree_buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         shop_grid.add_child(tree_buy)
         shop_tree_buttons.append(tree_buy)
     for i in range(DECOR_NAMES.size()):
-        var decor_buy: Button = btn("%s %d เหรียญ" % [DECOR_NAMES[i], DECOR_PRICES[i]], buy_decor_kit.bind(i), Color("#7e9070"))
-        decor_buy.custom_minimum_size = Vector2(145, 40)
+        var decor_buy: Button = btn("%s\n%d เหรียญ" % [DECOR_NAMES[i], DECOR_PRICES[i]], buy_decor_kit.bind(i), Color("#7e9070"))
+        decor_buy.custom_minimum_size = Vector2(145, 55)
         decor_buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         shop_grid.add_child(decor_buy)
         shop_decor_buttons.append(decor_buy)
