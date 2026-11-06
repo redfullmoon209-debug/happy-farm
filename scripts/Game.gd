@@ -1280,9 +1280,21 @@ func _process(delta: float) -> void:
         farmer_visual.set_state(pose_name)
 
 func move_actor(direction: Vector3, speed: float, delta: float) -> void:
-    farmer.position += direction*speed*delta
-    farmer.position.x = clampf(farmer.position.x,-30.0,30.0)
-    farmer.position.z = clampf(farmer.position.z,-17.0,17.0)
+    var desired: Vector3 = farmer.position + direction*speed*delta
+    desired.x = clampf(desired.x, -WORLD_HALF+0.6, WORLD_HALF-0.6)
+    desired.z = clampf(desired.z, -WORLD_HALF+0.6, WORLD_HALF-0.6)
+    if is_land_owned(desired):
+        farmer.position.x = desired.x
+        farmer.position.z = desired.z
+    else:
+        # Slide along the purchased area's border instead of walking into
+        # unowned land. Crossing the edge becomes possible after purchase.
+        var slide_x: Vector3 = Vector3(desired.x, 0, farmer.position.z)
+        var slide_z: Vector3 = Vector3(farmer.position.x, 0, desired.z)
+        if is_land_owned(slide_x):
+            farmer.position.x = desired.x
+        if is_land_owned(slide_z):
+            farmer.position.z = desired.z
     farmer.position.y = jumping+absf(sin(elapsed*12))*0.035
     farmer.rotation.y = atan2(-direction.x,-direction.z)
     var wave: float = sin(elapsed*(16 if running else 10))
@@ -1314,6 +1326,8 @@ func set_camera_zoom(target_distance: float) -> void:
 func _camera_overlay_at(pos: Vector2) -> bool:
     return (shop_panel != null and shop_panel.visible
         or restore_confirm != null and restore_confirm.visible
+        or land_confirm != null and land_confirm.visible
+        or gm_panel != null and gm_panel.visible
         or bag_panel != null and bag_panel.visible and bag_panel.get_global_rect().has_point(pos))
 
 func _camera_action_at(pos: Vector2) -> Button:
@@ -1506,7 +1520,7 @@ func _input(event: InputEvent) -> void:
             _update_placement_preview(event.position)
 
 func click_plot(pixel: Vector2) -> void:
-    if shop_panel.visible:
+    if shop_panel.visible or (gm_panel != null and gm_panel.visible) or (land_confirm != null and land_confirm.visible):
         return
     if landscaping_mode:
         if bag_panel.visible:
@@ -1517,6 +1531,10 @@ func click_plot(pixel: Vector2) -> void:
             _plant_purchased_tree(_ground_at(pixel))
         elif tool_mode == "chop_tree":
             _chop_tree_at(pixel)
+        elif tool_mode == "place_decor":
+            _place_decoration(_ground_at(pixel))
+        elif tool_mode == "buy_land":
+            _request_land_purchase(_ground_at(pixel))
         _update_placement_preview(pixel)
         return
     var origin: Vector3 = camera.project_ray_origin(pixel)
@@ -2286,6 +2304,9 @@ func snapshot() -> Dictionary:
         "extra_plots": free_cells,
         "placed_trees": placed_trees_data.duplicate(true),
         "removed_trees": removed_trees.duplicate(),
+        "unlocked_zones": unlocked_zones.duplicate(),
+        "decor_kits": decor_kits.duplicate(),
+        "placed_decor": placed_decor_data.duplicate(true),
         "seeds": seeds.duplicate(),
         "plots": plots.slice(0, FARM_ROWS * FARM_COLUMNS).duplicate(true)
     }
@@ -2303,6 +2324,9 @@ func _apply_snapshot(state: Dictionary) -> void:
     saved_extra_plots = state.get("extra_plots", []).duplicate(true)
     placed_trees_data = state.get("placed_trees", []).duplicate(true)
     removed_trees = state.get("removed_trees", []).duplicate()
+    unlocked_zones = state.get("unlocked_zones", STARTER_ZONES.duplicate()).duplicate()
+    decor_kits = state.get("decor_kits", [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]).duplicate()
+    placed_decor_data = state.get("placed_decor", []).duplicate(true)
     seeds = state["seeds"].duplicate()
     plots = state["plots"].duplicate(true)
 
@@ -2446,6 +2470,7 @@ func _confirm_import_backup() -> void:
     var to_restore: Dictionary = pending_restore.duplicate(true)
     pending_restore.clear()
     _apply_snapshot(to_restore)
+    _refresh_land_zones()
     update_plot_locks()
     rebuild_livestock()
     _rebuild_placed_world()
