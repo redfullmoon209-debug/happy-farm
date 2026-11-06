@@ -1646,11 +1646,13 @@ func btn(txt: String, callback: Callable, background: Color = Color("#417c59")) 
     # Original PNG has ~35px of empty transparent canvas above/below its
     # painted body. Show the COMPLETE painted art, not those empty bands.
     # Source asset remains unchanged; this rect only skips empty padding.
-    style.region_rect = Rect2(0.0, 34.0, 640.0, 153.0)
-    style.texture_margin_left = 15.0
-    style.texture_margin_right = 15.0
-    style.texture_margin_top = 8.0
-    style.texture_margin_bottom = 8.0
+    style.region_rect = Rect2(20.0, 34.0, 600.0, 153.0)
+    # Source edges are transparent. Minimal nine-patch margins avoid
+    # sacrificing the usable button width/height to invisible corners.
+    style.texture_margin_left = 3.0
+    style.texture_margin_right = 3.0
+    style.texture_margin_top = 1.0
+    style.texture_margin_bottom = 1.0
     style.content_margin_left = 0.0
     style.content_margin_right = 0.0
     style.content_margin_top = 0.0
@@ -2188,10 +2190,10 @@ func update_sizes() -> void:
     for zoom_button in [zoom_out_button, zoom_in_button]:
         var square: StyleBoxTexture = StyleBoxTexture.new()
         square.texture = UI_SLOT
-        square.texture_margin_left = 7.0
-        square.texture_margin_right = 7.0
-        square.texture_margin_top = 7.0
-        square.texture_margin_bottom = 7.0
+        square.texture_margin_left = 2.0
+        square.texture_margin_right = 2.0
+        square.texture_margin_top = 2.0
+        square.texture_margin_bottom = 2.0
         zoom_button.add_theme_stylebox_override("normal", square)
         var square_hover: StyleBoxTexture = square.duplicate()
         square_hover.modulate_color = Color(1.18, 1.18, 1.10)
