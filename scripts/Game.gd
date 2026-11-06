@@ -2131,28 +2131,31 @@ func update_sizes() -> void:
 
     # Small tool tray keeps the working 3D farm visible.
     var toolbar_width: float = minf(650.0, maxf(300.0, w-20.0))
-    var toolbar_y: float = h-208.0
+    var short_landscape: bool = w >= 700.0 and h < 500.0
+    var toolbar_height: float = 180.0 if short_landscape else 198.0
+    var toolbar_y: float = h-toolbar_height-10.0
     if touch_controls:
         # In landscape, reserve both side rails for joystick and buttons.
-        # In portrait, place the farming toolbar above the bottom controls.
+        # For short phone landscape keep the screen center free for pinch.
         if w >= 700.0:
             toolbar_width = minf(570.0, w-340.0)
         else:
             toolbar_width = w-18.0
             toolbar_y = h-365.0
     var toolbar_x: float = (w-toolbar_width)*0.5
-    set_box(ui_bottom, toolbar_x, toolbar_y, toolbar_width, 198.0)
-    set_box(status_label, 15, 7, toolbar_width-30.0, 42.0)
-    set_box(farm_level_label, 15, 51, toolbar_width-164.0, 27.0)
-    set_box(landscape_button, toolbar_width-147.0, 48.0, 131.0, 34.0)
-    set_box(active_seed_label, 15, 80, toolbar_width-170.0, 30.0)
-    set_box(change_seed_button, toolbar_width-150.0, 80.0, 134.0, 34.0)
-    set_box(landscape_shop_button, toolbar_width-150.0, 80.0, 134.0, 34.0)
+    set_box(ui_bottom, toolbar_x, toolbar_y, toolbar_width, toolbar_height)
+    set_box(status_label, 15, 7, toolbar_width-30.0, 30.0 if short_landscape else 42.0)
+    set_box(farm_level_label, 15, 36.0 if short_landscape else 51.0, toolbar_width-164.0, 27.0)
+    set_box(landscape_button, toolbar_width-147.0, 33.0 if short_landscape else 48.0, 131.0, 34.0)
+    set_box(active_seed_label, 15, 63.0 if short_landscape else 80.0, toolbar_width-170.0, 30.0)
+    set_box(change_seed_button, toolbar_width-150.0, 63.0 if short_landscape else 80.0, 134.0, 34.0)
+    set_box(landscape_shop_button, toolbar_width-150.0, 63.0 if short_landscape else 80.0, 134.0, 34.0)
     var gap: float = 6.0
     var tool_button_w: float = (toolbar_width-24.0-3.0*gap)*0.25
     var keys: Array[String] = ["till", "plant", "water", "harvest"]
     for i in range(4):
-        set_box(action_buttons[keys[i]], 12.0+float(i)*(tool_button_w+gap), 129.0, tool_button_w, 50.0)
+        set_box(action_buttons[keys[i]], 12.0+float(i)*(tool_button_w+gap),
+            110.0 if short_landscape else 129.0, tool_button_w, 50.0)
     var garden_keys: Array[String] = ["place_plot", "plant_tree", "chop_tree", "place_decor", "buy_land"]
     # Two generous rows prevent Thai labels from being squeezed into five
     # narrow buttons when decorating on a mobile or a desktop.
@@ -2163,7 +2166,7 @@ func update_sizes() -> void:
         var row: int = 0 if i < 3 else 1
         var offset: float = 0.0 if row == 0 else (landscape_w+gap)*0.5
         set_box(garden_button, 12.0+offset+float(col)*(landscape_w+gap),
-            115.0+float(row)*37.0, landscape_w, 34.0)
+            (94.0 if short_landscape else 115.0)+float(row)*37.0, landscape_w, 34.0)
 
     set_box(stick, 18, h-158, 144, 144)
     set_box(stick_label, 26, h-184, 128, 27)
