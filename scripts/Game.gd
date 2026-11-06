@@ -7,6 +7,13 @@ const SAVE_DATA = preload("res://scripts/SaveData.gd")
 const FARMER_VISUAL = preload("res://scripts/FarmerVisual.gd")
 const FARM_AUDIO = preload("res://scripts/FarmAudio.gd")
 const GARDEN_DECOR = preload("res://scripts/GardenDecor.gd")
+# Each visual element is imported from a standalone transparent PNG.
+# Text remains live Godot text for crisp rendering and future localization.
+const UI_BUTTON: Texture2D = preload("res://assets/ui/happy/button_green.png")
+const UI_WINDOW: Texture2D = preload("res://assets/ui/happy/window_wood.png")
+const UI_HEADER: Texture2D = preload("res://assets/ui/happy/window_header.png")
+const UI_SLOT: Texture2D = preload("res://assets/ui/happy/inventory_slot.png")
+const UI_HUD: Texture2D = preload("res://assets/ui/happy/hud_bar.png")
 const THAI = preload("res://assets/Sarabun-Regular.ttf")
 const THAI_BOLD = preload("res://assets/Sarabun-SemiBold.ttf")
 const SAVE = "user://happy_farm_clean.json"
@@ -179,6 +186,9 @@ var shop_button: Button
 var feed_button: Button
 var seed_caption: Label
 var shop_heading: Label
+var shop_header_art: TextureRect
+var bag_header_art: TextureRect
+var gm_header_art: TextureRect
 var shop_close: Button
 var shop_feed: Button
 var shop_scroll: ScrollContainer
@@ -1622,26 +1632,70 @@ func btn(txt: String, callback: Callable, background: Color = Color("#417c59")) 
     b.add_theme_font_size_override("font_size", 16)
     b.add_theme_color_override("font_color", Color.WHITE)
     b.clip_text = true
-    var style: StyleBoxFlat = StyleBoxFlat.new()
-    style.bg_color = background
-    style.set_corner_radius_all(12)
-    style.set_content_margin_all(5)
-    style.shadow_color = Color(0.12, 0.22, 0.17, 0.23)
-    style.shadow_size = 3
-    style.shadow_offset = Vector2(0, 2)
+    # Nine-slice the original standalone button PNG; no screenshot cropping.
+    # This keeps the glossy edges intact at desktop and mobile dimensions.
+    var style: StyleBoxTexture = StyleBoxTexture.new()
+    style.texture = UI_BUTTON
+    style.texture_margin_left = 28.0
+    style.texture_margin_right = 28.0
+    style.texture_margin_top = 16.0
+    style.texture_margin_bottom = 16.0
+    style.modulate_color = Color.WHITE
     b.add_theme_stylebox_override("normal", style)
-    var hover: StyleBoxFlat = style.duplicate()
-    hover.bg_color = background.lightened(0.16)
-    hover.shadow_size = 5
+    var hover: StyleBoxTexture = style.duplicate()
+    hover.modulate_color = Color(1.13, 1.13, 1.07, 1.0)
     b.add_theme_stylebox_override("hover", hover)
-    var down: StyleBoxFlat = style.duplicate()
-    down.bg_color = background.darkened(0.17)
-    down.shadow_size = 1
-    down.shadow_offset = Vector2.ZERO
+    var down: StyleBoxTexture = style.duplicate()
+    down.modulate_color = Color("#b4ceaa")
     b.add_theme_stylebox_override("pressed", down)
+    b.add_theme_stylebox_override("disabled", down)
     b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+    b.add_theme_color_override("font_color", Color("#fffce4"))
+    b.add_theme_color_override("font_hover_color", Color.WHITE)
+    b.add_theme_color_override("font_pressed_color", Color("#fff8d1"))
+    b.add_theme_color_override("font_disabled_color", Color("#d1d2bc"))
+    b.add_theme_color_override("font_outline_color", Color(0.09, 0.25, 0.12, 0.90))
+    b.add_theme_constant_override("outline_size", 2)
+    b.add_theme_constant_override("h_separation", 4)
     b.pressed.connect(callback)
     return b
+
+func _skin_window(p: Panel) -> void:
+    var frame: StyleBoxTexture = StyleBoxTexture.new()
+    frame.texture = UI_WINDOW
+    frame.texture_margin_left = 28.0
+    frame.texture_margin_right = 28.0
+    frame.texture_margin_top = 24.0
+    frame.texture_margin_bottom = 28.0
+    p.add_theme_stylebox_override("panel", frame)
+
+func _skin_hud(p: Panel) -> void:
+    var frame: StyleBoxTexture = StyleBoxTexture.new()
+    frame.texture = UI_HUD
+    frame.texture_margin_left = 24.0
+    frame.texture_margin_right = 24.0
+    frame.texture_margin_top = 18.0
+    frame.texture_margin_bottom = 18.0
+    p.add_theme_stylebox_override("panel", frame)
+
+func _header_layer(parent: Control) -> TextureRect:
+    var art: TextureRect = TextureRect.new()
+    art.texture = UI_HEADER
+    art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    art.stretch_mode = TextureRect.STRETCH_SCALE
+    art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    parent.add_child(art)
+    return art
+
+func _set_icon(button: Button, name: String) -> void:
+    if button == null:
+        return
+    var asset: String = "res://assets/ui/happy/icon_%s.png" % name
+    if ResourceLoader.exists(asset):
+        button.icon = load(asset) as Texture2D
+        button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+        button.expand_icon = true
+        button.icon_max_width = 26
 
 func panel(color: Color) -> Panel:
     # Panel (not PanelContainer) never enlarges itself to fit its children.
