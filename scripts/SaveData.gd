@@ -12,6 +12,7 @@ const OLD_PLOTS: int = 24
 const PLOTS_PER_ROW: int = 10
 const PIGS_PER_PEN: int = 4
 const MAX_PENS: int = 4
+const MAX_FARM_LEVEL: int = 10
 
 static func normalize(raw: Variant) -> Dictionary:
     if not (raw is Dictionary):
@@ -49,6 +50,19 @@ static func normalize(raw: Variant) -> Dictionary:
         return {}
     if pen_count < 1 or pen_count > MAX_PENS or animal_count < 0 or animal_count > pen_count * PIGS_PER_PEN:
         return {}
+
+    # Older browser saves have no farm progression. Preserve their contents
+    # while adding a fresh level 1 / 0 EXP progression when first loaded.
+    var level_value: Variant = data.get("farm_level", 1)
+    var xp_value: Variant = data.get("farm_xp", 0)
+    if not (level_value is int) or not (xp_value is int):
+        return {}
+    var farm_level: int = int(level_value)
+    var farm_xp: int = int(xp_value)
+    if farm_level < 1 or farm_level > MAX_FARM_LEVEL or farm_xp < 0 or farm_xp > 1000000:
+        return {}
+    if farm_level == MAX_FARM_LEVEL:
+        farm_xp = 0
 
     var safe_seeds: Array = []
     for value in input_seeds:
@@ -103,6 +117,8 @@ static func normalize(raw: Variant) -> Dictionary:
         "feed": stock,
         "pigs": animal_count,
         "pens": pen_count,
+        "farm_level": farm_level,
+        "farm_xp": farm_xp,
         "seeds": safe_seeds,
         "plots": safe_plots
     }
