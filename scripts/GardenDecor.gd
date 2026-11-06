@@ -117,11 +117,16 @@ static func make(parent: Node3D, position: Vector3, decor_type: int, yaw: float 
                 _cube(root, Vector3(x,1.64,0), Vector3(0.14,1.45,0.14), wood)
             _cube(root, Vector3(0,2.38,0), Vector3(1.90,0.20,1.28), Color("#b36e55"))
         10: # Hedge shrub
-            for x,z,size in [[0.0,0.0,1.25],[-0.52,0.24,0.86],[0.52,-0.10,0.91]]:
+            for entry in [[0.0,0.0,1.25],[-0.52,0.24,0.86],[0.52,-0.10,0.91]]:
+                var x: float = float(entry[0])
+                var z: float = float(entry[1])
+                var size: float = float(entry[2])
                 _round(root, Vector3(x,0.62,z), Vector3(size,size,size), green)
         11: # Paving stone
             _cube(root, Vector3(0,0.07,0), Vector3(1.45,0.12,1.45), Color("#d0c7b0"))
-            for x,z in [[-0.35,-0.34],[0.38,0.32]]:
+            for entry in [[-0.35,-0.34],[0.38,0.32]]:
+                var x: float = float(entry[0])
+                var z: float = float(entry[1])
                 _round(root, Vector3(x,0.14,z), Vector3(0.28,0.06,0.25), stone)
         12: # Mailbox
             _cube(root, Vector3(0,0.62,0), Vector3(0.14,1.24,0.14), wood)
@@ -134,7 +139,10 @@ static func make(parent: Node3D, position: Vector3, decor_type: int, yaw: float 
                     _cube(root, Vector3(x,1.30,z), Vector3(0.16,2.5,0.16), wood)
             _cylinder(root, Vector3(0,2.65,0), 0.75, 2.28, Color("#ae785e"), 0.15)
         14: # Rock garden
-            for x,z,size in [[-0.65,0.2,0.98],[0.40,-0.36,0.75],[0.8,0.48,0.68]]:
+            for entry in [[-0.65,0.2,0.98],[0.40,-0.36,0.75],[0.8,0.48,0.68]]:
+                var x: float = float(entry[0])
+                var z: float = float(entry[1])
+                var size: float = float(entry[2])
                 _round(root, Vector3(x,0.35 * size,z), Vector3(size,size*0.72,size*0.8), stone)
             _round(root, Vector3(-0.05,0.20,0.6), Vector3(0.55,0.34,0.54), green)
         15: # Small lantern
