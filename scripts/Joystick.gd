@@ -1,4 +1,7 @@
 extends Control
+# Two separate transparent PNG layers: stationary base + moving thumb.
+const BASE_TEXTURE: Texture2D = preload("res://assets/ui/happy/joystick_base.png")
+const THUMB_TEXTURE: Texture2D = preload("res://assets/ui/happy/joystick_thumb.png")
 # Thumb joystick that tracks a single finger and never steals other touches.
 var direction: Vector2 = Vector2.ZERO
 var finger_id: int = -1
@@ -61,17 +64,12 @@ func _move_stick(screen: Vector2) -> void:
     queue_redraw()
 
 func _draw() -> void:
-    var c: Vector2 = size * 0.5
-    var r: float = minf(size.x, size.y) * 0.47
-    # High-contrast analog base visible over bright farm grass and paths.
-    draw_circle(c, r, Color(0.10, 0.24, 0.20, 0.76))
-    draw_arc(c, r-2.0, 0.0, TAU, 48, Color("#e9f5de"), 3.0, true)
-    draw_arc(c, r*0.69, 0.0, TAU, 40, Color(0.91, 0.97, 0.91, 0.28), 2.0, true)
-    for arrow: Vector2 in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
-        var point: Vector2 = c+arrow*(r*0.77)
-        draw_line(point-arrow*5.0, point+arrow*3.0, Color("#d9e9d7"), 2.5, true)
-    var thumb: Vector2 = c + direction * (r * 0.61)
-    draw_circle(thumb, r * 0.36, Color("#f7fff1"))
-    draw_circle(thumb, r * 0.29, Color("#4b9472"))
-    draw_circle(thumb, r * 0.17, Color("#79c29a"))
-    draw_arc(thumb, r * 0.31, 0.0, TAU, 32, Color.WHITE, 1.5, true)
+    var center: Vector2 = size * 0.5
+    var diameter: float = minf(size.x, size.y) * 0.94
+    var base_rect: Rect2 = Rect2(center - Vector2.ONE*diameter*0.5, Vector2.ONE*diameter)
+    draw_texture_rect(BASE_TEXTURE, base_rect, false)
+    # Only the foreground PNG travels with the finger; never crop the art.
+    var knob_diameter: float = diameter * 0.50
+    var thumb_center: Vector2 = center + direction * diameter * 0.29
+    var thumb_rect: Rect2 = Rect2(thumb_center - Vector2.ONE*knob_diameter*0.5, Vector2.ONE*knob_diameter)
+    draw_texture_rect(THUMB_TEXTURE, thumb_rect, false)
