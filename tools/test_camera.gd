@@ -349,10 +349,12 @@ func _check() -> void:
         farm.set_camera_zoom(78.0)
         var viewport_rect: Rect2 = root.get_visible_rect()
         var all_visible: bool = true
-        for plot: Vector3 in farm.plot_places:
+        # Custom purchased beds can be anywhere in the open grass. The original
+        # fixed 50 must still be visible at the maximum zoom.
+        for plot: Vector3 in farm.plot_places.slice(0, 50):
             for corner: Vector3 in [Vector3(-1.08, 0.22, -1.08), Vector3(1.08, 0.22, 1.08), Vector3(-1.08, 0.22, 1.08), Vector3(1.08, 0.22, -1.08)]:
                 all_visible = all_visible and viewport_rect.has_point(farm.camera.unproject_position(plot + corner))
-        expect(all_visible and farm.plot_places.size() == 50, "all 50 bed bounds must fit at maximum zoom: " + str(viewport_size))
+        expect(all_visible and farm.plot_places.size() >= 50, "all 50 original bed bounds must fit at maximum zoom: " + str(viewport_size))
         var far_size: float = farm.camera.size
         farm.set_camera_zoom(6.0)
         expect(farm.camera.size < far_size and farm.camera.size >= 3.6, "close orthographic zoom must remain usable: " + str(viewport_size))
