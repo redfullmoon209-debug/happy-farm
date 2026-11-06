@@ -2119,14 +2119,25 @@ func refresh_labels() -> void:
         shop_pig_button.disabled = pigs >= pens*PEN_CAPACITY
     status_label.text = message
     if farm_level >= MAX_FARM_LEVEL:
-        farm_level_label.text = "ฟาร์ม Lv.10 MAX" if get_viewport().get_visible_rect().size.x < 700.0 else "ฟาร์ม Lv.10 MAX | 50 แปลงเดิม"
+        farm_level_label.text = "ฟาร์ม Lv.10 MAX" if get_viewport().get_visible_rect().size.x < 700.0 else "Lv.10 MAX | ที่ดิน %d/100" % unlocked_zones.size()
     elif get_viewport().get_visible_rect().size.x < 700.0:
-        farm_level_label.text = "Lv.%d EXP %d/%d" % [farm_level, farm_xp, xp_to_next_level()]
+        farm_level_label.text = "Lv.%d %d/%d | ที่ดิน %d" % [farm_level, farm_xp, xp_to_next_level(), unlocked_zones.size()]
     else:
-        farm_level_label.text = "ฟาร์ม Lv.%d | EXP %d/%d | เปิด %d/50" % [
-            farm_level, farm_xp, xp_to_next_level(), unlocked_plot_count()
+        farm_level_label.text = "Lv.%d EXP %d/%d | แปลง %d/50 | ที่ดิน %d/100" % [
+            farm_level, farm_xp, xp_to_next_level(), unlocked_plot_count(), unlocked_zones.size()
         ]
-    active_seed_label.text = ("แปลงชุด ×%d | ต้น%s ×%d" % [plot_kits, TREE_NAMES[selected_tree], int(tree_kits[selected_tree])]) if landscaping_mode else "เมล็ด: %s ×%d" % [CROPS[selected_seed]["name"], int(seeds[selected_seed])]
+    if not landscaping_mode:
+        active_seed_label.text = "เมล็ด: %s ×%d" % [CROPS[selected_seed]["name"], int(seeds[selected_seed])]
+    elif tool_mode == "place_plot":
+        active_seed_label.text = "ชุดแปลง: %d" % plot_kits
+    elif tool_mode == "plant_tree":
+        active_seed_label.text = "ต้น%s ×%d" % [TREE_NAMES[selected_tree], int(tree_kits[selected_tree])]
+    elif tool_mode == "place_decor":
+        active_seed_label.text = "%s ×%d" % [DECOR_NAMES[selected_decor], int(decor_kits[selected_decor])]
+    elif tool_mode == "buy_land":
+        active_seed_label.text = "ที่ดิน %d/100 โซน" % unlocked_zones.size()
+    else:
+        active_seed_label.text = "ไม้ %d" % wood
     if landscape_button != null:
         landscape_button.text = "กลับทำฟาร์ม" if landscaping_mode else "จัดสวน"
         change_seed_button.visible = not landscaping_mode
@@ -2134,7 +2145,7 @@ func refresh_labels() -> void:
     _refresh_save_indicator()
     refresh_bag_cards()
     for key in action_buttons.keys():
-        var is_garden: bool = str(key) == "place_plot" or str(key) == "plant_tree" or str(key) == "chop_tree"
+        var is_garden: bool = ["place_plot", "plant_tree", "chop_tree", "place_decor", "buy_land"].has(str(key))
         action_buttons[key].visible = is_garden == landscaping_mode
         action_buttons[key].modulate = Color.WHITE if key == tool_mode else Color("#bbcbbd")
 
@@ -2148,7 +2159,10 @@ func refresh_bag_cards() -> void:
     var tree_total: int = 0
     for stock in tree_kits:
         tree_total += int(stock)
-    bag_footer.text = "ชุดแปลง %d | ต้นกล้า %d | ไม้ %d" % [plot_kits, tree_total, wood]
+    var decor_total: int = 0
+    for stock in decor_kits:
+        decor_total += int(stock)
+    bag_footer.text = "แปลง %d | ต้น %d | ของแต่ง %d | ไม้ %d" % [plot_kits, tree_total, decor_total, wood]
     for i in range(bag_cards.size()):
         var count: int = int(seeds[i])
         var selected: bool = selected_seed == i
@@ -2186,14 +2200,24 @@ func pick_tool(key: String) -> void:
         return
     if key == "plant_tree" and tool_mode == "plant_tree" and landscaping_mode:
         selected_tree = (selected_tree + 1) % TREE_VARIANTS.size()
+    if key == "place_decor" and tool_mode == "place_decor" and landscaping_mode:
+        for offset in range(1, DECOR_NAMES.size()+1):
+            var next: int = (selected_decor + offset) % DECOR_NAMES.size()
+            if int(decor_kits[next]) > 0:
+                selected_decor = next
+                break
     tool_mode = key
-    landscaping_mode = key == "place_plot" or key == "plant_tree" or key == "chop_tree"
+    landscaping_mode = ["place_plot", "plant_tree", "chop_tree", "place_decor", "buy_land"].has(key)
     if key == "place_plot":
         message = "แตะพื้นหญ้าที่ว่างเพื่อวางแปลง (มี %d ชุด)" % plot_kits
     elif key == "plant_tree":
         message = "เลือกต้น%s (%d ต้น) แล้วแตะพื้นที่ว่าง | กดปุ่มซ้ำเพื่อเปลี่ยนชนิด" % [TREE_NAMES[selected_tree], int(tree_kits[selected_tree])]
     elif key == "chop_tree":
         message = "แตะต้นไม้ที่ต้องการตัดเพื่อเคลียร์พื้นที่"
+    elif key == "place_decor":
+        message = "เลือก%s ×%d จากร้านค้า แล้วแตะพื้นว่าง (กดปุ่มซ้ำเพื่อเปลี่ยนชนิด)" % [DECOR_NAMES[selected_decor], int(decor_kits[selected_decor])]
+    elif key == "buy_land":
+        message = "แตะโซนสีเข้มที่ติดที่ดินเพื่อดูราคาซื้อพื้นที่ 40×40"
     else:
         message = "เลือกแปลงผักที่ต้องการ"
     if placement_preview != null:
@@ -2265,6 +2289,46 @@ func buy_tree_kit(index: int) -> void:
         if farm_audio != null:
             farm_audio.play_effect("buy")
         save_game()
+    refresh_labels()
+
+func buy_decor_kit(index: int) -> void:
+    if index < 0 or index >= DECOR_NAMES.size():
+        return
+    if coins < int(DECOR_PRICES[index]):
+        message = "เหรียญไม่พอซื้อ%s" % DECOR_NAMES[index]
+    elif int(decor_kits[index]) >= 100000:
+        message = "เก็บของตกแต่งเกินจำนวนสูงสุดแล้ว"
+    else:
+        coins -= int(DECOR_PRICES[index])
+        decor_kits[index] = int(decor_kits[index]) + 1
+        selected_decor = index
+        landscaping_mode = true
+        tool_mode = "place_decor"
+        shop_panel.visible = false
+        message = "ซื้อ%sแล้ว! แตะที่ดินที่ปลดล็อกเพื่อวาง" % DECOR_NAMES[index]
+        if farm_audio != null:
+            farm_audio.play_effect("buy")
+        save_game()
+    refresh_labels()
+
+func toggle_gm_panel() -> void:
+    if not GM_TEST_MODE:
+        if gm_panel != null:
+            gm_panel.visible = false
+        return
+    gm_panel.visible = not gm_panel.visible
+    if gm_panel.visible:
+        shop_panel.visible = false
+        bag_panel.visible = false
+
+func gm_grant_coins(amount: int) -> void:
+    # Never call this in a public economy. A browser-only GM switch is
+    # suitable for testing, not for secure production currency.
+    if not GM_TEST_MODE or amount <= 0:
+        return
+    coins = mini(1000000000, coins + amount)
+    message = "GM TEST เติมเหรียญทดลอง %d (ยอดรวม %d)" % [amount, coins]
+    save_game()
     refresh_labels()
 
 func buy_seed(index: int) -> void:
