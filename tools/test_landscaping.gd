@@ -19,6 +19,7 @@ func _run() -> void:
         return
     var game: Variant = scene.instantiate()
     root.add_child(game)
+    var initial_save: Dictionary = game.snapshot()
 
     # Run independent of any auto-saved farm state from other tests.
     game.farm_level = 1
@@ -118,6 +119,12 @@ func _run() -> void:
     invalid = state.duplicate(true)
     invalid["placed_trees"][0]["variant"] = "unknown.fbx"
     check(SAVES.normalize(invalid).is_empty(), "reject unapproved FBX resource paths")
+
+    # Restore the prior browser save: later camera tests run in the same
+    # Godot user:// location but must not inherit this test's new bed.
+    game._apply_snapshot(initial_save)
+    game._rebuild_placed_world()
+    check(game.save_game(), "restore original save after integration test")
 
     if failures == 0:
         print("LANDSCAPING TESTS PASS: free plots, purchases, tree planting, chopping, placement and save restore")
