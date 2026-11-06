@@ -1720,11 +1720,11 @@ func _fit_button_caption(button: Button) -> void:
     var height: float = maxf(button.size.y, button.custom_minimum_size.y)
     if width < 45.0 or height < 22.0:
         return
-    var preferred: int = 18 if height >= 45.0 else 16
-    if height < 36.0:
-        preferred = 14
+    var preferred: int = 20 if height >= 48.0 else (18 if height >= 34.0 else 16)
     var min_size: int = 12 if width < 115.0 else 13
-    var original_icon: Texture2D = button.get_meta("happy_icon_texture", null) as Texture2D
+    var original_icon: Texture2D = null
+    if button.has_meta("happy_icon_texture"):
+        original_icon = button.get_meta("happy_icon_texture") as Texture2D
     var icon_width: int = mini(24, maxi(16, int(height * 0.43)))
     var free_space: float = width - 24.0
     var first_line: String = button.text.replace("\n", " ")
