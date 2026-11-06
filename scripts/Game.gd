@@ -1695,7 +1695,7 @@ func _set_icon(button: Button, name: String) -> void:
         button.icon = load(asset) as Texture2D
         button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
         button.expand_icon = true
-        button.icon_max_width = 26
+        button.add_theme_constant_override("icon_max_width", 26)
 
 func panel(color: Color) -> Panel:
     # Panel (not PanelContainer) never enlarges itself to fit its children.
