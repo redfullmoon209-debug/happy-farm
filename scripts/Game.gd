@@ -38,6 +38,12 @@ const PEN_CAPACITY: int = 4
 const MAX_PENS: int = 4
 const PEN_BASE_PRICE: int = 150
 const PIG_PRICE: int = 90
+const PLOT_KIT_PRICE: int = 75
+const TREE_VARIANTS = ["STOak2", "STPine3", "STWillow2", "STColumnar1", "STSwiggly1"]
+const TREE_NAMES = ["โอ๊ก", "สน", "วิลโลว์", "ทรงสูง", "กิ่งโค้ง"]
+const TREE_PRICES = [65, 75, 80, 75, 90]
+const MAX_EXTRA_PLOTS: int = 120
+const MAX_PLANTED_TREES: int = 80
 # Close enough to inspect the farmer; wide enough for all 10 x 5 beds.
 # Every zoom input uses the same limits (orthographic size is derived below).
 const CAMERA_ZOOM_MIN: float = 6.0
@@ -51,6 +57,18 @@ var dirt_meshes: Array[MeshInstance3D] = []
 var grow_stages: Array[int] = []
 var plot_locks: Array[Node3D] = []
 var plots: Array = []
+var plot_kits: int = 0
+var tree_kits: Array = [0, 0, 0, 0, 0]
+var selected_tree: int = 0
+var wood: int = 0
+var saved_extra_plots: Array = []
+var placed_trees_data: Array = []
+var removed_trees: Array = []
+var extra_plot_nodes: Array[Node3D] = []
+var base_tree_nodes: Array[Node3D] = []
+var placed_tree_nodes: Array[Node3D] = []
+var placement_preview: MeshInstance3D
+var landscaping_mode: bool = false
 var farm_level: int = 1
 var farm_xp: int = 0
 var coins: int = 250
@@ -111,6 +129,9 @@ var money_label: Label
 var seed_select: OptionButton
 var shop_panel: Panel
 var action_buttons: Dictionary = {}
+var landscape_button: Button
+var shop_plot_button: Button
+var shop_tree_buttons: Array[Button] = []
 var run_button: Button
 var jump_button: Button
 var zoom_in_button: Button
@@ -312,7 +333,7 @@ func _prepare_tree_model(model: Node3D, variant: String, target_height: float) -
     model.position.y = -bounds.position.y * fit
     return true
 
-func tree(pos: Vector3, variant: String = "STOak2", target_height: float = 4.7, yaw: float = 0.0) -> void:
+func tree(pos: Vector3, variant: String = "STOak2", target_height: float = 4.7, yaw: float = 0.0) -> Node3D:
     var group: Node3D = Node3D.new()
     group.name = "Tree_%s" % variant
     group.position = pos
@@ -326,7 +347,7 @@ func tree(pos: Vector3, variant: String = "STOak2", target_height: float = 4.7, 
             group.add_child(model)
             if _prepare_tree_model(model, variant, target_height):
                 group.add_to_group("farm_imported_trees")
-                return
+                return group
             group.remove_child(model)
             model.queue_free()
     # Fall back to the old lightweight tree if an FBX is unavailable.
@@ -334,6 +355,7 @@ func tree(pos: Vector3, variant: String = "STOak2", target_height: float = 4.7, 
     ball(group, Vector3(0,2.65,0), Vector3(2.2,1.75,2.05), Color("#528f61"))
     ball(group, Vector3(-0.6,2.4,0.1), Vector3(1.5,1.4,1.4), Color("#72b16f"))
     ball(group, Vector3(0.65,2.6,0), Vector3(1.3,1.4,1.3), Color("#81bb76"))
+    return group
 
 func build_scene() -> void:
     var world: WorldEnvironment = WorldEnvironment.new()
@@ -457,7 +479,221 @@ func build_scene() -> void:
         [Vector3(29,0,-3), "STPine1", 5.2, 23.0],
         [Vector3(28,0,7), "STOak4", 4.9, 290.0]
     ]:
-        tree(planting[0], str(planting[1]), float(planting[2]), float(planting[3]))
+        base_tree_nodes.append(tree(planting[0], str(planting[1]), float(planting[2]), float(planting[3])))
+    _rebuild_placed_world()
+    _build_placement_preview()
+
+
+# Freely placed crop beds are separate from the original 50 level-gated beds.
+# Saved world coordinates are never snapped onto the original plot grid.
+func _add_extra_plot(pos: Vector3, state: Dictionary = {}) -> void:
+    var root: Node3D = Node3D.new()
+    root.name = "FreePlot_%d" % extra_plot_nodes.size()
+    root.position = Vector3(pos.x, 0.0, pos.z)
+    add_child(root)
+    extra_plot_nodes.append(root)
+    plot_places.append(root.position)
+    var soil: MeshInstance3D = cube(root, Vector3(0,0.12,0), Vector3(1.93,0.22,1.92), SOIL)
+    dirt_meshes.append(soil)
+    for edge in [-1.0,1.0]:
+        cube(root, Vector3(edge,0.17,0), Vector3(0.12,0.19,2.04), Color("#c8aa74"))
+        cube(root, Vector3(0,0.17,edge), Vector3(2.04,0.19,0.12), Color("#c8aa74"))
+    for furrow in [-0.55,0.0,0.55]:
+        cube(root, Vector3(furrow,0.242,0), Vector3(0.11,0.032,1.45), Color("#926b4b"))
+    var holder: Node3D = Node3D.new()
+    holder.position.y = 0.28
+    root.add_child(holder)
+    plant_roots.append(holder)
+    grow_stages.append(-1)
+    plots.append(state.duplicate(true))
+
+func _rebuild_placed_world() -> void:
+    # Called on start and after confirmed save restore. Clear old scene nodes
+    # before replaying placements so restored items never duplicate.
+    for item in extra_plot_nodes:
+        if is_instance_valid(item):
+            item.queue_free()
+    extra_plot_nodes.clear()
+    while plot_places.size() > FARM_COLUMNS * FARM_ROWS:
+        plot_places.pop_back()
+        plant_roots.pop_back()
+        dirt_meshes.pop_back()
+        grow_stages.pop_back()
+    if plots.size() > FARM_COLUMNS * FARM_ROWS:
+        plots.resize(FARM_COLUMNS * FARM_ROWS)
+    for entry in saved_extra_plots:
+        var cell: Dictionary = entry.duplicate(true)
+        var pos: Vector3 = Vector3(float(cell["x"]), 0.0, float(cell["z"]))
+        cell.erase("x")
+        cell.erase("z")
+        _add_extra_plot(pos, cell)
+    for placed in placed_tree_nodes:
+        if is_instance_valid(placed):
+            placed.queue_free()
+    placed_tree_nodes.clear()
+    for idx in range(base_tree_nodes.size()):
+        base_tree_nodes[idx].visible = not removed_trees.has(idx)
+    for entry in placed_trees_data:
+        var pos: Vector3 = Vector3(float(entry["x"]), 0.0, float(entry["z"]))
+        placed_tree_nodes.append(tree(pos, str(entry["variant"]), 4.8, float(entry["rotation"])))
+    for i in range(grow_stages.size()):
+        grow_stages[i] = -1
+    refresh_plants()
+
+func _build_placement_preview() -> void:
+    placement_preview = MeshInstance3D.new()
+    placement_preview.name = "FreePlacementPreview"
+    var shape: BoxMesh = BoxMesh.new()
+    shape.size = Vector3(1.95, 0.05, 1.95)
+    placement_preview.mesh = shape
+    var material: StandardMaterial3D = StandardMaterial3D.new()
+    material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+    material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    material.albedo_color = Color(0.2, 0.85, 0.35, 0.45)
+    placement_preview.material_override = material
+    add_child(placement_preview)
+    placement_preview.visible = false
+
+func _can_place_on_grass(pos: Vector3, kind: String) -> bool:
+    var radius: float = 1.08 if kind == "plot" else 1.60
+    if not is_finite(pos.x) or not is_finite(pos.z):
+        return false
+    if absf(pos.x) > 31.0 - radius or absf(pos.z) > 19.0 - radius:
+        return false
+    # No placement on the farm house, its paths, or current/future pig pens.
+    if absf(pos.x + 19.0) < 2.35 + radius and absf(pos.z + 8.4) < 2.1 + radius:
+        return false
+    if absf(pos.x + 14.5) < 1.1 + radius and absf(pos.z) < 14.5 + radius:
+        return false
+    if absf(pos.z - 11.8) < 1.1 + radius and absf(pos.x) < 29.0 + radius:
+        return false
+    if absf(pos.x - 13.1) < 0.85 + radius and absf(pos.z) < 10.5 + radius:
+        return false
+    for pen_pos in pen_locations:
+        if absf(pos.x - pen_pos.x) < 3.4 + radius and absf(pos.z - pen_pos.z) < 3.4 + radius:
+            return false
+    for existing in plot_places:
+        if absf(pos.x - existing.x) < 1.06 + radius and absf(pos.z - existing.z) < 1.06 + radius:
+            return false
+    for node in base_tree_nodes:
+        if node.visible and Vector2(pos.x - node.position.x, pos.z - node.position.z).length() < 1.35 + radius:
+            return false
+    for node in placed_tree_nodes:
+        if is_instance_valid(node) and Vector2(pos.x - node.position.x, pos.z - node.position.z).length() < 1.35 + radius:
+            return false
+    return true
+
+func _ground_at(pixel: Vector2) -> Vector3:
+    var origin: Vector3 = camera.project_ray_origin(pixel)
+    var ray: Vector3 = camera.project_ray_normal(pixel)
+    if absf(ray.y) < 0.001:
+        return Vector3(9999.0, 0.0, 9999.0)
+    var t: float = -origin.y / ray.y
+    if t <= 0.0:
+        return Vector3(9999.0, 0.0, 9999.0)
+    var hit: Vector3 = origin + ray * t
+    return Vector3(hit.x, 0.0, hit.z)
+
+func _update_placement_preview(pixel: Vector2) -> void:
+    if placement_preview == null:
+        return
+    placement_preview.visible = false
+    if not landscaping_mode or (tool_mode != "place_plot" and tool_mode != "plant_tree"):
+        return
+    if shop_panel.visible or bag_panel.visible or point_on_ui(pixel):
+        return
+    var kind: String = "plot" if tool_mode == "place_plot" else "tree"
+    var place: Vector3 = _ground_at(pixel)
+    placement_preview.position = place + Vector3(0,0.08,0)
+    placement_preview.scale = Vector3.ONE * (1.0 if kind == "plot" else 1.55)
+    var material: StandardMaterial3D = placement_preview.material_override as StandardMaterial3D
+    material.albedo_color = Color(0.18, 0.84, 0.35, 0.40) if _can_place_on_grass(place, kind) else Color(0.96, 0.23, 0.17, 0.43)
+    placement_preview.visible = true
+
+func _place_new_plot(pos: Vector3) -> bool:
+    if plot_kits <= 0:
+        message = "ไม่มีชุดแปลงผัก ซื้อเพิ่มจากร้านค้าก่อน"
+    elif extra_plot_nodes.size() >= MAX_EXTRA_PLOTS:
+        message = "พื้นที่ปลูกเพิ่มถึงขีดจำกัดของเกมแล้ว"
+    elif not _can_place_on_grass(pos, "plot"):
+        message = "ตรงนี้วางแปลงไม่ได้ เลือกพื้นหญ้าว่างที่ไม่ทับสิ่งของ"
+    else:
+        _add_extra_plot(pos)
+        plot_kits -= 1
+        refresh_plants()
+        message = "วางแปลงใหม่แล้ว! เลือกโหมดปลูกผักเพื่อใช้งาน"
+        if farm_audio != null:
+            farm_audio.play_effect("till")
+        save_game()
+        refresh_labels()
+        return true
+    refresh_labels()
+    return false
+
+func _plant_purchased_tree(pos: Vector3) -> bool:
+    if int(tree_kits[selected_tree]) <= 0:
+        message = "ต้นกล้า%sหมด ซื้อเพิ่มที่ร้านค้า" % TREE_NAMES[selected_tree]
+    elif placed_tree_nodes.size() >= MAX_PLANTED_TREES:
+        message = "จำนวนต้นไม้ที่ปลูกเต็มแล้ว"
+    elif not _can_place_on_grass(pos, "tree"):
+        message = "ตรงนี้ปลูกต้นไม้ไม่ได้ ต้องเป็นพื้นหญ้าที่ว่าง"
+    else:
+        var variant: String = str(TREE_VARIANTS[selected_tree])
+        var yaw: float = float((placed_tree_nodes.size() * 67) % 360)
+        placed_tree_nodes.append(tree(pos, variant, 4.8, yaw))
+        placed_trees_data.append({
+            "x": pos.x, "z": pos.z, "variant": variant, "rotation": yaw
+        })
+        tree_kits[selected_tree] = int(tree_kits[selected_tree]) - 1
+        message = "ปลูกต้น%sแล้ว! เลือกพื้นที่ว่างเพื่อปลูกเพิ่ม" % TREE_NAMES[selected_tree]
+        if farm_audio != null:
+            farm_audio.play_effect("plant")
+        save_game()
+        refresh_labels()
+        return true
+    refresh_labels()
+    return false
+
+func _chop_tree_at(pixel: Vector2) -> bool:
+    var target_distance: float = 42.0
+    var base_index: int = -1
+    var planted_index: int = -1
+    # Tree FBX scenes do not have physics colliders. Test the crown and trunk
+    # in screen space so mouse/touch taps can select the visible model.
+    for i in range(base_tree_nodes.size() + placed_tree_nodes.size()):
+        var is_original: bool = i < base_tree_nodes.size()
+        var index: int = i if is_original else i - base_tree_nodes.size()
+        var node: Node3D = base_tree_nodes[index] if is_original else placed_tree_nodes[index]
+        if not node.visible:
+            continue
+        for elevation in [1.0, 2.5, 3.8]:
+            var world_pos: Vector3 = node.global_position + Vector3(0,elevation,0)
+            if camera.is_position_behind(world_pos):
+                continue
+            var distance: float = pixel.distance_to(camera.unproject_position(world_pos))
+            if distance < target_distance:
+                target_distance = distance
+                base_index = index if is_original else -1
+                planted_index = index if not is_original else -1
+    if base_index >= 0:
+        base_tree_nodes[base_index].visible = false
+        removed_trees.append(base_index)
+    elif planted_index >= 0:
+        var node: Node3D = placed_tree_nodes[planted_index]
+        placed_tree_nodes.remove_at(planted_index)
+        placed_trees_data.remove_at(planted_index)
+        node.queue_free()
+    else:
+        message = "แตะที่ต้นไม้ที่ต้องการตัด"
+        refresh_labels()
+        return false
+    wood += 1
+    message = "ตัดต้นไม้สำเร็จ ได้ไม้ +1 (รวม %d)" % wood
+    if farm_audio != null:
+        farm_audio.play_effect("till")
+    save_game()
+    refresh_labels()
+    return true
 
 func pen_price() -> int:
     return PEN_BASE_PRICE + maxi(0, pens-1)*110
