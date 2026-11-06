@@ -85,6 +85,17 @@ func _run() -> void:
     check(farm.shop_plot_button.text.contains("\n") and farm.shop_plot_button.custom_minimum_size.y >= 50.0,
         "shop item names and prices have their own lines")
     check(farm.shop_button.get_theme_stylebox("normal") is StyleBoxTexture, "buttons use imported PNG style texture")
+    var shop_skin: StyleBoxTexture = farm.shop_button.get_theme_stylebox("normal") as StyleBoxTexture
+    check(shop_skin != null and shop_skin.region_rect.position.y >= 30.0,
+        "button art is shown without transparent top and bottom gaps")
+    check(farm.zoom_in_button.get_theme_stylebox("normal") is StyleBoxTexture,
+        "zoom buttons use dedicated square PNG")
+    check((farm.zoom_in_button.get_theme_stylebox("normal") as StyleBoxTexture).texture == farm.UI_SLOT,
+        "zoom buttons must not squeeze wide green art into a square")
+    check(farm.money_label.get_theme_color("font_color").get_luminance() < 0.4,
+        "header money text is dark enough on the pale background")
+    check(farm.status_label.get_theme_font_size("font_size") >= 16,
+        "farm HUD status is at least 16px")
     check(farm.shop_panel.get_theme_stylebox("panel") is StyleBoxTexture, "shop window uses imported PNG skin")
     check(farm.bag_panel.get_theme_stylebox("panel") is StyleBoxTexture, "inventory window uses imported PNG skin")
     check(farm.shop_header_art.texture != null and farm.bag_header_art.texture != null, "heading art independent layer")
