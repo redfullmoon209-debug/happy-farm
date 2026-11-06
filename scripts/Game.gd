@@ -6,6 +6,7 @@ const SEED_ICON = preload("res://scripts/SeedIcon.gd")
 const SAVE_DATA = preload("res://scripts/SaveData.gd")
 const FARMER_VISUAL = preload("res://scripts/FarmerVisual.gd")
 const FARM_AUDIO = preload("res://scripts/FarmAudio.gd")
+const GARDEN_DECOR = preload("res://scripts/GardenDecor.gd")
 const THAI = preload("res://assets/Sarabun-Regular.ttf")
 const THAI_BOLD = preload("res://assets/Sarabun-SemiBold.ttf")
 const SAVE = "user://happy_farm_clean.json"
@@ -88,7 +89,7 @@ var unlocked_zones: Array = [44, 45, 54, 55]
 var zone_covers: Array[MeshInstance3D] = []
 var zone_signs: Array[Label3D] = []
 var pending_zone_id: int = -1
-var decor_kits: Array = []
+var decor_kits: Array = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 var selected_decor: int = 0
 var placed_decor_data: Array = []
 var decor_nodes: Array[Node3D] = []
@@ -686,6 +687,13 @@ func _rebuild_placed_world() -> void:
     for entry in placed_trees_data:
         var pos: Vector3 = Vector3(float(entry["x"]), 0.0, float(entry["z"]))
         placed_tree_nodes.append(tree(pos, str(entry["variant"]), 4.8, float(entry["rotation"])))
+    for old_decor in decor_nodes:
+        if is_instance_valid(old_decor):
+            old_decor.queue_free()
+    decor_nodes.clear()
+    for entry in placed_decor_data:
+        var pos: Vector3 = Vector3(float(entry["x"]), 0.0, float(entry["z"]))
+        decor_nodes.append(GARDEN_DECOR.make(self, pos, int(entry["type"]), float(entry["rotation"])))
     for i in range(grow_stages.size()):
         grow_stages[i] = -1
     refresh_plants()
@@ -705,11 +713,17 @@ func _build_placement_preview() -> void:
     placement_preview.visible = false
 
 func _can_place_on_grass(pos: Vector3, kind: String) -> bool:
-    var radius: float = 1.08 if kind == "plot" else 1.60
+    var radius: float = 1.08 if kind == "plot" else (float(DECOR_RADII[selected_decor]) if kind == "decor" else 1.60)
     if not is_finite(pos.x) or not is_finite(pos.z):
         return false
-    if absf(pos.x) > 31.0 - radius or absf(pos.z) > 19.0 - radius:
+    if absf(pos.x) > WORLD_HALF - radius or absf(pos.z) > WORLD_HALF - radius:
         return false
+    # A purchased object must fit wholly inside owned zones, not straddle a
+    # locked parcel even when its center happens to be on player land.
+    for dx in [-radius, radius]:
+        for dz in [-radius, radius]:
+            if not is_land_owned(Vector3(pos.x+dx, 0.0, pos.z+dz)):
+                return false
     # No placement on the farm house, its paths, or current/future pig pens.
     if absf(pos.x + 19.0) < 2.35 + radius and absf(pos.z + 8.4) < 2.1 + radius:
         return false
@@ -731,6 +745,14 @@ func _can_place_on_grass(pos: Vector3, kind: String) -> bool:
     for node in placed_tree_nodes:
         if is_instance_valid(node) and Vector2(pos.x - node.position.x, pos.z - node.position.z).length() < 1.35 + radius:
             return false
+    for j in range(decor_nodes.size()):
+        var decor_node: Node3D = decor_nodes[j]
+        if not is_instance_valid(decor_node):
+            continue
+        var existing_type: int = int(placed_decor_data[j]["type"])
+        var other_radius: float = float(DECOR_RADII[existing_type])
+        if Vector2(pos.x - decor_node.position.x, pos.z - decor_node.position.z).length() < radius + other_radius:
+            return false
     return true
 
 func _ground_at(pixel: Vector2) -> Vector3:
@@ -748,16 +770,31 @@ func _update_placement_preview(pixel: Vector2) -> void:
     if placement_preview == null:
         return
     placement_preview.visible = false
-    if not landscaping_mode or (tool_mode != "place_plot" and tool_mode != "plant_tree"):
+    if not landscaping_mode or not ["place_plot", "plant_tree", "place_decor", "buy_land"].has(tool_mode):
         return
-    if shop_panel.visible or bag_panel.visible or point_on_ui(pixel):
+    if shop_panel.visible or bag_panel.visible or (gm_panel != null and gm_panel.visible) or point_on_ui(pixel):
         return
-    var kind: String = "plot" if tool_mode == "place_plot" else "tree"
     var place: Vector3 = _ground_at(pixel)
+    var can_use: bool = false
+    var radius: float = 1.0
+    if tool_mode == "buy_land":
+        var id: int = zone_for_position(place)
+        if id < 0 or unlocked_zones.has(id):
+            return
+        var col: int = id % ZONE_COLUMNS
+        var row: int = id / ZONE_COLUMNS
+        place.x = -WORLD_HALF + (float(col)+0.5)*ZONE_SIZE
+        place.z = -WORLD_HALF + (float(row)+0.5)*ZONE_SIZE
+        radius = (ZONE_SIZE - 0.4) / 1.95
+        can_use = zone_can_be_bought(id) and coins >= zone_price(id)
+    else:
+        var kind: String = "plot" if tool_mode == "place_plot" else ("decor" if tool_mode == "place_decor" else "tree")
+        radius = 1.0 if kind == "plot" else (float(DECOR_RADII[selected_decor]) if kind == "decor" else 1.55)
+        can_use = _can_place_on_grass(place, kind)
     placement_preview.position = place + Vector3(0,0.08,0)
-    placement_preview.scale = Vector3.ONE * (1.0 if kind == "plot" else 1.55)
+    placement_preview.scale = Vector3(radius, 1.0, radius)
     var material: StandardMaterial3D = placement_preview.material_override as StandardMaterial3D
-    material.albedo_color = Color(0.18, 0.84, 0.35, 0.40) if _can_place_on_grass(place, kind) else Color(0.96, 0.23, 0.17, 0.43)
+    material.albedo_color = Color(0.18, 0.84, 0.35, 0.40) if can_use else Color(0.96, 0.23, 0.17, 0.43)
     placement_preview.visible = true
 
 func _place_new_plot(pos: Vector3) -> bool:
@@ -796,6 +833,30 @@ func _plant_purchased_tree(pos: Vector3) -> bool:
         })
         tree_kits[selected_tree] = int(tree_kits[selected_tree]) - 1
         message = "ปลูกต้น%sแล้ว! เลือกพื้นที่ว่างเพื่อปลูกเพิ่ม" % TREE_NAMES[selected_tree]
+        if farm_audio != null:
+            farm_audio.play_effect("plant")
+        save_game()
+        refresh_labels()
+        return true
+    refresh_labels()
+    return false
+
+
+func _place_decoration(pos: Vector3) -> bool:
+    if int(decor_kits[selected_decor]) <= 0:
+        message = "ไม่มี%sในกระเป๋า ซื้อที่ร้านค้าก่อน" % DECOR_NAMES[selected_decor]
+    elif placed_decor_data.size() >= MAX_DECORATIONS:
+        message = "วางของตกแต่งครบจำนวนสูงสุดแล้ว"
+    elif not _can_place_on_grass(pos, "decor"):
+        message = "เลือกพื้นที่ปลดล็อกแล้วที่ว่าง ไม่ทับแปลง ต้นไม้ หรือสิ่งปลูกสร้าง"
+    else:
+        var facing: float = float((placed_decor_data.size()*53) % 360)
+        decor_nodes.append(GARDEN_DECOR.make(self, pos, selected_decor, facing))
+        placed_decor_data.append({
+            "x": pos.x, "z": pos.z, "type": selected_decor, "rotation": facing
+        })
+        decor_kits[selected_decor] = int(decor_kits[selected_decor]) - 1
+        message = "วาง%sแล้ว (เหลือ %d)" % [DECOR_NAMES[selected_decor], int(decor_kits[selected_decor])]
         if farm_audio != null:
             farm_audio.play_effect("plant")
         save_game()
