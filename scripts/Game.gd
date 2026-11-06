@@ -1636,10 +1636,16 @@ func btn(txt: String, callback: Callable, background: Color = Color("#417c59")) 
     # This keeps the glossy edges intact at desktop and mobile dimensions.
     var style: StyleBoxTexture = StyleBoxTexture.new()
     style.texture = UI_BUTTON
-    style.texture_margin_left = 28.0
-    style.texture_margin_right = 28.0
-    style.texture_margin_top = 16.0
-    style.texture_margin_bottom = 16.0
+    # Keep the rendered 640x213 PNG as art, while reducing nine-slice
+    # margins so mobile buttons and +/- camera controls stay 34-52px tall.
+    style.texture_margin_left = 8.0
+    style.texture_margin_right = 8.0
+    style.texture_margin_top = 4.0
+    style.texture_margin_bottom = 4.0
+    style.content_margin_left = 0.0
+    style.content_margin_right = 0.0
+    style.content_margin_top = 0.0
+    style.content_margin_bottom = 0.0
     style.modulate_color = Color.WHITE
     b.add_theme_stylebox_override("normal", style)
     var hover: StyleBoxTexture = style.duplicate()
