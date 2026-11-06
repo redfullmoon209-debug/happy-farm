@@ -13,6 +13,16 @@ const PLOTS_PER_ROW: int = 10
 const PIGS_PER_PEN: int = 4
 const MAX_PENS: int = 4
 const MAX_FARM_LEVEL: int = 10
+const MAX_EXTRA_PLOTS: int = 120
+const MAX_PLANTED_TREES: int = 80
+const TREE_VARIANTS = ["STOak2", "STPine3", "STWillow2", "STColumnar1", "STSwiggly1"]
+const BASE_TREE_COUNT: int = 15
+
+static func _valid_position_number(raw: Variant, bound: float) -> bool:
+    if not (raw is int or raw is float):
+        return false
+    var value: float = float(raw)
+    return is_finite(value) and absf(value) <= bound
 
 static func normalize(raw: Variant) -> Dictionary:
     if not (raw is Dictionary):
@@ -70,6 +80,28 @@ static func normalize(raw: Variant) -> Dictionary:
     if farm_level == MAX_FARM_LEVEL:
         farm_xp = 0
 
+    var plot_kits_value: Variant = data.get("plot_kits", 0)
+    var wood_value: Variant = data.get("wood", 0)
+    for quantity in [plot_kits_value, wood_value]:
+        if not (quantity is int or quantity is float):
+            return {}
+        if not is_finite(float(quantity)) or float(quantity) != float(int(quantity)):
+            return {}
+        if int(quantity) < 0 or int(quantity) > 100000:
+            return {}
+    var safe_tree_kits: Array = []
+    var raw_tree_kits: Variant = data.get("tree_kits", [0, 0, 0, 0, 0])
+    if not (raw_tree_kits is Array) or raw_tree_kits.size() != TREE_VARIANTS.size():
+        return {}
+    for quantity in raw_tree_kits:
+        if not (quantity is int or quantity is float):
+            return {}
+        if not is_finite(float(quantity)) or float(quantity) != float(int(quantity)):
+            return {}
+        if int(quantity) < 0 or int(quantity) > 100000:
+            return {}
+        safe_tree_kits.append(int(quantity))
+
     var safe_seeds: Array = []
     for value in input_seeds:
         if not (value is int or value is float):
@@ -105,6 +137,68 @@ static func normalize(raw: Variant) -> Dictionary:
             cell["water_time"] = timestamp
         safe_plots.append(cell)
 
+    var safe_extra_plots: Array = []
+    var raw_extra: Variant = data.get("extra_plots", [])
+    if not (raw_extra is Array) or raw_extra.size() > MAX_EXTRA_PLOTS:
+        return {}
+    for entry in raw_extra:
+        if not (entry is Dictionary):
+            return {}
+        if not _valid_position_number(entry.get("x"), 30.0) or not _valid_position_number(entry.get("z"), 18.0):
+            return {}
+        var cell: Dictionary = {"x": float(entry["x"]), "z": float(entry["z"])}
+        if entry.has("tilled"):
+            cell["tilled"] = bool(entry["tilled"])
+        if entry.has("crop"):
+            var crop_val: Variant = entry["crop"]
+            if not (crop_val is int or crop_val is float) or not is_finite(float(crop_val)):
+                return {}
+            var crop_id: int = int(crop_val)
+            if float(crop_val) != float(crop_id) or crop_id < 0 or crop_id >= NUM_CROPS:
+                return {}
+            cell["crop"] = crop_id
+            cell["wet"] = bool(entry.get("wet", false))
+            var time_val: Variant = entry.get("water_time", 0.0)
+            if not (time_val is int or time_val is float) or not is_finite(float(time_val)):
+                return {}
+            var timestamp: float = float(time_val)
+            if timestamp < 0.0 or timestamp > max_timestamp:
+                return {}
+            cell["water_time"] = timestamp
+        safe_extra_plots.append(cell)
+
+    var safe_placed_trees: Array = []
+    var raw_trees: Variant = data.get("placed_trees", [])
+    if not (raw_trees is Array) or raw_trees.size() > MAX_PLANTED_TREES:
+        return {}
+    for entry in raw_trees:
+        if not (entry is Dictionary):
+            return {}
+        if not _valid_position_number(entry.get("x"), 30.0) or not _valid_position_number(entry.get("z"), 18.0):
+            return {}
+        var variant: String = str(entry.get("variant", ""))
+        if not TREE_VARIANTS.has(variant):
+            return {}
+        var rotation_value: Variant = entry.get("rotation", 0.0)
+        if not _valid_position_number(rotation_value, 360.0) or float(rotation_value) < 0.0:
+            return {}
+        safe_placed_trees.append({
+            "x": float(entry["x"]), "z": float(entry["z"]),
+            "variant": variant, "rotation": float(rotation_value)
+        })
+
+    var safe_removed_trees: Array = []
+    var raw_removed: Variant = data.get("removed_trees", [])
+    if not (raw_removed is Array) or raw_removed.size() > BASE_TREE_COUNT:
+        return {}
+    for value in raw_removed:
+        if not (value is int or value is float) or not is_finite(float(value)):
+            return {}
+        var index: int = int(value)
+        if float(value) != float(index) or index < 0 or index >= BASE_TREE_COUNT or safe_removed_trees.has(index):
+            return {}
+        safe_removed_trees.append(index)
+
     if input_plots.size() == OLD_PLOTS:
         # Legacy plots were a 6x4 farm. Retain their row/column ordering
         # inside the center columns of the new 10x5 farm.
@@ -125,6 +219,12 @@ static func normalize(raw: Variant) -> Dictionary:
         "pens": pen_count,
         "farm_level": farm_level,
         "farm_xp": farm_xp,
+        "plot_kits": int(plot_kits_value),
+        "tree_kits": safe_tree_kits,
+        "wood": int(wood_value),
+        "extra_plots": safe_extra_plots,
+        "placed_trees": safe_placed_trees,
+        "removed_trees": safe_removed_trees,
         "seeds": safe_seeds,
         "plots": safe_plots
     }
