@@ -72,8 +72,18 @@ func _run() -> void:
 
     check(farm.stick != null and farm.stick.BASE_TEXTURE != null, "joystick base uses imported PNG")
     check(farm.stick.THUMB_TEXTURE != null, "joystick thumb is independent PNG")
-    check(farm.shop_button.icon != null and farm.bag_button.icon != null, "shop/bag have separate PNG icons")
-    check(farm.action_buttons["plant"].icon != null, "farm tools have separate PNG icons")
+    # Small buttons are allowed to hide PNGs so Thai words stay readable.
+    # The independent asset must remain attached for wider layouts.
+    check(farm.shop_button.has_meta("happy_icon_texture") and farm.bag_button.has_meta("happy_icon_texture"),
+        "shop/bag preserve their separate PNG assets")
+    check(farm.action_buttons["plant"].has_meta("happy_icon_texture"),
+        "farm tools preserve their separate PNG assets")
+    check(farm.action_buttons["plant"].get_theme_font_size("font_size") >= 15,
+        "farming button captions stay readable")
+    check(farm.status_label.autowrap_mode == TextServer.AUTOWRAP_WORD_SMART,
+        "status text can use two readable Thai lines")
+    check(farm.shop_plot_button.text.contains("\n") and farm.shop_plot_button.custom_minimum_size.y >= 50.0,
+        "shop item names and prices have their own lines")
     check(farm.shop_button.get_theme_stylebox("normal") is StyleBoxTexture, "buttons use imported PNG style texture")
     check(farm.shop_panel.get_theme_stylebox("panel") is StyleBoxTexture, "shop window uses imported PNG skin")
     check(farm.bag_panel.get_theme_stylebox("panel") is StyleBoxTexture, "inventory window uses imported PNG skin")
