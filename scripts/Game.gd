@@ -2057,6 +2057,12 @@ func give_feed() -> void:
     refresh_labels()
 
 func snapshot() -> Dictionary:
+    var free_cells: Array = []
+    for i in range(FARM_ROWS * FARM_COLUMNS, plots.size()):
+        var cell: Dictionary = plots[i].duplicate(true)
+        cell["x"] = plot_places[i].x
+        cell["z"] = plot_places[i].z
+        free_cells.append(cell)
     return {
         "coins": coins,
         "feed": feed,
@@ -2064,8 +2070,14 @@ func snapshot() -> Dictionary:
         "pens": pens,
         "farm_level": farm_level,
         "farm_xp": farm_xp,
+        "plot_kits": plot_kits,
+        "tree_kits": tree_kits.duplicate(),
+        "wood": wood,
+        "extra_plots": free_cells,
+        "placed_trees": placed_trees_data.duplicate(true),
+        "removed_trees": removed_trees.duplicate(),
         "seeds": seeds.duplicate(),
-        "plots": plots.duplicate(true)
+        "plots": plots.slice(0, FARM_ROWS * FARM_COLUMNS).duplicate(true)
     }
 
 func _apply_snapshot(state: Dictionary) -> void:
@@ -2075,6 +2087,12 @@ func _apply_snapshot(state: Dictionary) -> void:
     pens = int(state["pens"])
     farm_level = int(state.get("farm_level", 1))
     farm_xp = int(state.get("farm_xp", 0))
+    plot_kits = int(state.get("plot_kits", 0))
+    tree_kits = state.get("tree_kits", [0, 0, 0, 0, 0]).duplicate()
+    wood = int(state.get("wood", 0))
+    saved_extra_plots = state.get("extra_plots", []).duplicate(true)
+    placed_trees_data = state.get("placed_trees", []).duplicate(true)
+    removed_trees = state.get("removed_trees", []).duplicate()
     seeds = state["seeds"].duplicate()
     plots = state["plots"].duplicate(true)
 
@@ -2220,6 +2238,9 @@ func _confirm_import_backup() -> void:
     _apply_snapshot(to_restore)
     update_plot_locks()
     rebuild_livestock()
+    _rebuild_placed_world()
+    if placement_preview != null:
+        placement_preview.visible = false
     for i in range(grow_stages.size()):
         grow_stages[i] = -1
     refresh_plants()
