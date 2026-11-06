@@ -86,14 +86,26 @@ func _run() -> void:
         "shop item names and prices have their own lines")
     check(farm.shop_button.get_theme_stylebox("normal") is StyleBoxTexture, "buttons use imported PNG style texture")
     var shop_skin: StyleBoxTexture = farm.shop_button.get_theme_stylebox("normal") as StyleBoxTexture
-    check(shop_skin != null and shop_skin.region_rect.position.y >= 30.0,
-        "button art is shown without transparent top and bottom gaps")
+    check(shop_skin != null and shop_skin.region_rect.size.x == 680.0,
+        "glossy standalone PNG button is fully used, not cropped from a screenshot")
+    check(farm.UI_TOP != null and farm.UI_HUD != null and farm.UI_ZOOM != null,
+        "three separate matching farm UI graphic layers load")
+    check(not farm.tool_menu_open and not farm.ui_bottom.visible,
+        "farming tools initially collapse to keep the play area clear")
+    check(farm.tool_menu_toggle_button.visible and farm.tool_menu_toggle_button.text.contains("เครื่องมือ"),
+        "a permanent tools toggle is visible")
+    farm.toggle_tool_menu()
+    check(farm.tool_menu_open and farm.ui_bottom.visible, "tools toggle opens the complete farming HUD")
+    check(farm.action_buttons["plant"].is_visible_in_tree(), "existing farming buttons still work")
+    farm.toggle_tool_menu()
+    check(not farm.tool_menu_open and not farm.ui_bottom.visible, "tools toggle closes the HUD")
+    check(farm.action_buttons["plant"].get_parent() == farm.ui_bottom, "tools are retained, never removed")
     check(farm.zoom_in_button.get_theme_stylebox("normal") is StyleBoxTexture,
         "zoom buttons use dedicated square PNG")
-    check((farm.zoom_in_button.get_theme_stylebox("normal") as StyleBoxTexture).texture == farm.UI_SLOT,
-        "zoom buttons must not squeeze wide green art into a square")
-    check(farm.money_label.get_theme_color("font_color").get_luminance() < 0.4,
-        "header money text is dark enough on the pale background")
+    check((farm.zoom_in_button.get_theme_stylebox("normal") as StyleBoxTexture).texture == farm.UI_ZOOM,
+        "zoom buttons use an independent glossy square PNG")
+    check(farm.money_label.get_theme_color("font_color").get_luminance() > 0.6,
+        "money text is bright enough against the glossy dark-green top bar")
     check(farm.status_label.get_theme_font_size("font_size") >= 16,
         "farm HUD status is at least 16px")
     check(farm.shop_panel.get_theme_stylebox("panel") is StyleBoxTexture, "shop window uses imported PNG skin")
@@ -105,7 +117,7 @@ func _run() -> void:
 
     for file in [
         "button_green.png", "window_wood.png", "window_header.png", "inventory_slot.png",
-        "hud_bar.png", "joystick_base.png", "joystick_thumb.png",
+        "hud_bar.png", "hud_top.png", "button_zoom.png", "joystick_base.png", "joystick_thumb.png",
         "icon_bag.png", "icon_shop.png", "icon_plant.png", "icon_water.png",
         "icon_harvest.png", "icon_farm.png", "icon_gm.png"
     ]:

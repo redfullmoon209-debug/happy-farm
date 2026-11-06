@@ -14,6 +14,8 @@ const UI_WINDOW: Texture2D = preload("res://assets/ui/happy/window_wood.png")
 const UI_HEADER: Texture2D = preload("res://assets/ui/happy/window_header.png")
 const UI_SLOT: Texture2D = preload("res://assets/ui/happy/inventory_slot.png")
 const UI_HUD: Texture2D = preload("res://assets/ui/happy/hud_bar.png")
+const UI_TOP: Texture2D = preload("res://assets/ui/happy/hud_top.png")
+const UI_ZOOM: Texture2D = preload("res://assets/ui/happy/button_zoom.png")
 const THAI = preload("res://assets/Sarabun-Regular.ttf")
 const THAI_BOLD = preload("res://assets/Sarabun-SemiBold.ttf")
 const SAVE = "user://happy_farm_clean.json"
@@ -180,6 +182,9 @@ var zoom_in_button: Button
 var zoom_out_button: Button
 var ui_top: Panel
 var ui_bottom: Panel
+# Collapsible farming tool tray, independent of which farming tool is selected.
+var tool_menu_open: bool = false
+var tool_menu_toggle_button: Button
 var touch_controls: bool = false
 var title_label: Label
 var shop_button: Button
@@ -1639,20 +1644,15 @@ func btn(txt: String, callback: Callable, background: Color = Color("#417c59")) 
     b.add_theme_color_override("font_color", Color.WHITE)
     b.alignment = HORIZONTAL_ALIGNMENT_CENTER
     b.clip_text = true
-    # Nine-slice the original standalone button PNG; no screenshot cropping.
-    # This keeps the glossy edges intact at desktop and mobile dimensions.
+    # New standalone artist-generated glossy PNG. Never cut buttons out of
+    # screenshots: the whole source is a real transparent editable asset.
     var style: StyleBoxTexture = StyleBoxTexture.new()
     style.texture = UI_BUTTON
-    # Original PNG has ~35px of empty transparent canvas above/below its
-    # painted body. Show the COMPLETE painted art, not those empty bands.
-    # Source asset remains unchanged; this rect only skips empty padding.
-    style.region_rect = Rect2(20.0, 34.0, 600.0, 153.0)
-    # Source edges are transparent. Minimal nine-patch margins avoid
-    # sacrificing the usable button width/height to invisible corners.
-    style.texture_margin_left = 3.0
-    style.texture_margin_right = 3.0
-    style.texture_margin_top = 1.0
-    style.texture_margin_bottom = 1.0
+    style.region_rect = Rect2(0.0, 0.0, 680.0, 170.0)
+    style.texture_margin_left = 4.0
+    style.texture_margin_right = 4.0
+    style.texture_margin_top = 2.0
+    style.texture_margin_bottom = 2.0
     style.content_margin_left = 0.0
     style.content_margin_right = 0.0
     style.content_margin_top = 0.0
@@ -1689,10 +1689,21 @@ func _skin_window(p: Panel) -> void:
 func _skin_hud(p: Panel) -> void:
     var frame: StyleBoxTexture = StyleBoxTexture.new()
     frame.texture = UI_HUD
-    frame.texture_margin_left = 24.0
-    frame.texture_margin_right = 24.0
-    frame.texture_margin_top = 18.0
-    frame.texture_margin_bottom = 18.0
+    frame.region_rect = Rect2(0.0, 0.0, 1120.0, 350.0)
+    frame.texture_margin_left = 12.0
+    frame.texture_margin_right = 12.0
+    frame.texture_margin_top = 7.0
+    frame.texture_margin_bottom = 7.0
+    p.add_theme_stylebox_override("panel", frame)
+
+func _skin_top(p: Panel) -> void:
+    var frame: StyleBoxTexture = StyleBoxTexture.new()
+    frame.texture = UI_TOP
+    frame.region_rect = Rect2(0.0, 0.0, 1050.0, 155.0)
+    frame.texture_margin_left = 10.0
+    frame.texture_margin_right = 10.0
+    frame.texture_margin_top = 4.0
+    frame.texture_margin_bottom = 4.0
     p.add_theme_stylebox_override("panel", frame)
 
 func _header_layer(parent: Control) -> TextureRect:
@@ -1826,15 +1837,16 @@ func build_ui() -> void:
 
     # Compact information card: fixed dimensions, never stretched by labels.
     ui_top = panel(Color("#edf5e5ed"))
+    _skin_top(ui_top)
     ui.add_child(ui_top)
-    title_label = text_label("ฟาร์มสุขใจ", 20, Color("#315941"))
+    title_label = text_label("ฟาร์มสุขใจ", 20, Color("#fff8de"))
     title_label.add_theme_font_override("font", THAI_BOLD)
     ui_top.add_child(title_label)
     var coin_icon: Control = ICON.new()
     coin_icon.kind = "coin"
     ui_top.add_child(coin_icon)
     coin_icon.name = "CoinIcon"
-    money_label = text_label("", 18, Color("#1d3f2b"))
+    money_label = text_label("", 18, Color("#fff9de"))
     money_label.add_theme_font_override("font", THAI_BOLD)
     ui_top.add_child(money_label)
     bag_button = btn("กระเป๋า", show_bag, Color("#426d55"))
@@ -1870,6 +1882,12 @@ func build_ui() -> void:
     ui_bottom = panel(Color("#edf5e5f2"))
     _skin_hud(ui_bottom)
     ui.add_child(ui_bottom)
+    ui_bottom.visible = tool_menu_open
+    # The small standalone PNG button is always accessible even if the
+    # large tools panel is collapsed to reveal the game world.
+    tool_menu_toggle_button = btn("☰ เครื่องมือ", toggle_tool_menu, Color("#248b3d"))
+    ui.add_child(tool_menu_toggle_button)
+    _set_icon(tool_menu_toggle_button, "tools")
     status_label = text_label("", 16, Color("#ffffff"))
     status_label.add_theme_font_override("font", THAI_BOLD)
     status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -2153,7 +2171,15 @@ func update_sizes() -> void:
             toolbar_y = h-365.0
     var toolbar_x: float = (w-toolbar_width)*0.5
     set_box(ui_bottom, toolbar_x, toolbar_y, toolbar_width, toolbar_height)
-    set_box(status_label, 15, 7, toolbar_width-30.0, 30.0 if short_landscape else 42.0)
+    ui_bottom.visible = tool_menu_open
+    # Folded: bottom center. Open: upper-right INSIDE the tool panel so
+    # it does not steal the middle of the screen from pinch/drag camera input.
+    var toggle_width: float = 144.0
+    var toggle_height: float = 37.0
+    var toggle_x: float = toolbar_x+toolbar_width-toggle_width-12.0 if tool_menu_open else (w-toggle_width)*0.5
+    var toggle_y: float = toolbar_y+6.0 if tool_menu_open else h-toggle_height-9.0
+    set_box(tool_menu_toggle_button, toggle_x, toggle_y, toggle_width, toggle_height)
+    set_box(status_label, 15, 7, toolbar_width-167.0, 30.0 if short_landscape else 42.0)
     set_box(farm_level_label, 15, 36.0 if short_landscape else 51.0, toolbar_width-164.0, 27.0)
     set_box(landscape_button, toolbar_width-147.0, 33.0 if short_landscape else 48.0, 131.0, 34.0)
     set_box(active_seed_label, 15, 63.0 if short_landscape else 80.0, toolbar_width-170.0, 30.0)
@@ -2189,7 +2215,8 @@ func update_sizes() -> void:
     # thin line. Use the independent square PNG for these two controls.
     for zoom_button in [zoom_out_button, zoom_in_button]:
         var square: StyleBoxTexture = StyleBoxTexture.new()
-        square.texture = UI_SLOT
+        square.texture = UI_ZOOM
+        square.region_rect = Rect2(0.0, 0.0, 256.0, 256.0)
         square.texture_margin_left = 2.0
         square.texture_margin_right = 2.0
         square.texture_margin_top = 2.0
@@ -2267,7 +2294,7 @@ func update_sizes() -> void:
 func point_on_ui(pos: Vector2) -> bool:
     if _camera_overlay_at(pos):
         return true
-    for panel_node in [ui_top,ui_bottom,save_chip,stick_label,voice_caption]:
+    for panel_node in [ui_top,ui_bottom,tool_menu_toggle_button,save_chip,stick_label,voice_caption]:
         if panel_node != null and panel_node.is_visible_in_tree() and panel_node.get_global_rect().has_point(pos):
             return true
     if GM_TEST_MODE and gm_button != null and gm_button.visible and gm_button.get_global_rect().has_point(pos):
@@ -2276,6 +2303,12 @@ func point_on_ui(pos: Vector2) -> bool:
         for control in [stick,run_button,jump_button,zoom_in_button,zoom_out_button,audio_button]:
             if control.visible and control.get_global_rect().has_point(pos): return true
     return false
+
+func toggle_tool_menu() -> void:
+    tool_menu_open = not tool_menu_open
+    tool_menu_toggle_button.text = "▲ ปิดเครื่องมือ" if tool_menu_open else "☰ เครื่องมือ"
+    ui_bottom.visible = tool_menu_open
+    update_sizes()
 
 func toggle_sound() -> void:
     if farm_audio == null:
@@ -2351,7 +2384,7 @@ func refresh_labels() -> void:
         money_label.text = "เงิน %d | คอก %d | หมู %d/%d" % [coins, pens, pigs, pens*PEN_CAPACITY]
     else:
         money_label.text = "เงิน %d | คอก %d/%d | หมู %d/%d | อาหาร %d" % [coins, pens, MAX_PENS, pigs, pens*PEN_CAPACITY, feed]
-    money_label.add_theme_font_size_override("font_size", 14)
+    money_label.add_theme_font_size_override("font_size", 16)
     if shop_livestock_label != null:
         shop_livestock_label.text = "คอก %d/%d  |  หมู %d/%d ตัว" % [pens, MAX_PENS, pigs, pens*PEN_CAPACITY]
         shop_pen_button.text = "ขยายคอกหมู +1 (ราคา %d เหรียญ)" % pen_price() if pens < MAX_PENS else "คอกเต็มแล้ว (%d คอก)" % MAX_PENS
