@@ -1705,7 +1705,8 @@ func build_ui() -> void:
     landscape_button = btn("จัดสวน", toggle_landscaping, Color("#638d72"))
     ui_bottom.add_child(landscape_button)
     for pair in [["till","พรวนดิน"],["plant","ปลูกผัก"],["water","รดน้ำ"],["harvest","เก็บเกี่ยว"],
-        ["place_plot","วางแปลง"],["plant_tree","ปลูกต้นไม้"],["chop_tree","ตัดต้นไม้"]]:
+        ["place_plot","แปลง"],["plant_tree","ต้นไม้"],["chop_tree","ตัดไม้"],
+        ["place_decor","ของแต่ง"],["buy_land","ซื้อที่ดิน"]]:
         var key: String = str(pair[0])
         var button: Button = btn(str(pair[1]), pick_tool.bind(key), Color("#468566") if key != "water" else Color("#4d95ac"))
         ui_bottom.add_child(button)
@@ -1743,7 +1744,7 @@ func build_ui() -> void:
     shop_panel = panel(Color("#f4f8effa"))
     ui.add_child(shop_panel)
     shop_panel.visible = false
-    shop_heading = text_label("ร้านค้าฟาร์มและสัตว์เลี้ยง", 21, Color("#345841"))
+    shop_heading = text_label("ร้านฟาร์ม • ของตกแต่ง • สัตว์เลี้ยง", 21, Color("#345841"))
     shop_heading.add_theme_font_override("font", THAI_BOLD)
     shop_panel.add_child(shop_heading)
     shop_close = btn("ปิด", show_shop, Color("#73817a"))
@@ -1774,6 +1775,12 @@ func build_ui() -> void:
         tree_buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         shop_grid.add_child(tree_buy)
         shop_tree_buttons.append(tree_buy)
+    for i in range(DECOR_NAMES.size()):
+        var decor_buy: Button = btn("%s %d เหรียญ" % [DECOR_NAMES[i], DECOR_PRICES[i]], buy_decor_kit.bind(i), Color("#7e9070"))
+        decor_buy.custom_minimum_size = Vector2(145, 40)
+        decor_buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        shop_grid.add_child(decor_buy)
+        shop_decor_buttons.append(decor_buy)
     shop_feed = btn("ซื้ออาหารหมู +5 (35 เหรียญ)", buy_feed, Color("#ad7c53"))
     shop_panel.add_child(shop_feed)
     shop_pen_button = btn("ขยายคอกหมู", buy_pen, Color("#7c985d"))
@@ -1845,6 +1852,33 @@ func build_ui() -> void:
     bag_import_button = btn("นำเข้าเซฟ", request_import_backup, Color("#ab8054"))
     bag_panel.add_child(bag_import_button)
 
+    # Optional GM testing controls are disabled entirely before release.
+    gm_button = btn("GM TEST", toggle_gm_panel, Color("#98624a"))
+    gm_button.visible = GM_TEST_MODE
+    ui.add_child(gm_button)
+    gm_panel = panel(Color("#eff4e9f9"))
+    gm_panel.visible = false
+    ui.add_child(gm_panel)
+    gm_title = text_label("GM ทดสอบ — เติมเหรียญจำลอง", 19, Color("#485f48"))
+    gm_title.add_theme_font_override("font", THAI_BOLD)
+    gm_panel.add_child(gm_title)
+    var gm_close: Button = btn("ปิด", toggle_gm_panel, Color("#7c8880"))
+    gm_close.name = "GMClose"
+    gm_panel.add_child(gm_close)
+    for entry in [[1000, "+1,000 เหรียญ"],[10000, "+10,000 เหรียญ"],[100000, "+100,000 เหรียญ"]]:
+        var amount: int = int(entry[0])
+        var add_coins: Button = btn(str(entry[1]), gm_grant_coins.bind(amount), Color("#4f9b70"))
+        add_coins.name = "Add%d" % amount
+        gm_panel.add_child(add_coins)
+
+    land_confirm = ConfirmationDialog.new()
+    land_confirm.title = "ยืนยันซื้อที่ดิน"
+    land_confirm.dialog_text = "ซื้อโซนขนาด 40×40 ด้วยเหรียญในเกม"
+    land_confirm.ok_button_text = "ซื้อพื้นที่"
+    land_confirm.cancel_button_text = "ยกเลิก"
+    land_confirm.confirmed.connect(_confirm_land_purchase)
+    ui.add_child(land_confirm)
+
     restore_confirm = ConfirmationDialog.new()
     restore_confirm.title = "ยืนยันนำเข้าเซฟ"
     restore_confirm.dialog_text = "ข้อมูลปัจจุบันในเบราว์เซอร์จะถูกแทนที่"
@@ -1855,6 +1889,8 @@ func build_ui() -> void:
     shop_panel.visibility_changed.connect(_reset_camera_input)
     bag_panel.visibility_changed.connect(_reset_camera_input)
     restore_confirm.visibility_changed.connect(_reset_camera_input)
+    land_confirm.visibility_changed.connect(_reset_camera_input)
+    gm_panel.visibility_changed.connect(_reset_camera_input)
 
     update_sizes()
     pick_tool("plant")
@@ -1913,10 +1949,12 @@ func update_sizes() -> void:
     var keys: Array[String] = ["till", "plant", "water", "harvest"]
     for i in range(4):
         set_box(action_buttons[keys[i]], 12.0+float(i)*(tool_button_w+gap), 98.0, tool_button_w, 34.0)
-    var landscape_w: float = (toolbar_width-24.0-2.0*gap)/3.0
-    var garden_keys: Array[String] = ["place_plot", "plant_tree", "chop_tree"]
+    var garden_keys: Array[String] = ["place_plot", "plant_tree", "chop_tree", "place_decor", "buy_land"]
+    var landscape_w: float = (toolbar_width-24.0-4.0*gap)/5.0
     for i in range(garden_keys.size()):
-        set_box(action_buttons[garden_keys[i]], 12.0+float(i)*(landscape_w+gap), 98.0, landscape_w, 34.0)
+        var garden_button: Button = action_buttons[garden_keys[i]]
+        garden_button.add_theme_font_size_override("font_size", 14)
+        set_box(garden_button, 12.0+float(i)*(landscape_w+gap), 98.0, landscape_w, 34.0)
 
     set_box(stick, 18, h-158, 144, 144)
     set_box(stick_label, 26, h-184, 128, 27)
@@ -1947,6 +1985,16 @@ func update_sizes() -> void:
     set_box(save_status_label, 37.0, 7.0, 117.0, 25.0)
     var sound_x: float = w-290.0 if w >= 430.0 else 10.0
     set_box(audio_button, sound_x, badge_y, 108.0, 35.0)
+    if GM_TEST_MODE:
+        set_box(gm_button, w-125.0, badge_y+41.0, 113.0, 34.0)
+    var gm_width: float = minf(w-24.0, 365.0)
+    var gm_height: float = minf(h-24.0, 258.0)
+    set_box(gm_panel, (w-gm_width)*0.5, (h-gm_height)*0.5, gm_width, gm_height)
+    set_box(gm_title, 14.0, 12.0, gm_width-108.0, 34.0)
+    set_box(gm_panel.get_node("GMClose"), gm_width-83.0, 9.0, 73.0, 37.0)
+    set_box(gm_panel.get_node("Add1000"), 13.0, 60.0, gm_width-26.0, 50.0)
+    set_box(gm_panel.get_node("Add10000"), 13.0, 119.0, gm_width-26.0, 50.0)
+    set_box(gm_panel.get_node("Add100000"), 13.0, 178.0, gm_width-26.0, 50.0)
     var caption_width: float = minf(w-22.0, 540.0)
     var caption_y: float = 70.0 if not narrow else header_height+56.0
     set_box(voice_caption, (w-caption_width)*0.5, caption_y, caption_width, 53.0)
@@ -1981,6 +2029,8 @@ func point_on_ui(pos: Vector2) -> bool:
     for panel_node in [ui_top,ui_bottom,save_chip,stick_label,voice_caption]:
         if panel_node != null and panel_node.is_visible_in_tree() and panel_node.get_global_rect().has_point(pos):
             return true
+    if GM_TEST_MODE and gm_button != null and gm_button.visible and gm_button.get_global_rect().has_point(pos):
+        return true
     if touch_controls:
         for control in [stick,run_button,jump_button,zoom_in_button,zoom_out_button,audio_button]:
             if control.visible and control.get_global_rect().has_point(pos): return true
