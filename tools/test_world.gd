@@ -3,8 +3,8 @@ extends SceneTree
 const SAVES = preload("res://scripts/SaveData.gd")
 var failures: int = 0
 
-func check(pass: bool, name: String) -> void:
-    if not pass:
+func check(okay: bool, name: String) -> void:
+    if not okay:
         failures += 1
         printerr("WORLD TEST FAIL: " + name)
 
