@@ -1643,12 +1643,14 @@ func btn(txt: String, callback: Callable, background: Color = Color("#417c59")) 
     # This keeps the glossy edges intact at desktop and mobile dimensions.
     var style: StyleBoxTexture = StyleBoxTexture.new()
     style.texture = UI_BUTTON
-    # Keep the rendered 640x213 PNG as art, while reducing nine-slice
-    # margins so mobile buttons and +/- camera controls stay 34-52px tall.
-    style.texture_margin_left = 8.0
-    style.texture_margin_right = 8.0
-    style.texture_margin_top = 4.0
-    style.texture_margin_bottom = 4.0
+    # Original PNG has ~35px of empty transparent canvas above/below its
+    # painted body. Show the COMPLETE painted art, not those empty bands.
+    # Source asset remains unchanged; this rect only skips empty padding.
+    style.region_rect = Rect2(0.0, 34.0, 640.0, 153.0)
+    style.texture_margin_left = 15.0
+    style.texture_margin_right = 15.0
+    style.texture_margin_top = 8.0
+    style.texture_margin_bottom = 8.0
     style.content_margin_left = 0.0
     style.content_margin_right = 0.0
     style.content_margin_top = 0.0
@@ -1663,7 +1665,7 @@ func btn(txt: String, callback: Callable, background: Color = Color("#417c59")) 
     b.add_theme_stylebox_override("pressed", down)
     b.add_theme_stylebox_override("disabled", down)
     b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-    b.add_theme_color_override("font_color", Color("#fffce4"))
+    b.add_theme_color_override("font_color", Color("#ffffff"))
     b.add_theme_color_override("font_hover_color", Color.WHITE)
     b.add_theme_color_override("font_pressed_color", Color("#fff8d1"))
     b.add_theme_color_override("font_disabled_color", Color("#d1d2bc"))
@@ -1720,19 +1722,23 @@ func _fit_button_caption(button: Button) -> void:
     var height: float = maxf(button.size.y, button.custom_minimum_size.y)
     if width < 45.0 or height < 22.0:
         return
+    if button.text in ["+", "−", "-"]:
+        button.icon = null
+        button.add_theme_font_size_override("font_size", 29)
+        return
     var preferred: int = 20 if height >= 48.0 else (18 if height >= 34.0 else 16)
-    var min_size: int = 12 if width < 115.0 else 13
+    var min_size: int = 14 if width < 115.0 else 15
     var original_icon: Texture2D = null
     if button.has_meta("happy_icon_texture"):
         original_icon = button.get_meta("happy_icon_texture") as Texture2D
     var icon_width: int = mini(24, maxi(16, int(height * 0.43)))
-    var free_space: float = width - 24.0
+    var free_space: float = width - 16.0
     var preferred_text_width: float = 0.0
     for caption_line in button.text.split("\n"):
         preferred_text_width = maxf(preferred_text_width, THAI_BOLD.get_string_size(
             caption_line, HORIZONTAL_ALIGNMENT_LEFT, -1.0, preferred).x)
     # Prioritize complete readable words over decoration on small controls.
-    var show_icon: bool = original_icon != null and width >= 140.0 and (
+    var show_icon: bool = original_icon != null and width >= 145.0 and (
         preferred_text_width + float(icon_width) + 12.0 <= free_space)
     button.icon = original_icon if show_icon else null
     if show_icon:
@@ -1826,7 +1832,8 @@ func build_ui() -> void:
     coin_icon.kind = "coin"
     ui_top.add_child(coin_icon)
     coin_icon.name = "CoinIcon"
-    money_label = text_label("", 16, Color("#375c49"))
+    money_label = text_label("", 18, Color("#1d3f2b"))
+    money_label.add_theme_font_override("font", THAI_BOLD)
     ui_top.add_child(money_label)
     bag_button = btn("กระเป๋า", show_bag, Color("#426d55"))
     ui_top.add_child(bag_button)
@@ -1854,7 +1861,7 @@ func build_ui() -> void:
     save_icon = ICON.new()
     save_icon.kind = "save"
     save_chip.add_child(save_icon)
-    save_status_label = text_label("", 15, Color("#357652"))
+    save_status_label = text_label("", 17, Color("#1c5b3b"))
     save_chip.add_child(save_status_label)
 
     # Floating toolbar: only 118px tall instead of covering the farm.
@@ -2125,9 +2132,9 @@ func update_sizes() -> void:
         set_box(title_label, 12, 12, 115, 30)
         set_box(ui_top.get_node("CoinIcon"), 131, 15, 24, 24)
         set_box(money_label, 158, 13, 348, 30)
-        set_box(bag_button, 517, 8, 115, 40)
-        set_box(shop_button, 640, 8, 113, 40)
-        set_box(feed_button, 761, 8, 150, 40)
+        set_box(bag_button, 517, 8, 115, 43)
+        set_box(shop_button, 640, 8, 113, 43)
+        set_box(feed_button, 761, 8, 150, 43)
 
     # Small tool tray keeps the working 3D farm visible.
     var toolbar_width: float = minf(650.0, maxf(300.0, w-20.0))
@@ -2176,6 +2183,22 @@ func update_sizes() -> void:
     var zoom_buttons_y: float = h-264.0 if w >= 700.0 else h-408.0
     set_box(zoom_out_button, w-142, zoom_buttons_y, 62, 52)
     set_box(zoom_in_button, w-73, zoom_buttons_y, 62, 52)
+    # A wide pill image compressed into a 62px zoom button turns into a
+    # thin line. Use the independent square PNG for these two controls.
+    for zoom_button in [zoom_out_button, zoom_in_button]:
+        var square: StyleBoxTexture = StyleBoxTexture.new()
+        square.texture = UI_SLOT
+        square.texture_margin_left = 7.0
+        square.texture_margin_right = 7.0
+        square.texture_margin_top = 7.0
+        square.texture_margin_bottom = 7.0
+        zoom_button.add_theme_stylebox_override("normal", square)
+        var square_hover: StyleBoxTexture = square.duplicate()
+        square_hover.modulate_color = Color(1.18, 1.18, 1.10)
+        zoom_button.add_theme_stylebox_override("hover", square_hover)
+        var square_down: StyleBoxTexture = square.duplicate()
+        square_down.modulate_color = Color("#c5d4a9")
+        zoom_button.add_theme_stylebox_override("pressed", square_down)
     stick.queue_redraw()
 
     var shop_w: float = minf(w-24.0, 490.0)
