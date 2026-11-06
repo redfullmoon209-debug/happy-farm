@@ -1776,13 +1776,14 @@ func build_ui() -> void:
 
     # Floating toolbar: only 118px tall instead of covering the farm.
     ui_bottom = panel(Color("#edf5e5f2"))
+    _skin_hud(ui_bottom)
     ui.add_child(ui_bottom)
-    status_label = text_label("", 15, Color("#3f654b"))
+    status_label = text_label("", 15, Color("#f0ffe9"))
     ui_bottom.add_child(status_label)
-    farm_level_label = text_label("", 15, Color("#7a643c"))
+    farm_level_label = text_label("", 15, Color("#ffe3a2"))
     farm_level_label.add_theme_font_override("font", THAI_BOLD)
     ui_bottom.add_child(farm_level_label)
-    active_seed_label = text_label("", 16, Color("#365c44"))
+    active_seed_label = text_label("", 16, Color("#f2ffde"))
     active_seed_label.add_theme_font_override("font", THAI_BOLD)
     ui_bottom.add_child(active_seed_label)
     change_seed_button = btn("เลือกเมล็ด", show_bag, Color("#6a946f"))
@@ -1829,14 +1830,16 @@ func build_ui() -> void:
 
     # Shop is an explicitly sized popup; scrolling happens inside its bounds.
     shop_panel = panel(Color("#f4f8effa"))
+    _skin_window(shop_panel)
     ui.add_child(shop_panel)
     shop_panel.visible = false
-    shop_heading = text_label("ร้านฟาร์ม • ของตกแต่ง • สัตว์เลี้ยง", 21, Color("#345841"))
+    shop_header_art = _header_layer(shop_panel)
+    shop_heading = text_label("ร้านฟาร์ม • ของตกแต่ง • สัตว์เลี้ยง", 21, Color("#fff2c6"))
     shop_heading.add_theme_font_override("font", THAI_BOLD)
     shop_panel.add_child(shop_heading)
     shop_close = btn("ปิด", show_shop, Color("#73817a"))
     shop_panel.add_child(shop_close)
-    shop_livestock_label = text_label("", 15, Color("#426e55"))
+    shop_livestock_label = text_label("", 15, Color("#f9e7b9"))
     shop_panel.add_child(shop_livestock_label)
     shop_scroll = ScrollContainer.new()
     shop_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -1878,10 +1881,12 @@ func build_ui() -> void:
     # Dedicated seed inventory in the left-side area shown in the reference.
     # The panel is a fixed-size Panel, not a PanelContainer; it cannot grow.
     bag_panel = panel(Color("#ecf1e6fb"))
+    _skin_window(bag_panel)
     ui.add_child(bag_panel)
     bag_panel.visible = false
+    bag_header_art = _header_layer(bag_panel)
     bag_header = ColorRect.new()
-    bag_header.color = Color("#335b47")
+    bag_header.color = Color.TRANSPARENT
     bag_header.mouse_filter = Control.MOUSE_FILTER_IGNORE
     bag_panel.add_child(bag_header)
     bag_heading = text_label("กระเป๋าเมล็ดพันธุ์", 23, Color("#ffffff"))
@@ -1889,7 +1894,7 @@ func build_ui() -> void:
     bag_panel.add_child(bag_heading)
     bag_close = btn("ปิด", show_bag, Color("#d4a16b"))
     bag_panel.add_child(bag_close)
-    bag_summary = text_label("", 16, Color("#45624c"))
+    bag_summary = text_label("", 16, Color("#fff2d2"))
     bag_panel.add_child(bag_summary)
     bag_scroll = ScrollContainer.new()
     bag_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -1930,9 +1935,9 @@ func build_ui() -> void:
         count.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         contents.add_child(count)
         bag_counts.append(count)
-    bag_footer = text_label("แตะซองเมล็ดเพื่อเลือกไปปลูก", 15, Color("#5c715c"))
+    bag_footer = text_label("แตะซองเมล็ดเพื่อเลือกไปปลูก", 15, Color("#fff2d2"))
     bag_panel.add_child(bag_footer)
-    bag_save_status = text_label("เซฟเก็บอยู่ในเบราว์เซอร์เครื่องนี้", 14, Color("#487456"))
+    bag_save_status = text_label("เซฟเก็บอยู่ในเบราว์เซอร์เครื่องนี้", 14, Color("#f4d6a3"))
     bag_panel.add_child(bag_save_status)
     bag_export_button = btn("ดาวน์โหลดเซฟ", export_save_backup, Color("#397e62"))
     bag_panel.add_child(bag_export_button)
@@ -1944,9 +1949,11 @@ func build_ui() -> void:
     gm_button.visible = GM_TEST_MODE
     ui.add_child(gm_button)
     gm_panel = panel(Color("#eff4e9f9"))
+    _skin_window(gm_panel)
     gm_panel.visible = false
     ui.add_child(gm_panel)
-    gm_title = text_label("GM ทดสอบ — เติมเหรียญจำลอง", 19, Color("#485f48"))
+    gm_header_art = _header_layer(gm_panel)
+    gm_title = text_label("GM ทดสอบ — เติมเหรียญจำลอง", 19, Color("#fff2c6"))
     gm_title.add_theme_font_override("font", THAI_BOLD)
     gm_panel.add_child(gm_title)
     var gm_close: Button = btn("ปิด", toggle_gm_panel, Color("#7c8880"))
@@ -1978,6 +1985,29 @@ func build_ui() -> void:
     restore_confirm.visibility_changed.connect(_reset_camera_input)
     land_confirm.visibility_changed.connect(_reset_camera_input)
     gm_panel.visibility_changed.connect(_reset_camera_input)
+
+    # PNG glyphs stay separate from PNG button bases and live labels.
+    for entry in [
+        [shop_button, "shop"], [bag_button, "bag"], [landscape_button, "tools"],
+        [landscape_shop_button, "shop"], [change_seed_button, "farm"],
+        [gm_button, "gm"], [feed_button, "farm"], [run_button, "run"],
+        [jump_button, "jump"], [audio_button, "sound"],
+        [shop_plot_button, "plot"], [shop_feed, "farm"], [shop_pen_button, "farm"],
+        [shop_pig_button, "farm"], [bag_close, "close"], [shop_close, "close"],
+        [bag_export_button, "bag"], [bag_import_button, "bag"]
+    ]:
+        _set_icon(entry[0] as Button, str(entry[1]))
+    for key in action_buttons.keys():
+        var art_name: String = {
+            "till":"tools", "plant":"plant", "water":"water", "harvest":"harvest",
+            "place_plot":"plot", "plant_tree":"tree", "chop_tree":"axe",
+            "place_decor":"decorate", "buy_land":"land"
+        }.get(str(key), "farm")
+        _set_icon(action_buttons[key] as Button, art_name)
+    for button in shop_tree_buttons:
+        _set_icon(button, "tree")
+    for button in shop_decor_buttons:
+        _set_icon(button, "decorate")
 
     update_sizes()
     pick_tool("plant")
@@ -2056,6 +2086,7 @@ func update_sizes() -> void:
     var shop_w: float = minf(w-24.0, 490.0)
     var shop_h: float = minf(h-24.0, 560.0)
     set_box(shop_panel, (w-shop_w)*0.5, (h-shop_h)*0.5, shop_w, shop_h)
+    set_box(shop_header_art, 7, 3, shop_w-14, 57)
     set_box(shop_heading, 15, 10, shop_w-105, 33)
     set_box(shop_close, shop_w-85, 8, 73, 37)
     set_box(shop_livestock_label, 15, 48, shop_w-30, 28)
@@ -2077,6 +2108,7 @@ func update_sizes() -> void:
     var gm_width: float = minf(w-24.0, 365.0)
     var gm_height: float = minf(h-24.0, 258.0)
     set_box(gm_panel, (w-gm_width)*0.5, (h-gm_height)*0.5, gm_width, gm_height)
+    set_box(gm_header_art, 7, 3, gm_width-14.0, 54.0)
     set_box(gm_title, 14.0, 12.0, gm_width-108.0, 34.0)
     set_box(gm_panel.get_node("GMClose"), gm_width-83.0, 9.0, 73.0, 37.0)
     set_box(gm_panel.get_node("Add1000"), 13.0, 60.0, gm_width-26.0, 50.0)
@@ -2096,6 +2128,7 @@ func update_sizes() -> void:
         bag_bottom_margin = 303.0
     var bag_height: float = maxf(278.0, minf(h-bag_top-12.0, h-bag_top-bag_bottom_margin))
     set_box(bag_panel, bag_x, bag_top, bag_width, bag_height)
+    set_box(bag_header_art, 7, 2, bag_width-14.0, 62)
     set_box(bag_header, 0, 0, bag_width, 60)
     set_box(bag_heading, 16, 12, bag_width-104, 35)
     set_box(bag_close, bag_width-76, 11, 63, 37)
