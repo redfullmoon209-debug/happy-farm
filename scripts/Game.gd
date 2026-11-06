@@ -1616,8 +1616,14 @@ func text_label(txt: String, font_size: int, color: Color = Color("#284c3a")) ->
     var label: Label = Label.new()
     label.text = txt
     label.add_theme_font_override("font", THAI)
-    label.add_theme_font_size_override("font_size", font_size)
+    label.add_theme_font_size_override("font_size", maxi(font_size, 16))
     label.add_theme_color_override("font_color", color)
+    # Thai glyphs stay crisp against either the light inventory or dark PNG HUD.
+    var light_text: bool = color.get_luminance() > 0.57
+    label.add_theme_color_override("font_outline_color",
+        Color(0.09, 0.15, 0.10, 0.96) if light_text else Color(0.98, 0.99, 0.94, 0.94))
+    label.add_theme_constant_override("outline_size", 2 if light_text else 1)
+    label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
     label.autowrap_mode = TextServer.AUTOWRAP_OFF
     label.clip_text = true
     label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1629,8 +1635,9 @@ func btn(txt: String, callback: Callable, background: Color = Color("#417c59")) 
     b.focus_mode = Control.FOCUS_NONE
     b.custom_minimum_size = Vector2.ZERO
     b.add_theme_font_override("font", THAI_BOLD)
-    b.add_theme_font_size_override("font_size", 16)
+    b.add_theme_font_size_override("font_size", 17)
     b.add_theme_color_override("font_color", Color.WHITE)
+    b.alignment = HORIZONTAL_ALIGNMENT_CENTER
     b.clip_text = true
     # Nine-slice the original standalone button PNG; no screenshot cropping.
     # This keeps the glossy edges intact at desktop and mobile dimensions.
@@ -1660,9 +1667,9 @@ func btn(txt: String, callback: Callable, background: Color = Color("#417c59")) 
     b.add_theme_color_override("font_hover_color", Color.WHITE)
     b.add_theme_color_override("font_pressed_color", Color("#fff8d1"))
     b.add_theme_color_override("font_disabled_color", Color("#d1d2bc"))
-    b.add_theme_color_override("font_outline_color", Color(0.09, 0.25, 0.12, 0.90))
-    b.add_theme_constant_override("outline_size", 2)
-    b.add_theme_constant_override("h_separation", 4)
+    b.add_theme_color_override("font_outline_color", Color(0.03, 0.13, 0.07, 0.98))
+    b.add_theme_constant_override("outline_size", 3)
+    b.add_theme_constant_override("h_separation", 6)
     b.pressed.connect(callback)
     return b
 
@@ -1701,7 +1708,72 @@ func _set_icon(button: Button, name: String) -> void:
         button.icon = load(asset) as Texture2D
         button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
         button.expand_icon = true
-        button.add_theme_constant_override("icon_max_width", 26)
+        button.add_theme_constant_override("icon_max_width", 24)
+        button.set_meta("happy_icon_texture", button.icon)
+
+# Dynamically size actual Thai glyphs to the *rendered* button width.
+# Keep the original texture in metadata so icons can return after resize.
+func _fit_button_caption(button: Button) -> void:
+    if button == null or button.text.is_empty():
+        return
+    var width: float = maxf(button.size.x, button.custom_minimum_size.x)
+    var height: float = maxf(button.size.y, button.custom_minimum_size.y)
+    if width < 45.0 or height < 22.0:
+        return
+    var preferred: int = 18 if height >= 45.0 else 16
+    if height < 36.0:
+        preferred = 14
+    var min_size: int = 12 if width < 115.0 else 13
+    var original_icon: Texture2D = button.get_meta("happy_icon_texture", null) as Texture2D
+    var icon_width: int = mini(24, maxi(16, int(height * 0.43)))
+    var free_space: float = width - 24.0
+    var first_line: String = button.text.replace("\n", " ")
+    var preferred_text_width: float = THAI_BOLD.get_string_size(first_line,
+        HORIZONTAL_ALIGNMENT_LEFT, -1.0, preferred).x
+    # Prioritize complete readable words over decoration on small controls.
+    var show_icon: bool = original_icon != null and width >= 140.0 and (
+        preferred_text_width + float(icon_width) + 12.0 <= free_space)
+    button.icon = original_icon if show_icon else null
+    if show_icon:
+        free_space -= float(icon_width) + 8.0
+    button.add_theme_constant_override("icon_max_width", icon_width)
+    var font_size: int = preferred
+    while font_size > min_size:
+        if THAI_BOLD.get_string_size(first_line,
+            HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x <= free_space:
+            break
+        font_size -= 1
+    button.add_theme_font_size_override("font_size", font_size)
+
+func _fit_title_caption(label: Label, preferred: int, minimum: int = 15) -> void:
+    if label == null or label.text.is_empty() or label.size.x < 35.0:
+        return
+    var font: Font = label.get_theme_font("font")
+    var max_width: float = label.size.x - 6.0
+    var font_size: int = preferred
+    while font_size > minimum:
+        if font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT,
+            -1.0, font_size).x <= max_width:
+            break
+        font_size -= 1
+    label.add_theme_font_size_override("font_size", font_size)
+
+func _fit_descendant_buttons(node: Node) -> void:
+    for child in node.get_children():
+        if child is Button:
+            _fit_button_caption(child as Button)
+        _fit_descendant_buttons(child)
+
+func _fit_all_ui_text() -> void:
+    if ui == null:
+        return
+    _fit_descendant_buttons(ui)
+    _fit_title_caption(shop_heading, 21, 15)
+    _fit_title_caption(bag_heading, 23, 17)
+    _fit_title_caption(gm_title, 19, 15)
+    _fit_title_caption(title_label, 20, 16)
+    _fit_title_caption(money_label, 17, 14)
+    _fit_title_caption(shop_livestock_label, 16, 14)
 
 func panel(color: Color) -> Panel:
     # Panel (not PanelContainer) never enlarges itself to fit its children.
@@ -1748,12 +1820,9 @@ func build_ui() -> void:
     coin_icon.name = "CoinIcon"
     money_label = text_label("", 16, Color("#375c49"))
     ui_top.add_child(money_label)
-    bag_button = btn("   กระเป๋า", show_bag, Color("#426d55"))
+    bag_button = btn("กระเป๋า", show_bag, Color("#426d55"))
     ui_top.add_child(bag_button)
-    var bag_icon: Control = ICON.new()
-    bag_icon.kind = "bag"
-    bag_button.add_child(bag_icon)
-    set_box(bag_icon, 5, 6, 24, 24)
+    # The bag button now uses its own imported transparent PNG icon layer.
     shop_button = btn("ร้านค้า", show_shop, Color("#ad7c53"))
     ui_top.add_child(shop_button)
     feed_button = btn("ให้อาหาร", give_feed, Color("#b87b89"))
@@ -1784,12 +1853,16 @@ func build_ui() -> void:
     ui_bottom = panel(Color("#edf5e5f2"))
     _skin_hud(ui_bottom)
     ui.add_child(ui_bottom)
-    status_label = text_label("", 15, Color("#f0ffe9"))
+    status_label = text_label("", 16, Color("#ffffff"))
+    status_label.add_theme_font_override("font", THAI_BOLD)
+    status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    status_label.clip_text = false
+    status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
     ui_bottom.add_child(status_label)
-    farm_level_label = text_label("", 15, Color("#ffe3a2"))
+    farm_level_label = text_label("", 16, Color("#ffedb2"))
     farm_level_label.add_theme_font_override("font", THAI_BOLD)
     ui_bottom.add_child(farm_level_label)
-    active_seed_label = text_label("", 16, Color("#f2ffde"))
+    active_seed_label = text_label("", 17, Color("#ffffff"))
     active_seed_label.add_theme_font_override("font", THAI_BOLD)
     ui_bottom.add_child(active_seed_label)
     change_seed_button = btn("เลือกเมล็ด", show_bag, Color("#6a946f"))
@@ -1845,7 +1918,7 @@ func build_ui() -> void:
     shop_panel.add_child(shop_heading)
     shop_close = btn("ปิด", show_shop, Color("#73817a"))
     shop_panel.add_child(shop_close)
-    shop_livestock_label = text_label("", 15, Color("#f9e7b9"))
+    shop_livestock_label = text_label("", 17, Color("#fff0c2"))
     shop_panel.add_child(shop_livestock_label)
     shop_scroll = ScrollContainer.new()
     shop_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -1900,7 +1973,7 @@ func build_ui() -> void:
     bag_panel.add_child(bag_heading)
     bag_close = btn("ปิด", show_bag, Color("#d4a16b"))
     bag_panel.add_child(bag_close)
-    bag_summary = text_label("", 16, Color("#fff2d2"))
+    bag_summary = text_label("", 17, Color("#ffffff"))
     bag_panel.add_child(bag_summary)
     bag_scroll = ScrollContainer.new()
     bag_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -1941,9 +2014,9 @@ func build_ui() -> void:
         count.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         contents.add_child(count)
         bag_counts.append(count)
-    bag_footer = text_label("แตะซองเมล็ดเพื่อเลือกไปปลูก", 15, Color("#fff2d2"))
+    bag_footer = text_label("แตะซองเมล็ดเพื่อเลือกไปปลูก", 16, Color("#ffffff"))
     bag_panel.add_child(bag_footer)
-    bag_save_status = text_label("เซฟเก็บอยู่ในเบราว์เซอร์เครื่องนี้", 14, Color("#f4d6a3"))
+    bag_save_status = text_label("เซฟเก็บอยู่ในเบราว์เซอร์เครื่องนี้", 16, Color("#ffe4a6"))
     bag_panel.add_child(bag_save_status)
     bag_export_button = btn("ดาวน์โหลดเซฟ", export_save_backup, Color("#397e62"))
     bag_panel.add_child(bag_export_button)
@@ -2050,7 +2123,7 @@ func update_sizes() -> void:
 
     # Small tool tray keeps the working 3D farm visible.
     var toolbar_width: float = minf(650.0, maxf(300.0, w-20.0))
-    var toolbar_y: float = h-191.0
+    var toolbar_y: float = h-208.0
     if touch_controls:
         # In landscape, reserve both side rails for joystick and buttons.
         # In portrait, place the farming toolbar above the bottom controls.
@@ -2058,26 +2131,31 @@ func update_sizes() -> void:
             toolbar_width = minf(570.0, w-340.0)
         else:
             toolbar_width = w-18.0
-            toolbar_y = h-355.0
+            toolbar_y = h-365.0
     var toolbar_x: float = (w-toolbar_width)*0.5
-    set_box(ui_bottom, toolbar_x, toolbar_y, toolbar_width, 180.0)
-    set_box(status_label, 12, 5, toolbar_width-24.0, 25.0)
-    set_box(farm_level_label, 12, 32, toolbar_width-157.0, 22.0)
-    set_box(landscape_button, toolbar_width-142.0, 29.0, 130.0, 28.0)
-    set_box(active_seed_label, 13, 58, toolbar_width-166.0, 30.0)
-    set_box(change_seed_button, toolbar_width-148.0, 55, 135.0, 34.0)
-    set_box(landscape_shop_button, toolbar_width-148.0, 55, 135.0, 34.0)
+    set_box(ui_bottom, toolbar_x, toolbar_y, toolbar_width, 198.0)
+    set_box(status_label, 15, 7, toolbar_width-30.0, 42.0)
+    set_box(farm_level_label, 15, 51, toolbar_width-164.0, 27.0)
+    set_box(landscape_button, toolbar_width-147.0, 48.0, 131.0, 34.0)
+    set_box(active_seed_label, 15, 80, toolbar_width-170.0, 30.0)
+    set_box(change_seed_button, toolbar_width-150.0, 80.0, 134.0, 34.0)
+    set_box(landscape_shop_button, toolbar_width-150.0, 80.0, 134.0, 34.0)
     var gap: float = 6.0
     var tool_button_w: float = (toolbar_width-24.0-3.0*gap)*0.25
     var keys: Array[String] = ["till", "plant", "water", "harvest"]
     for i in range(4):
-        set_box(action_buttons[keys[i]], 12.0+float(i)*(tool_button_w+gap), 98.0, tool_button_w, 34.0)
+        set_box(action_buttons[keys[i]], 12.0+float(i)*(tool_button_w+gap), 129.0, tool_button_w, 50.0)
     var garden_keys: Array[String] = ["place_plot", "plant_tree", "chop_tree", "place_decor", "buy_land"]
-    var landscape_w: float = (toolbar_width-24.0-4.0*gap)/5.0
+    # Two generous rows prevent Thai labels from being squeezed into five
+    # narrow buttons when decorating on a mobile or a desktop.
+    var landscape_w: float = (toolbar_width-24.0-2.0*gap)/3.0
     for i in range(garden_keys.size()):
         var garden_button: Button = action_buttons[garden_keys[i]]
-        garden_button.add_theme_font_size_override("font_size", 14)
-        set_box(garden_button, 12.0+float(i)*(landscape_w+gap), 139.0, landscape_w, 34.0)
+        var col: int = i if i < 3 else i-3
+        var row: int = 0 if i < 3 else 1
+        var offset: float = 0.0 if row == 0 else (landscape_w+gap)*0.5
+        set_box(garden_button, 12.0+offset+float(col)*(landscape_w+gap),
+            115.0+float(row)*37.0, landscape_w, 34.0)
 
     set_box(stick, 18, h-158, 144, 144)
     set_box(stick_label, 26, h-184, 128, 27)
@@ -2148,6 +2226,7 @@ func update_sizes() -> void:
     bag_grid.columns = 3 if bag_width >= 345.0 else 2
     for card in bag_cards:
         card.custom_minimum_size = Vector2(95.0, 119.0)
+    _fit_all_ui_text()
     update_camera()
 func point_on_ui(pos: Vector2) -> bool:
     if _camera_overlay_at(pos):
@@ -2273,7 +2352,8 @@ func refresh_labels() -> void:
     for key in action_buttons.keys():
         var is_garden: bool = ["place_plot", "plant_tree", "chop_tree", "place_decor", "buy_land"].has(str(key))
         action_buttons[key].visible = is_garden == landscaping_mode
-        action_buttons[key].modulate = Color.WHITE if key == tool_mode else Color("#bbcbbd")
+        action_buttons[key].modulate = Color.WHITE if key == tool_mode else Color("#d7e0d2")
+    _fit_all_ui_text()
 
 func refresh_bag_cards() -> void:
     if bag_summary == null:
