@@ -130,6 +130,7 @@ var seed_select: OptionButton
 var shop_panel: Panel
 var action_buttons: Dictionary = {}
 var landscape_button: Button
+var landscape_shop_button: Button
 var shop_plot_button: Button
 var shop_tree_buttons: Array[Button] = []
 var run_button: Button
@@ -827,6 +828,9 @@ func required_farm_level(index: int) -> int:
 func is_plot_unlocked(index: int) -> bool:
     if index < 0 or index >= plots.size():
         return false
+    # Player-purchased beds never inherit any lock from the original 50.
+    if index >= FARM_COLUMNS * FARM_ROWS:
+        return true
     if required_farm_level(index) <= farm_level:
         return true
     # Grandfather existing planted/tilled beds from saves made before levels
@@ -835,7 +839,7 @@ func is_plot_unlocked(index: int) -> bool:
 
 func unlocked_plot_count() -> int:
     var total: int = 0
-    for i in range(plots.size()):
+    for i in range(mini(plots.size(), FARM_COLUMNS * FARM_ROWS)):
         if is_plot_unlocked(i):
             total += 1
     return total
@@ -1288,9 +1292,23 @@ func _input(event: InputEvent) -> void:
             camera_yaw -= event.relative.x * 0.007
             camera_pitch = clampf(camera_pitch + event.relative.y * 0.005, -1.33, -0.28)
             update_camera()
+        else:
+            _update_placement_preview(event.position)
 
 func click_plot(pixel: Vector2) -> void:
-    if shop_panel.visible: return
+    if shop_panel.visible:
+        return
+    if landscaping_mode:
+        if bag_panel.visible:
+            return
+        if tool_mode == "place_plot":
+            _place_new_plot(_ground_at(pixel))
+        elif tool_mode == "plant_tree":
+            _plant_purchased_tree(_ground_at(pixel))
+        elif tool_mode == "chop_tree":
+            _chop_tree_at(pixel)
+        _update_placement_preview(pixel)
+        return
     var origin: Vector3 = camera.project_ray_origin(pixel)
     var ray: Vector3 = camera.project_ray_normal(pixel)
     if absf(ray.y) < 0.001: return
@@ -1454,7 +1472,12 @@ func build_ui() -> void:
     ui_bottom.add_child(active_seed_label)
     change_seed_button = btn("เลือกเมล็ด", show_bag, Color("#6a946f"))
     ui_bottom.add_child(change_seed_button)
-    for pair in [["till","พรวนดิน"],["plant","ปลูกผัก"],["water","รดน้ำ"],["harvest","เก็บเกี่ยว"]]:
+    landscape_shop_button = btn("เปิดร้านค้า", show_shop, Color("#987849"))
+    ui_bottom.add_child(landscape_shop_button)
+    landscape_button = btn("จัดสวน", toggle_landscaping, Color("#638d72"))
+    ui_bottom.add_child(landscape_button)
+    for pair in [["till","พรวนดิน"],["plant","ปลูกผัก"],["water","รดน้ำ"],["harvest","เก็บเกี่ยว"],
+        ["place_plot","วางแปลง"],["plant_tree","ปลูกต้นไม้"],["chop_tree","ตัดต้นไม้"]]:
         var key: String = str(pair[0])
         var button: Button = btn(str(pair[1]), pick_tool.bind(key), Color("#468566") if key != "water" else Color("#4d95ac"))
         ui_bottom.add_child(button)
@@ -1513,6 +1536,16 @@ func build_ui() -> void:
         buy.custom_minimum_size = Vector2(145, 39)
         buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         shop_grid.add_child(buy)
+    shop_plot_button = btn("ชุดแปลงปลูก 75 เหรียญ", buy_plot_kit, Color("#5d9d75"))
+    shop_plot_button.custom_minimum_size = Vector2(145, 40)
+    shop_plot_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    shop_grid.add_child(shop_plot_button)
+    for i in range(TREE_VARIANTS.size()):
+        var tree_buy: Button = btn("ต้น%s %d เหรียญ" % [TREE_NAMES[i], TREE_PRICES[i]], buy_tree_kit.bind(i), Color("#568768"))
+        tree_buy.custom_minimum_size = Vector2(145, 40)
+        tree_buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        shop_grid.add_child(tree_buy)
+        shop_tree_buttons.append(tree_buy)
     shop_feed = btn("ซื้ออาหารหมู +5 (35 เหรียญ)", buy_feed, Color("#ad7c53"))
     shop_panel.add_child(shop_feed)
     shop_pen_button = btn("ขยายคอกหมู", buy_pen, Color("#7c985d"))
@@ -1642,14 +1675,20 @@ func update_sizes() -> void:
     var toolbar_x: float = (w-toolbar_width)*0.5
     set_box(ui_bottom, toolbar_x, toolbar_y, toolbar_width, 140.0)
     set_box(status_label, 12, 5, toolbar_width-24.0, 25.0)
-    set_box(farm_level_label, 12, 32, toolbar_width-24.0, 22.0)
+    set_box(farm_level_label, 12, 32, toolbar_width-157.0, 22.0)
+    set_box(landscape_button, toolbar_width-142.0, 29.0, 130.0, 28.0)
     set_box(active_seed_label, 13, 58, toolbar_width-166.0, 30.0)
     set_box(change_seed_button, toolbar_width-148.0, 55, 135.0, 34.0)
+    set_box(landscape_shop_button, toolbar_width-148.0, 55, 135.0, 34.0)
     var gap: float = 6.0
     var tool_button_w: float = (toolbar_width-24.0-3.0*gap)*0.25
     var keys: Array[String] = ["till", "plant", "water", "harvest"]
     for i in range(4):
         set_box(action_buttons[keys[i]], 12.0+float(i)*(tool_button_w+gap), 98.0, tool_button_w, 34.0)
+    var landscape_w: float = (toolbar_width-24.0-2.0*gap)/3.0
+    var garden_keys: Array[String] = ["place_plot", "plant_tree", "chop_tree"]
+    for i in range(garden_keys.size()):
+        set_box(action_buttons[garden_keys[i]], 12.0+float(i)*(landscape_w+gap), 98.0, landscape_w, 34.0)
 
     set_box(stick, 18, h-158, 144, 144)
     set_box(stick_label, 26, h-184, 128, 27)
@@ -1802,15 +1841,23 @@ func refresh_labels() -> void:
         shop_pig_button.disabled = pigs >= pens*PEN_CAPACITY
     status_label.text = message
     if farm_level >= MAX_FARM_LEVEL:
-        farm_level_label.text = "ฟาร์ม Lv.10 MAX  |  เปิดครบ 50 แปลง"
+        farm_level_label.text = "ฟาร์ม Lv.10 MAX" if get_viewport().get_visible_rect().size.x < 700.0 else "ฟาร์ม Lv.10 MAX | 50 แปลงเดิม"
+    elif get_viewport().get_visible_rect().size.x < 700.0:
+        farm_level_label.text = "Lv.%d EXP %d/%d" % [farm_level, farm_xp, xp_to_next_level()]
     else:
-        farm_level_label.text = "ฟาร์ม Lv.%d  |  EXP %d/%d  |  เปิดแปลง %d/50" % [
+        farm_level_label.text = "ฟาร์ม Lv.%d | EXP %d/%d | เปิด %d/50" % [
             farm_level, farm_xp, xp_to_next_level(), unlocked_plot_count()
         ]
-    active_seed_label.text = "เมล็ดที่เลือก: %s ×%d" % [CROPS[selected_seed]["name"], int(seeds[selected_seed])]
+    active_seed_label.text = ("แปลงชุด ×%d | ต้น%s ×%d" % [plot_kits, TREE_NAMES[selected_tree], int(tree_kits[selected_tree])]) if landscaping_mode else "เมล็ด: %s ×%d" % [CROPS[selected_seed]["name"], int(seeds[selected_seed])]
+    if landscape_button != null:
+        landscape_button.text = "กลับทำฟาร์ม" if landscaping_mode else "จัดสวน"
+        change_seed_button.visible = not landscaping_mode
+        landscape_shop_button.visible = landscaping_mode
     _refresh_save_indicator()
     refresh_bag_cards()
     for key in action_buttons.keys():
+        var is_garden: bool = str(key) == "place_plot" or str(key) == "plant_tree" or str(key) == "chop_tree"
+        action_buttons[key].visible = is_garden == landscaping_mode
         action_buttons[key].modulate = Color.WHITE if key == tool_mode else Color("#bbcbbd")
 
 func refresh_bag_cards() -> void:
@@ -1819,7 +1866,11 @@ func refresh_bag_cards() -> void:
     var total: int = 0
     for i in range(seeds.size()):
         total += int(seeds[i])
-    bag_summary.text = "เมล็ดพันธุ์ %d ชนิด  |  รวม %d ซอง" % [CROPS.size(), total]
+    bag_summary.text = "เมล็ดพันธุ์ %d ชนิด | รวม %d ซอง" % [CROPS.size(), total]
+    var tree_total: int = 0
+    for stock in tree_kits:
+        tree_total += int(stock)
+    bag_footer.text = "ชุดแปลง %d | ต้นกล้า %d | ไม้ %d" % [plot_kits, tree_total, wood]
     for i in range(bag_cards.size()):
         var count: int = int(seeds[i])
         var selected: bool = selected_seed == i
@@ -1838,13 +1889,37 @@ func refresh_bag_cards() -> void:
         bag_cards[i].add_theme_stylebox_override("pressed", style)
         bag_cards[i].modulate = Color.WHITE if count > 0 or selected else Color("#dddddd")
 
+func toggle_landscaping() -> void:
+    if work_plot >= 0 or work_time > 0.0:
+        message = "รอทำแปลงปัจจุบันให้เสร็จก่อน"
+        refresh_labels()
+        return
+    landscaping_mode = not landscaping_mode
+    tool_mode = "place_plot" if landscaping_mode else "plant"
+    message = "เลือกวางแปลงบนพื้นหญ้าว่าง ไม่ต้องใช้เลเวล" if landscaping_mode else "แตะแปลงผักเพื่อทำฟาร์ม"
+    if placement_preview != null:
+        placement_preview.visible = false
+    refresh_labels()
+
 func pick_tool(key: String) -> void:
     if work_plot >= 0 or work_time > 0.0:
         message = "รอชาวสวนทำแปลงปัจจุบันให้เสร็จก่อน"
         refresh_labels()
         return
+    if key == "plant_tree" and tool_mode == "plant_tree" and landscaping_mode:
+        selected_tree = (selected_tree + 1) % TREE_VARIANTS.size()
     tool_mode = key
-    message = "เลือกแปลงผักที่ต้องการ"
+    landscaping_mode = key == "place_plot" or key == "plant_tree" or key == "chop_tree"
+    if key == "place_plot":
+        message = "แตะพื้นหญ้าที่ว่างเพื่อวางแปลง (มี %d ชุด)" % plot_kits
+    elif key == "plant_tree":
+        message = "เลือกต้น%s (%d ต้น) แล้วแตะพื้นที่ว่าง | กดปุ่มซ้ำเพื่อเปลี่ยนชนิด" % [TREE_NAMES[selected_tree], int(tree_kits[selected_tree])]
+    elif key == "chop_tree":
+        message = "แตะต้นไม้ที่ต้องการตัดเพื่อเคลียร์พื้นที่"
+    else:
+        message = "เลือกแปลงผักที่ต้องการ"
+    if placement_preview != null:
+        placement_preview.visible = false
     refresh_labels()
 
 func select_seed(index: int) -> void:
@@ -1854,6 +1929,7 @@ func select_seed(index: int) -> void:
         return
     selected_seed = index
     tool_mode = "plant"
+    landscaping_mode = false
     bag_panel.visible = false
     if int(seeds[index]) > 0:
         message = "เลือก%sแล้ว แตะแปลงเพื่อปลูก" % CROPS[index]["name"]
@@ -1875,6 +1951,43 @@ func show_shop() -> void:
     if bag_panel != null:
         bag_panel.visible = false
     shop_panel.visible = not shop_panel.visible
+
+func buy_plot_kit() -> void:
+    if coins < PLOT_KIT_PRICE:
+        message = "เหรียญไม่พอซื้อชุดแปลงผัก"
+    elif plot_kits >= 100000:
+        message = "เก็บชุดแปลงมากเกินไปแล้ว"
+    else:
+        coins -= PLOT_KIT_PRICE
+        plot_kits += 1
+        landscaping_mode = true
+        tool_mode = "place_plot"
+        shop_panel.visible = false
+        message = "ซื้อชุดแปลงแล้ว แตะพื้นหญ้าว่างเพื่อวางได้เลย"
+        if farm_audio != null:
+            farm_audio.play_effect("buy")
+        save_game()
+    refresh_labels()
+
+func buy_tree_kit(index: int) -> void:
+    if index < 0 or index >= TREE_VARIANTS.size():
+        return
+    if coins < int(TREE_PRICES[index]):
+        message = "เหรียญไม่พอซื้อต้นกล้า"
+    elif int(tree_kits[index]) >= 100000:
+        message = "เก็บต้นกล้ามากเกินไปแล้ว"
+    else:
+        coins -= int(TREE_PRICES[index])
+        tree_kits[index] = int(tree_kits[index]) + 1
+        selected_tree = index
+        landscaping_mode = true
+        tool_mode = "plant_tree"
+        shop_panel.visible = false
+        message = "ซื้อต้น%sแล้ว แตะพื้นหญ้าที่ว่างเพื่อปลูก" % TREE_NAMES[index]
+        if farm_audio != null:
+            farm_audio.play_effect("buy")
+        save_game()
+    refresh_labels()
 
 func buy_seed(index: int) -> void:
     var price: int = int(CROPS[index]["price"])
