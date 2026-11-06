@@ -17,6 +17,11 @@ const MAX_EXTRA_PLOTS: int = 120
 const MAX_PLANTED_TREES: int = 80
 const TREE_VARIANTS = ["STOak2", "STPine3", "STWillow2", "STColumnar1", "STSwiggly1"]
 const BASE_TREE_COUNT: int = 15
+const WORLD_HALF: float = 200.0
+const ZONE_COUNT: int = 100
+const STARTER_ZONES = [44, 45, 54, 55]
+const DECOR_TYPES: int = 16
+const MAX_DECORATIONS: int = 260
 
 static func _valid_position_number(raw: Variant, bound: float) -> bool:
     if not (raw is int or raw is float):
@@ -144,7 +149,7 @@ static func normalize(raw: Variant) -> Dictionary:
     for entry in raw_extra:
         if not (entry is Dictionary):
             return {}
-        if not _valid_position_number(entry.get("x"), 30.0) or not _valid_position_number(entry.get("z"), 18.0):
+        if not _valid_position_number(entry.get("x"), 199.0) or not _valid_position_number(entry.get("z"), 199.0):
             return {}
         var cell: Dictionary = {"x": float(entry["x"]), "z": float(entry["z"])}
         if entry.has("tilled"):
@@ -174,7 +179,7 @@ static func normalize(raw: Variant) -> Dictionary:
     for entry in raw_trees:
         if not (entry is Dictionary):
             return {}
-        if not _valid_position_number(entry.get("x"), 30.0) or not _valid_position_number(entry.get("z"), 18.0):
+        if not _valid_position_number(entry.get("x"), 199.0) or not _valid_position_number(entry.get("z"), 199.0):
             return {}
         var variant: String = str(entry.get("variant", ""))
         if not TREE_VARIANTS.has(variant):
@@ -198,6 +203,63 @@ static func normalize(raw: Variant) -> Dictionary:
         if float(value) != float(index) or index < 0 or index >= BASE_TREE_COUNT or safe_removed_trees.has(index):
             return {}
         safe_removed_trees.append(index)
+
+    # New expansion fields default to the old central farm for existing saves.
+    var unlocked_input: Variant = data.get("unlocked_zones", STARTER_ZONES.duplicate())
+    if not (unlocked_input is Array) or unlocked_input.size() > ZONE_COUNT:
+        return {}
+    var safe_unlocked_zones: Array = []
+    for raw_id in unlocked_input:
+        if not (raw_id is int or raw_id is float) or not is_finite(float(raw_id)):
+            return {}
+        var sector: int = int(raw_id)
+        if float(raw_id) != float(sector) or sector < 0 or sector >= ZONE_COUNT or safe_unlocked_zones.has(sector):
+            return {}
+        safe_unlocked_zones.append(sector)
+    for required in STARTER_ZONES:
+        if not safe_unlocked_zones.has(required):
+            return {}
+
+    var raw_decor_kits: Variant = data.get("decor_kits", [])
+    if not (raw_decor_kits is Array):
+        return {}
+    if raw_decor_kits.is_empty():
+        raw_decor_kits = []
+        for _idx in range(DECOR_TYPES):
+            raw_decor_kits.append(0)
+    if raw_decor_kits.size() != DECOR_TYPES:
+        return {}
+    var safe_decor_kits: Array = []
+    for qty in raw_decor_kits:
+        if not (qty is int or qty is float) or not is_finite(float(qty)):
+            return {}
+        var amount: int = int(qty)
+        if float(qty) != float(amount) or amount < 0 or amount > 100000:
+            return {}
+        safe_decor_kits.append(amount)
+
+    var input_decor: Variant = data.get("placed_decor", [])
+    if not (input_decor is Array) or input_decor.size() > MAX_DECORATIONS:
+        return {}
+    var safe_placed_decor: Array = []
+    for entry in input_decor:
+        if not (entry is Dictionary):
+            return {}
+        if not _valid_position_number(entry.get("x"), 199.0) or not _valid_position_number(entry.get("z"), 199.0):
+            return {}
+        var type_value: Variant = entry.get("type", -1)
+        if not (type_value is int or type_value is float) or not is_finite(float(type_value)):
+            return {}
+        var type_index: int = int(type_value)
+        if float(type_value) != float(type_index) or type_index < 0 or type_index >= DECOR_TYPES:
+            return {}
+        var rotation_value: Variant = entry.get("rotation", 0.0)
+        if not _valid_position_number(rotation_value, 360.0) or float(rotation_value) < 0.0:
+            return {}
+        safe_placed_decor.append({
+            "x": float(entry["x"]), "z": float(entry["z"]),
+            "type": type_index, "rotation": float(rotation_value)
+        })
 
     if input_plots.size() == OLD_PLOTS:
         # Legacy plots were a 6x4 farm. Retain their row/column ordering
@@ -225,6 +287,9 @@ static func normalize(raw: Variant) -> Dictionary:
         "extra_plots": safe_extra_plots,
         "placed_trees": safe_placed_trees,
         "removed_trees": safe_removed_trees,
+        "unlocked_zones": safe_unlocked_zones,
+        "decor_kits": safe_decor_kits,
+        "placed_decor": safe_placed_decor,
         "seeds": safe_seeds,
         "plots": safe_plots
     }
