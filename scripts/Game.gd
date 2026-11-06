@@ -1595,14 +1595,20 @@ func btn(txt: String, callback: Callable, background: Color = Color("#417c59")) 
     b.clip_text = true
     var style: StyleBoxFlat = StyleBoxFlat.new()
     style.bg_color = background
-    style.set_corner_radius_all(10)
-    style.set_content_margin_all(3)
+    style.set_corner_radius_all(12)
+    style.set_content_margin_all(5)
+    style.shadow_color = Color(0.12, 0.22, 0.17, 0.23)
+    style.shadow_size = 3
+    style.shadow_offset = Vector2(0, 2)
     b.add_theme_stylebox_override("normal", style)
     var hover: StyleBoxFlat = style.duplicate()
-    hover.bg_color = background.lightened(0.12)
+    hover.bg_color = background.lightened(0.16)
+    hover.shadow_size = 5
     b.add_theme_stylebox_override("hover", hover)
     var down: StyleBoxFlat = style.duplicate()
-    down.bg_color = background.darkened(0.13)
+    down.bg_color = background.darkened(0.17)
+    down.shadow_size = 1
+    down.shadow_offset = Vector2.ZERO
     b.add_theme_stylebox_override("pressed", down)
     b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
     b.pressed.connect(callback)
@@ -1613,13 +1619,11 @@ func panel(color: Color) -> Panel:
     var p: Panel = Panel.new()
     var style: StyleBoxFlat = StyleBoxFlat.new()
     style.bg_color = color
-    style.set_corner_radius_all(13)
+    style.set_corner_radius_all(18)
     style.set_content_margin_all(0)
-    style.border_width_left = 1
-    style.border_width_top = 1
-    style.border_width_right = 1
-    style.border_width_bottom = 1
-    style.border_color = Color(1.0, 1.0, 1.0, 0.36)
+    style.shadow_color = Color(0.07, 0.16, 0.12, 0.32)
+    style.shadow_size = 10
+    style.shadow_offset = Vector2(0, 5)
     p.add_theme_stylebox_override("panel", style)
     p.mouse_filter = Control.MOUSE_FILTER_IGNORE
     return p
@@ -1927,7 +1931,7 @@ func update_sizes() -> void:
 
     # Small tool tray keeps the working 3D farm visible.
     var toolbar_width: float = minf(650.0, maxf(300.0, w-20.0))
-    var toolbar_y: float = h-150.0
+    var toolbar_y: float = h-191.0
     if touch_controls:
         # In landscape, reserve both side rails for joystick and buttons.
         # In portrait, place the farming toolbar above the bottom controls.
@@ -1935,9 +1939,9 @@ func update_sizes() -> void:
             toolbar_width = minf(570.0, w-340.0)
         else:
             toolbar_width = w-18.0
-            toolbar_y = h-316.0
+            toolbar_y = h-355.0
     var toolbar_x: float = (w-toolbar_width)*0.5
-    set_box(ui_bottom, toolbar_x, toolbar_y, toolbar_width, 140.0)
+    set_box(ui_bottom, toolbar_x, toolbar_y, toolbar_width, 180.0)
     set_box(status_label, 12, 5, toolbar_width-24.0, 25.0)
     set_box(farm_level_label, 12, 32, toolbar_width-157.0, 22.0)
     set_box(landscape_button, toolbar_width-142.0, 29.0, 130.0, 28.0)
@@ -1954,7 +1958,7 @@ func update_sizes() -> void:
     for i in range(garden_keys.size()):
         var garden_button: Button = action_buttons[garden_keys[i]]
         garden_button.add_theme_font_size_override("font_size", 14)
-        set_box(garden_button, 12.0+float(i)*(landscape_w+gap), 98.0, landscape_w, 34.0)
+        set_box(garden_button, 12.0+float(i)*(landscape_w+gap), 139.0, landscape_w, 34.0)
 
     set_box(stick, 18, h-158, 144, 144)
     set_box(stick_label, 26, h-184, 128, 27)
@@ -1967,7 +1971,7 @@ func update_sizes() -> void:
     stick.queue_redraw()
 
     var shop_w: float = minf(w-24.0, 490.0)
-    var shop_h: float = minf(h-24.0, 490.0)
+    var shop_h: float = minf(h-24.0, 560.0)
     set_box(shop_panel, (w-shop_w)*0.5, (h-shop_h)*0.5, shop_w, shop_h)
     set_box(shop_heading, 15, 10, shop_w-105, 33)
     set_box(shop_close, shop_w-85, 8, 73, 37)
