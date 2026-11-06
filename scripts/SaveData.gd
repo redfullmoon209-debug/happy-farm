@@ -55,7 +55,13 @@ static func normalize(raw: Variant) -> Dictionary:
     # while adding a fresh level 1 / 0 EXP progression when first loaded.
     var level_value: Variant = data.get("farm_level", 1)
     var xp_value: Variant = data.get("farm_xp", 0)
-    if not (level_value is int) or not (xp_value is int):
+    # Godot's JSON parser reads integer JSON numbers as floats; accept
+    # either representation, but never accept fractional levels/EXP.
+    if not (level_value is int or level_value is float) or not (xp_value is int or xp_value is float):
+        return {}
+    if not is_finite(float(level_value)) or not is_finite(float(xp_value)):
+        return {}
+    if float(level_value) != float(int(level_value)) or float(xp_value) != float(int(xp_value)):
         return {}
     var farm_level: int = int(level_value)
     var farm_xp: int = int(xp_value)
