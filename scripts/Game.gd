@@ -146,6 +146,9 @@ var touch_button_fingers: Dictionary = {}
 # Godot emits an emulated mouse event BEFORE its corresponding touch event.
 # Keep its ownership until mouse-up, even when the finger crosses a control.
 var block_touch_mouse: bool = false
+# Real keyboard key-down/up state for Web exports. Use physical key codes
+# so WASD remains reliable even with a non-English keyboard layout.
+var keyboard_held: Dictionary = {}
 var stick: Control
 var stick_label: Label
 var ui: Control
@@ -227,6 +230,7 @@ func _ready() -> void:
     add_child(farm_audio)
     farm_audio.subtitle.connect(_show_voice_caption)
     build_ui()
+    _focus_game_canvas()
     refresh_plants()
     refresh_labels()
     update_camera()
@@ -1203,6 +1207,19 @@ func finish_work() -> void:
     refresh_labels()
     save_game()
 
+func _focus_game_canvas() -> void:
+    if OS.has_feature("web"):
+        # Browser canvas must be focused before it receives keyboard events.
+        JavaScriptBridge.eval("(()=>{let c=document.querySelector('canvas'); if(c){c.tabIndex=0; c.focus(); c.addEventListener('pointerdown',()=>c.focus());}})();", true)
+
+func _keyboard_active(code: Key) -> bool:
+    return bool(keyboard_held.get(code, false)) or Input.is_key_pressed(code) or Input.is_physical_key_pressed(code)
+
+func keyboard_vector() -> Vector2:
+    var x: float = float(_keyboard_active(KEY_D) or _keyboard_active(KEY_RIGHT)) - float(_keyboard_active(KEY_A) or _keyboard_active(KEY_LEFT))
+    var y: float = float(_keyboard_active(KEY_S) or _keyboard_active(KEY_DOWN)) - float(_keyboard_active(KEY_W) or _keyboard_active(KEY_UP))
+    return Vector2(x, y).limit_length(1.0)
+
 func _process(delta: float) -> void:
     var previous_position: Vector3 = farmer.position
     elapsed += delta
@@ -1236,11 +1253,13 @@ func _process(delta: float) -> void:
         if work_time <= 0:
             finish_work()
     else:
-        var input_dir: Vector2 = Vector2(float(Input.is_key_pressed(KEY_D))-float(Input.is_key_pressed(KEY_A)),
-            float(Input.is_key_pressed(KEY_S))-float(Input.is_key_pressed(KEY_W)))
+        var input_dir: Vector2 = keyboard_vector()
+        if _camera_overlay_at(Vector2.ZERO):
+            # A modal popup should not let the character walk in the background.
+            input_dir = Vector2.ZERO
         if stick != null and stick.visible and stick.direction.length() > 0.055:
             input_dir = stick.direction
-        running = Input.is_key_pressed(KEY_SHIFT) or run_toggle
+        running = _keyboard_active(KEY_SHIFT) or run_toggle
         if input_dir.length() > 0.08:
             var side: Vector3 = camera.global_basis.x
             side.y = 0
@@ -1392,6 +1411,7 @@ func _reset_camera_input() -> void:
 func _notification(what: int) -> void:
     if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT or what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_APPLICATION_PAUSED:
         _reset_camera_input()
+        keyboard_held.clear()
 
 func _camera_touch_gap() -> float:
     if camera_touches.size() < 2:
@@ -1464,6 +1484,15 @@ func _camera_drag(event: InputEventScreenDrag) -> void:
         update_camera()
 
 func _input(event: InputEvent) -> void:
+    if event is InputEventKey:
+        var physical: Key = event.physical_keycode
+        var logical: Key = event.keycode
+        for code in [physical, logical]:
+            if code in [KEY_W, KEY_A, KEY_S, KEY_D, KEY_UP, KEY_LEFT, KEY_DOWN, KEY_RIGHT, KEY_SHIFT]:
+                if event.pressed:
+                    keyboard_held[code] = true
+                else:
+                    keyboard_held.erase(code)
     if farm_audio != null and not farm_audio.unlocked:
         var is_first_gesture: bool = (
             (event is InputEventKey and event.pressed)
