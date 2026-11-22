@@ -78,6 +78,8 @@ const CAMERA_ZOOM_MIN: float = 6.0
 const CAMERA_ZOOM_MAX: float = 78.0
 const CAMERA_TAP_SLOP: float = 9.0
 const CAMERA_PINCH_MIN_GAP: float = 10.0
+const CAMERA_PITCH_MIN: float = -1.553343 # 89 degrees down
+const CAMERA_PITCH_MAX: float = 1.483530 # 85 degrees up
 var materials: Dictionary = {}
 var plot_places: Array[Vector3] = []
 var plant_roots: Array[Node3D] = []
@@ -417,8 +419,15 @@ func tree(pos: Vector3, variant: String = "STOak2", target_height: float = 4.7, 
 func build_scene() -> void:
     var world: WorldEnvironment = WorldEnvironment.new()
     world.environment = Environment.new()
-    world.environment.background_mode = Environment.BG_COLOR
-    world.environment.background_color = Color("#b4dce8")
+    world.environment.background_mode = Environment.BG_SKY
+    var sky_material: ProceduralSkyMaterial = ProceduralSkyMaterial.new()
+    sky_material.sky_top_color = Color("#78b7e9")
+    sky_material.sky_horizon_color = Color("#d6eef4")
+    sky_material.ground_bottom_color = Color("#a5bd88")
+    sky_material.ground_horizon_color = Color("#d6eef4")
+    var sky: Sky = Sky.new()
+    sky.sky_material = sky_material
+    world.environment.sky = sky
     world.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
     world.environment.ambient_light_color = Color("#c2d5cb")
     world.environment.ambient_light_energy = 0.55
@@ -1518,7 +1527,7 @@ func _camera_drag(event: InputEventScreenDrag) -> void:
         cam_dragged = true
     if cam_dragged:
         camera_yaw -= delta_screen.x * 0.006
-        camera_pitch = clampf(camera_pitch + delta_screen.y * 0.005, -1.33, -0.28)
+        camera_pitch = clampf(camera_pitch + delta_screen.y * 0.005, CAMERA_PITCH_MIN, CAMERA_PITCH_MAX)
         update_camera()
 
 func _input(event: InputEvent) -> void:
@@ -1581,7 +1590,7 @@ func _input(event: InputEvent) -> void:
             stick._input(event)
         elif drag_camera:
             camera_yaw -= event.relative.x * 0.007
-            camera_pitch = clampf(camera_pitch + event.relative.y * 0.005, -1.33, -0.28)
+            camera_pitch = clampf(camera_pitch + event.relative.y * 0.005, CAMERA_PITCH_MIN, CAMERA_PITCH_MAX)
             update_camera()
         else:
             _update_placement_preview(event.position)
@@ -1635,7 +1644,10 @@ func update_camera() -> void:
         cos(camera_yaw) * cos(camera_pitch)
     )
     camera.position = camera_focus + offset * camera_distance
-    camera.look_at(camera_focus)
+    # An upward view would otherwise put the orbit camera underground.
+    # Keep its eye above ground, while preserving the requested view angle.
+    camera.position.y = maxf(0.8, camera.position.y)
+    camera.look_at(camera.position - offset)
     var factor: float = 0.82 if aspect > 1.3 else (1.07 if aspect > 0.82 else 1.40)
     var close_factor: float = lerpf(0.75, 1.0, smoothstep(12.0, 30.0, camera_distance))
     camera.size = clampf(camera_distance * factor * close_factor, 3.6, 120.0)
