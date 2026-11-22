@@ -78,8 +78,8 @@ const CAMERA_ZOOM_MIN: float = 6.0
 const CAMERA_ZOOM_MAX: float = 78.0
 const CAMERA_TAP_SLOP: float = 9.0
 const CAMERA_PINCH_MIN_GAP: float = 10.0
-const CAMERA_PITCH_MIN: float = -PI
-const CAMERA_PITCH_MAX: float = PI
+const CAMERA_PITCH_MIN: float = -1.56206968 # -89.5 degrees: ground
+const CAMERA_PITCH_MAX: float = 1.56206968 # +89.5 degrees: sky
 const CAMERA_PITCH_SENSITIVITY: float = 0.014
 var materials: Dictionary = {}
 var plot_places: Array[Vector3] = []
@@ -1528,7 +1528,7 @@ func _camera_drag(event: InputEventScreenDrag) -> void:
         cam_dragged = true
     if cam_dragged:
         camera_yaw -= delta_screen.x * 0.006
-        camera_pitch = wrapf(camera_pitch + delta_screen.y * CAMERA_PITCH_SENSITIVITY, -PI, PI)
+        camera_pitch = clampf(camera_pitch + delta_screen.y * CAMERA_PITCH_SENSITIVITY, CAMERA_PITCH_MIN, CAMERA_PITCH_MAX)
         update_camera()
 
 func _input(event: InputEvent) -> void:
@@ -1596,7 +1596,7 @@ func _input(event: InputEvent) -> void:
             stick._input(event)
         elif drag_camera:
             camera_yaw -= event.relative.x * 0.007
-            camera_pitch = wrapf(camera_pitch + event.relative.y * CAMERA_PITCH_SENSITIVITY, -PI, PI)
+            camera_pitch = clampf(camera_pitch + event.relative.y * CAMERA_PITCH_SENSITIVITY, CAMERA_PITCH_MIN, CAMERA_PITCH_MAX)
             update_camera()
         else:
             _update_placement_preview(event.position)
@@ -1882,7 +1882,7 @@ func build_ui() -> void:
     ui_top = panel(Color("#edf5e5ed"))
     _skin_top(ui_top)
     ui.add_child(ui_top)
-    title_label = text_label("FarmFlex V3", 20, Color("#fff8de"))
+    title_label = text_label("FarmFlex V4", 20, Color("#fff8de"))
     title_label.add_theme_font_override("font", THAI_BOLD)
     ui_top.add_child(title_label)
     var coin_icon: Control = ICON.new()
