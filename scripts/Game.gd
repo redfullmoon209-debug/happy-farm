@@ -78,8 +78,9 @@ const CAMERA_ZOOM_MIN: float = 6.0
 const CAMERA_ZOOM_MAX: float = 78.0
 const CAMERA_TAP_SLOP: float = 9.0
 const CAMERA_PINCH_MIN_GAP: float = 10.0
-const CAMERA_PITCH_MIN: float = -1.553343 # 89 degrees down
-const CAMERA_PITCH_MAX: float = 1.483530 # 85 degrees up
+const CAMERA_PITCH_MIN: float = -PI
+const CAMERA_PITCH_MAX: float = PI
+const CAMERA_PITCH_SENSITIVITY: float = 0.014
 var materials: Dictionary = {}
 var plot_places: Array[Vector3] = []
 var plant_roots: Array[Node3D] = []
@@ -1527,7 +1528,7 @@ func _camera_drag(event: InputEventScreenDrag) -> void:
         cam_dragged = true
     if cam_dragged:
         camera_yaw -= delta_screen.x * 0.006
-        camera_pitch = clampf(camera_pitch + delta_screen.y * 0.005, CAMERA_PITCH_MIN, CAMERA_PITCH_MAX)
+        camera_pitch = wrapf(camera_pitch + delta_screen.y * CAMERA_PITCH_SENSITIVITY, -PI, PI)
         update_camera()
 
 func _input(event: InputEvent) -> void:
@@ -1557,6 +1558,11 @@ func _input(event: InputEvent) -> void:
         if event is InputEventMouseButton and event.pressed:
             block_touch_mouse = not point_on_ui(event.position) or _joystick_at(event.position) or _camera_action_at(event.position) != null
         if block_touch_mouse:
+            get_viewport().set_input_as_handled()
+        return
+    if event is InputEventMagnifyGesture:
+        if camera_touches.size() < 2 and not point_on_ui(event.position) and event.factor > 0.0:
+            set_camera_zoom(camera_distance / event.factor)
             get_viewport().set_input_as_handled()
         return
     if event is InputEventScreenTouch:
@@ -1590,7 +1596,7 @@ func _input(event: InputEvent) -> void:
             stick._input(event)
         elif drag_camera:
             camera_yaw -= event.relative.x * 0.007
-            camera_pitch = clampf(camera_pitch + event.relative.y * 0.005, CAMERA_PITCH_MIN, CAMERA_PITCH_MAX)
+            camera_pitch = wrapf(camera_pitch + event.relative.y * CAMERA_PITCH_SENSITIVITY, -PI, PI)
             update_camera()
         else:
             _update_placement_preview(event.position)
@@ -1638,16 +1644,18 @@ func update_camera() -> void:
     camera_focus = CENTER
     if farmer != null:
         camera_focus = Vector3(farmer.position.x, 1.0, farmer.position.z)
-    var offset: Vector3 = Vector3(
-        sin(camera_yaw) * cos(camera_pitch),
-        -sin(camera_pitch),
-        cos(camera_yaw) * cos(camera_pitch)
-    )
+    # Explicit orientation avoids look_at degeneracy at exactly +/-90 degrees.
+    var orbit_basis: Basis = Basis(Vector3.UP, camera_yaw) * Basis(Vector3.RIGHT, camera_pitch)
+    var offset: Vector3 = orbit_basis.z
     camera.position = camera_focus + offset * camera_distance
     # An upward view would otherwise put the orbit camera underground.
     # Keep its eye above ground, while preserving the requested view angle.
     camera.position.y = maxf(0.8, camera.position.y)
-    camera.look_at(camera.position - offset)
+    camera.basis = orbit_basis
+    # Perspective sky mode makes the horizon and sky visible even when the
+    # camera is looking almost straight up. Keep farm framing orthographic.
+    camera.projection = Camera3D.PROJECTION_PERSPECTIVE if -offset.y > 0.015 else Camera3D.PROJECTION_ORTHOGONAL
+    camera.fov = 60.0
     var factor: float = 0.82 if aspect > 1.3 else (1.07 if aspect > 0.82 else 1.40)
     var close_factor: float = lerpf(0.75, 1.0, smoothstep(12.0, 30.0, camera_distance))
     camera.size = clampf(camera_distance * factor * close_factor, 3.6, 120.0)
@@ -1874,7 +1882,7 @@ func build_ui() -> void:
     ui_top = panel(Color("#edf5e5ed"))
     _skin_top(ui_top)
     ui.add_child(ui_top)
-    title_label = text_label("FarmFlex", 20, Color("#fff8de"))
+    title_label = text_label("FarmFlex V3", 20, Color("#fff8de"))
     title_label.add_theme_font_override("font", THAI_BOLD)
     ui_top.add_child(title_label)
     var coin_icon: Control = ICON.new()
