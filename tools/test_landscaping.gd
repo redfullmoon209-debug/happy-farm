@@ -25,6 +25,7 @@ func _run() -> void:
     game.farm_level = 1
     game.farm_xp = 0
     game.coins = 5000
+    game.unlocked_zones = [171,170,153,172]
     game.plot_kits = 0
     game.tree_kits = [0, 0, 0, 0, 0]
     game.wood = 0
@@ -38,10 +39,10 @@ func _run() -> void:
     check(game.unlocked_plot_count() == 5, "existing level locks still operate")
     check(game.landscape_button != null, "landscape mode button available")
     check(game.shop_plot_button != null and game.shop_tree_buttons.size() == 5, "shop sells beds and five tree species")
-    check(not game._can_place_on_grass(Vector3(-19,0,-8.4), "plot"), "no plots inside farmhouse")
+    check(not game._can_place_on_grass(Vector3(-8,0,-8.4), "plot"), "no plots inside farmhouse")
     check(not game._can_place_on_grass(Vector3(16.8,0,4.2), "tree"), "cannot plant inside pig pens")
     check(not game._can_place_on_grass(Vector3(0,0,0), "plot"), "cannot overlap original beds")
-    check(not game._can_place_on_grass(Vector3(-14.5,0,0), "plot"), "paths remain clear")
+    check(not game._can_place_on_grass(Vector3(-11.6,0,0), "plot"), "paths remain clear")
     check(not game._can_place_on_grass(Vector3(100,0,0), "plot"), "outside world is rejected")
 
     var free_bed: Vector3 = Vector3(-23.0,0,3.0)

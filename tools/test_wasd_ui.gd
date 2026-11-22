@@ -113,7 +113,7 @@ func _run() -> void:
     check(farm.shop_header_art.texture != null and farm.bag_header_art.texture != null, "heading art independent layer")
     check(farm.gm_button.visible, "GM playtest button remains available")
     check(farm.shop_decor_buttons.size() == 16, "decoration shop retained")
-    check(farm.WORLD_SIZE == 400.0 and farm.zone_covers.size() == 100, "map and land progression untouched")
+    check(farm.WORLD_SIZE == 450.0 and farm.zone_covers.size() == 324, "450m map and parcel progression")
 
     for file in [
         "button_green.png", "window_wood.png", "window_header.png", "inventory_slot.png",

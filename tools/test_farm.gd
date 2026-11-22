@@ -28,6 +28,8 @@ func _run_checks() -> void:
     check(game.shop_pen_button != null, "buy pen button")
 
     game.coins = 100000
+    if not game.unlocked_zones.has(172):
+        check(game.buy_land_zone(172), "buy eastern parcel before extending livestock")
     while game.pens < 4:
         var before: int = game.pens
         game.buy_pen()
