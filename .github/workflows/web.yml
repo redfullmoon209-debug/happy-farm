@@ -100,7 +100,9 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p build/web
-          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --export-release Web build/web/index.html 2>&1 | tee /tmp/export.log
+          BUILD_NAME="farmflex-${GITHUB_SHA:0:8}"
+          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --export-release Web "build/web/${BUILD_NAME}.html" 2>&1 | tee /tmp/export.log
+          cp "build/web/${BUILD_NAME}.html" build/web/index.html
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/export.log; then exit 1; fi
           test -s build/web/index.html
           touch build/web/.nojekyll

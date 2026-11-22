@@ -301,12 +301,20 @@ func _check() -> void:
     send(motion)
     mouse(MOUSE_BUTTON_RIGHT, false, motion.position)
     expect(is_equal_approx(farm.camera_yaw, yaw - 20.0 * 0.007) and not farm.drag_camera, "PC right-mouse orbit must be preserved")
-    farm.camera_pitch = farm.CAMERA_PITCH_MAX
+    farm.camera_pitch = PI/2.0
     farm.update_camera()
     expect((-farm.camera.global_basis.z).y > 0.98 and farm.camera.position.y >= 0.8, "sky view looks upward without going below ground")
-    farm.camera_pitch = farm.CAMERA_PITCH_MIN
+    farm.camera_pitch = -PI/2.0
     farm.update_camera()
     expect((-farm.camera.global_basis.z).y < -0.99, "top view looks almost straight down")
+    farm.camera_pitch = deg_to_rad(100.0)
+    farm.update_camera()
+    expect((-farm.camera.global_basis.z).y > 0.98 and farm.camera.projection == Camera3D.PROJECTION_PERSPECTIVE, "view can pass vertical to 100 degrees and sky is perspective")
+    farm.camera_pitch = 0.0
+    touch(2, a)
+    drag(2, a + Vector2(0, 130))
+    expect(farm.camera_pitch > PI/2.0, "single mobile swipe reaches beyond vertical")
+    release_all()
     farm.camera_pitch = -0.79
     farm.update_camera()
     farm.plot_taps = 0
