@@ -69,7 +69,9 @@ func _run_checks() -> void:
     game.work_plot = 43
     game.finish_work()
     check(game.farm_xp == 37, "harvesting grants 25 EXP")
-    check(game.coins > coins_before, "harvesting keeps coin rewards")
+    check(game.coins == coins_before and int(game.produce[game.selected_seed]) > 0, "harvest stores produce without paying money")
+    game.sell_produce()
+    check(game.coins > coins_before and game.produce_value() == 0, "selling pays once and clears produce")
     check(not game.plots[43].has("crop"), "harvest clears the crop")
 
     check(game.gain_farm_xp(38), "enough EXP levels the farm up")

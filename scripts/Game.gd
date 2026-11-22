@@ -54,11 +54,12 @@ const TREE_NAMES = ["โอ๊ก", "สน", "วิลโลว์", "ทร�
 const TREE_PRICES = [65, 75, 80, 75, 90]
 const MAX_EXTRA_PLOTS: int = 120
 const MAX_PLANTED_TREES: int = 80
-const WORLD_SIZE: float = 400.0
-const WORLD_HALF: float = 200.0
-const ZONE_SIZE: float = 40.0
-const ZONE_COLUMNS: int = 10
-const STARTER_ZONES = [44, 45, 54, 55]
+const WORLD_SIZE: float = 450.0
+const WORLD_MIN: float = -237.5
+const WORLD_MAX: float = 212.5
+const ZONE_SIZE: float = 25.0
+const ZONE_COLUMNS: int = 18
+const STARTER_ZONES = [171]
 const MAX_DECORATIONS: int = 260
 const DECOR_NAMES = [
     "ม้านั่งไม้", "รั้วไม้", "กระถางดอกไม้", "โคมไฟสวน",
@@ -94,7 +95,10 @@ var removed_trees: Array = []
 var extra_plot_nodes: Array[Node3D] = []
 var base_tree_nodes: Array[Node3D] = []
 var placed_tree_nodes: Array[Node3D] = []
-var unlocked_zones: Array = [44, 45, 54, 55]
+var unlocked_zones: Array = STARTER_ZONES.duplicate()
+var produce: Array = [0,0,0,0,0,0]
+var avatar_gender: String = "female"
+var sell_button: Button
 var zone_covers: Array[MeshInstance3D] = []
 var zone_signs: Array[Label3D] = []
 var pending_zone_id: int = -1
@@ -115,8 +119,8 @@ var pen_nodes: Array[Node3D] = []
 var pig_nodes: Array[Node3D] = []
 var pig_roam_positions: Array[Vector3] = []
 var pen_locations: Array[Vector3] = [
-    Vector3(16.8, 0, -4.4), Vector3(16.8, 0, 4.2),
-    Vector3(24.0, 0, -4.4), Vector3(24.0, 0, 4.2)
+    Vector3(7.8, 0, -8.5), Vector3(16.8, 0, -4.4),
+    Vector3(16.8, 0, 4.2), Vector3(24.0, 0, -4.4)
 ]
 var selected_seed: int = 0
 var tool_mode: String = "plant"
@@ -175,6 +179,8 @@ var shop_decor_buttons: Array[Button] = []
 var gm_button: Button
 var gm_panel: Panel
 var gm_title: Label
+var gm_coin_input: SpinBox
+var gm_level_input: SpinBox
 var land_confirm: ConfirmationDialog
 var run_button: Button
 var jump_button: Button
@@ -428,16 +434,16 @@ func build_scene() -> void:
     camera.current = true
     add_child(camera)
 
-    # 400x400 playable surface. 40x40 zones hide until bought with farm coins.
-    cube(self, Vector3(0,-0.24,0), Vector3(WORLD_SIZE,0.45,WORLD_SIZE), Color("#85ba77"))
+    # 450m square, centered on the starter parcel rather than a grid junction.
+    cube(self, Vector3(-12.5,-0.24,-12.5), Vector3(WORLD_SIZE,0.45,WORLD_SIZE), Color("#85ba77"))
     _build_land_zones()
-    cube(self, Vector3(-14.5,0,0), Vector3(2.2,0.04,29.0), Color("#d2c397"))
-    cube(self, Vector3(0,0,11.8), Vector3(58.0,0.04,2.1), Color("#d2c397"))
-    cube(self, Vector3(13.1,0,0), Vector3(1.7,0.04,21.0), Color("#d2c397"))
+    cube(self, Vector3(-11.6,0,0), Vector3(1.0,0.04,21.0), Color("#d2c397"))
+    cube(self, Vector3(0,0,10.8), Vector3(24.0,0.04,1.4), Color("#d2c397"))
+    cube(self, Vector3(11.6,0,0), Vector3(1.0,0.04,21.0), Color("#d2c397"))
 
     var house: Node3D = Node3D.new()
     house.name = "FarmHouse"
-    house.position = Vector3(-19.0,0,-8.4)
+    house.position = Vector3(-8.0,0,-8.4)
     add_child(house)
     cube(house, Vector3(0,1.5,0), Vector3(4.5,3,3.9), Color("#efdebb"))
     # Both slopes meet at a raised ridge; the eaves overhang the 3m walls.
@@ -538,14 +544,14 @@ func build_scene() -> void:
 
 
 # Land ownership is a separate progression from the first 50 level-gated beds.
-# The starting four 40x40 parcels preserve the existing farm in the center.
+# A single 25x25 parcel contains the fixed beds, house and first pen.
 func zone_for_position(pos: Vector3) -> int:
     if not is_finite(pos.x) or not is_finite(pos.z):
         return -1
-    if pos.x < -WORLD_HALF or pos.x >= WORLD_HALF or pos.z < -WORLD_HALF or pos.z >= WORLD_HALF:
+    if pos.x < WORLD_MIN or pos.x >= WORLD_MAX or pos.z < WORLD_MIN or pos.z >= WORLD_MAX:
         return -1
-    var col: int = floori((pos.x + WORLD_HALF) / ZONE_SIZE)
-    var row: int = floori((pos.z + WORLD_HALF) / ZONE_SIZE)
+    var col: int = floori((pos.x - WORLD_MIN) / ZONE_SIZE)
+    var row: int = floori((pos.z - WORLD_MIN) / ZONE_SIZE)
     return row * ZONE_COLUMNS + col
 
 func is_land_owned(pos: Vector3) -> bool:
@@ -581,8 +587,8 @@ func _build_land_zones() -> void:
     for id in range(ZONE_COLUMNS * ZONE_COLUMNS):
         var col: int = id % ZONE_COLUMNS
         var row: int = id / ZONE_COLUMNS
-        var x: float = -WORLD_HALF + (float(col) + 0.5) * ZONE_SIZE
-        var z: float = -WORLD_HALF + (float(row) + 0.5) * ZONE_SIZE
+        var x: float = WORLD_MIN + (float(col) + 0.5) * ZONE_SIZE
+        var z: float = WORLD_MIN + (float(row) + 0.5) * ZONE_SIZE
         var shade: Color = Color("#577966") if (col + row) % 2 == 0 else Color("#61806b")
         var cover: MeshInstance3D = cube(root, Vector3(x,0.04,z), Vector3(ZONE_SIZE-0.22,0.06,ZONE_SIZE-0.22), shade)
         cover.name = "LockedZone_%02d" % id
@@ -735,7 +741,7 @@ func _can_place_on_grass(pos: Vector3, kind: String) -> bool:
     var radius: float = 1.08 if kind == "plot" else (float(DECOR_RADII[selected_decor]) if kind == "decor" else 1.60)
     if not is_finite(pos.x) or not is_finite(pos.z):
         return false
-    if absf(pos.x) > WORLD_HALF - radius or absf(pos.z) > WORLD_HALF - radius:
+    if pos.x < WORLD_MIN + radius or pos.z < WORLD_MIN + radius or pos.x >= WORLD_MAX - radius or pos.z >= WORLD_MAX - radius:
         return false
     # A purchased object must fit wholly inside owned zones, not straddle a
     # locked parcel even when its center happens to be on player land.
@@ -744,13 +750,13 @@ func _can_place_on_grass(pos: Vector3, kind: String) -> bool:
             if not is_land_owned(Vector3(pos.x+dx, 0.0, pos.z+dz)):
                 return false
     # No placement on the farm house, its paths, or current/future pig pens.
-    if absf(pos.x + 19.0) < 2.35 + radius and absf(pos.z + 8.4) < 2.1 + radius:
+    if absf(pos.x + 8.0) < 2.35 + radius and absf(pos.z + 8.4) < 2.1 + radius:
         return false
-    if absf(pos.x + 14.5) < 1.1 + radius and absf(pos.z) < 14.5 + radius:
+    if absf(pos.x + 11.6) < 0.5 + radius and absf(pos.z) < 10.5 + radius:
         return false
-    if absf(pos.z - 11.8) < 1.1 + radius and absf(pos.x) < 29.0 + radius:
+    if absf(pos.z - 10.8) < 0.7 + radius and absf(pos.x) < 12.0 + radius:
         return false
-    if absf(pos.x - 13.1) < 0.85 + radius and absf(pos.z) < 10.5 + radius:
+    if absf(pos.x - 11.6) < 0.5 + radius and absf(pos.z) < 10.5 + radius:
         return false
     for pen_pos in pen_locations:
         if absf(pos.x - pen_pos.x) < 3.4 + radius and absf(pos.z - pen_pos.z) < 3.4 + radius:
@@ -802,8 +808,8 @@ func _update_placement_preview(pixel: Vector2) -> void:
             return
         var col: int = id % ZONE_COLUMNS
         var row: int = id / ZONE_COLUMNS
-        place.x = -WORLD_HALF + (float(col)+0.5)*ZONE_SIZE
-        place.z = -WORLD_HALF + (float(row)+0.5)*ZONE_SIZE
+        place.x = WORLD_MIN + (float(col)+0.5)*ZONE_SIZE
+        place.z = WORLD_MIN + (float(row)+0.5)*ZONE_SIZE
         radius = (ZONE_SIZE - 0.4) / 1.95
         can_use = zone_can_be_bought(id) and coins >= zone_price(id)
     else:
@@ -894,7 +900,7 @@ func _chop_tree_at(pixel: Vector2) -> bool:
         var is_original: bool = i < base_tree_nodes.size()
         var index: int = i if is_original else i - base_tree_nodes.size()
         var node: Node3D = base_tree_nodes[index] if is_original else placed_tree_nodes[index]
-        if not node.visible:
+        if not node.visible or not is_land_owned(node.position):
             continue
         for elevation in [1.0, 2.5, 3.8]:
             var world_pos: Vector3 = node.global_position + Vector3(0,elevation,0)
@@ -998,10 +1004,12 @@ func build_farmer() -> void:
     farmer = Node3D.new()
     farmer.position = Vector3(-1,0,7.8)
     add_child(farmer)
-    ball(farmer,Vector3(0,1.48,0),Vector3(0.70,0.91,0.52),Color("#4d9ca5"))
+    ball(farmer,Vector3(0,1.48,0),Vector3(0.76 if avatar_gender == "male" else 0.70,0.91,0.52),Color("#4d9ca5") if avatar_gender == "male" else Color("#c17991"))
     ball(farmer,Vector3(0,2.11,0),Vector3(0.54,0.61,0.53),Color("#edba91"))
     stalk(farmer,Vector3(0,2.42,0),0.13,0.52,Color("#d4ab67"))
     stalk(farmer,Vector3(0,2.53,0),0.22,0.30,Color("#ae824c"))
+    if avatar_gender == "female":
+        ball(farmer,Vector3(0,1.95,0.27),Vector3(0.55,0.78,0.30),Color("#694735"))
     for side in [-1.0,1.0]:
         ball(farmer,Vector3(side*0.17,2.11,-0.257),Vector3(0.055,0.06,0.06),Color("#403d38"))
     arm_l = Node3D.new()
@@ -1037,7 +1045,7 @@ func build_farmer() -> void:
     var mixamo: Node3D = FARMER_VISUAL.new()
     mixamo.name = "MixamoFemale"
     farmer.add_child(mixamo)
-    if mixamo.initialize() and mixamo.has_visible_avatar():
+    if avatar_gender == "female" and mixamo.initialize() and mixamo.has_visible_avatar():
         farmer_visual = mixamo
         for part in farmer.get_children():
             if part != farmer_visual:
@@ -1140,6 +1148,10 @@ func refresh_plants() -> void:
 func work_on(index: int) -> void:
     if index < 0 or index >= plots.size() or work_plot >= 0 or work_time > 0:
         return
+    if not is_land_owned(plot_places[index]) or not is_land_owned(plot_places[index] + Vector3(0,0,1.20)):
+        message = "ต้องปลดล็อกที่ดินก่อนทำงาน"
+        refresh_labels()
+        return
     if not is_plot_unlocked(index):
         message = "แปลงนี้ต้องใช้ฟาร์ม Lv.%d (ปัจจุบัน Lv.%d)" % [required_farm_level(index), farm_level]
         refresh_labels()
@@ -1203,10 +1215,10 @@ func finish_work() -> void:
         message = "รดน้ำแล้ว ผักจะค่อย ๆ โต"
     elif tool_mode == "harvest":
         var crop_id: int = int(plots[i].get("crop",0))
-        coins += int(CROPS[crop_id]["reward"])
+        produce[crop_id] = mini(100000, int(produce[crop_id]) + 1)
         plots[i] = {"tilled":true}
         gained_xp = 25
-        message = "เก็บเกี่ยวสำเร็จ ได้เหรียญเพิ่ม"
+        message = "เก็บเกี่ยวสำเร็จ นำผลผลิตไปขายที่ร้านค้า"
     if farm_audio != null:
         farm_audio.play_effect(tool_mode)
         if tool_mode == "plant":
@@ -1255,7 +1267,11 @@ func _process(delta: float) -> void:
         var gap: Vector3 = actor_goal - farmer.position
         gap.y = 0
         if gap.length() > 0.10:
-            move_actor(gap.normalized(),4.3,delta)
+            move_actor(gap.normalized(), minf(4.3, gap.length()/maxf(delta,0.001)),delta)
+            if Vector2(farmer.position.x-previous_position.x, farmer.position.z-previous_position.z).length() < 0.001:
+                work_plot = -1
+                message = "เดินไปแปลงไม่ได้ โปรดเดินอ้อมพื้นที่ล็อกก่อน"
+                refresh_labels()
         else:
             work_time = 0.95 if tool_mode != "water" else 1.30
             hoe.visible = tool_mode == "till"
@@ -1315,9 +1331,9 @@ func _process(delta: float) -> void:
 
 func move_actor(direction: Vector3, speed: float, delta: float) -> void:
     var desired: Vector3 = farmer.position + direction*speed*delta
-    desired.x = clampf(desired.x, -WORLD_HALF+0.6, WORLD_HALF-0.6)
-    desired.z = clampf(desired.z, -WORLD_HALF+0.6, WORLD_HALF-0.6)
-    if is_land_owned(desired):
+    desired.x = clampf(desired.x, WORLD_MIN+0.6, WORLD_MAX-0.6)
+    desired.z = clampf(desired.z, WORLD_MIN+0.6, WORLD_MAX-0.6)
+    if land_path_owned(farmer.position, desired):
         farmer.position.x = desired.x
         farmer.position.z = desired.z
     else:
@@ -1325,9 +1341,9 @@ func move_actor(direction: Vector3, speed: float, delta: float) -> void:
         # unowned land. Crossing the edge becomes possible after purchase.
         var slide_x: Vector3 = Vector3(desired.x, 0, farmer.position.z)
         var slide_z: Vector3 = Vector3(farmer.position.x, 0, desired.z)
-        if is_land_owned(slide_x):
+        if land_path_owned(farmer.position, slide_x):
             farmer.position.x = desired.x
-        if is_land_owned(slide_z):
+        if land_path_owned(farmer.position, Vector3(farmer.position.x, 0, slide_z.z)):
             farmer.position.z = desired.z
     farmer.position.y = jumping+absf(sin(elapsed*12))*0.035
     farmer.rotation.y = atan2(-direction.x,-direction.z)
@@ -1336,6 +1352,13 @@ func move_actor(direction: Vector3, speed: float, delta: float) -> void:
     leg_r.rotation.x = -wave*0.60
     arm_l.rotation.x = -wave*0.36
     arm_r.rotation.x = wave*0.36
+
+func land_path_owned(from: Vector3, to: Vector3) -> bool:
+    var steps: int = maxi(1, ceili(from.distance_to(to)/0.25))
+    for i in range(1, steps+1):
+        if not is_land_owned(from.lerp(to, float(i)/steps)):
+            return false
+    return true
 
 func jump() -> void:
     if work_plot >= 0 or work_time > 0 or shop_panel.visible: return
@@ -1839,7 +1862,7 @@ func build_ui() -> void:
     ui_top = panel(Color("#edf5e5ed"))
     _skin_top(ui_top)
     ui.add_child(ui_top)
-    title_label = text_label("ฟาร์มสุขใจ", 20, Color("#fff8de"))
+    title_label = text_label("FarmFlex", 20, Color("#fff8de"))
     title_label.add_theme_font_override("font", THAI_BOLD)
     ui_top.add_child(title_label)
     var coin_icon: Control = ICON.new()
@@ -1964,6 +1987,9 @@ func build_ui() -> void:
     shop_grid.add_theme_constant_override("v_separation", 7)
     shop_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     shop_scroll.add_child(shop_grid)
+    sell_button = btn("ขายผลผลิตทั้งหมด", sell_produce, Color("#ad7c53"))
+    sell_button.custom_minimum_size = Vector2(145, 55)
+    shop_grid.add_child(sell_button)
     for i in range(CROPS.size()):
         var buy: Button = btn("%s\n%d เหรียญ" % [CROPS[i]["name"], CROPS[i]["price"]], buy_seed.bind(i))
         buy.custom_minimum_size = Vector2(145, 55)
@@ -2067,7 +2093,7 @@ func build_ui() -> void:
     gm_panel.visible = false
     ui.add_child(gm_panel)
     gm_header_art = _header_layer(gm_panel)
-    gm_title = text_label("GM ทดสอบ — เติมเหรียญจำลอง", 19, Color("#fff2c6"))
+    gm_title = text_label("GM ทดสอบ FarmFlex", 19, Color("#fff2c6"))
     gm_title.add_theme_font_override("font", THAI_BOLD)
     gm_panel.add_child(gm_title)
     var gm_close: Button = btn("ปิด", toggle_gm_panel, Color("#7c8880"))
@@ -2099,6 +2125,31 @@ func build_ui() -> void:
     restore_confirm.visibility_changed.connect(_reset_camera_input)
     land_confirm.visibility_changed.connect(_reset_camera_input)
     gm_panel.visibility_changed.connect(_reset_camera_input)
+    gm_coin_input = SpinBox.new()
+    gm_coin_input.max_value = 1000000000
+    gm_coin_input.step = 1
+    gm_coin_input.value = 1000
+    gm_panel.add_child(gm_coin_input)
+    gm_level_input = SpinBox.new()
+    gm_level_input.min_value = 1
+    gm_level_input.max_value = MAX_FARM_LEVEL
+    gm_level_input.step = 1
+    gm_panel.add_child(gm_level_input)
+    var set_money: Button = btn("ตั้งเงิน", gm_set_money)
+    set_money.name = "GMSetMoney"
+    gm_panel.add_child(set_money)
+    var gm_level: Button = btn("ตั้งเลเวล", gm_set_exact_level)
+    gm_level.name = "GMLevel"
+    gm_panel.add_child(gm_level)
+    var gm_max: Button = btn("Lv. MAX", gm_set_level.bind(10))
+    gm_max.name = "GMMax"
+    gm_panel.add_child(gm_max)
+    var gm_male: Button = btn("ตัวละครชาย", gm_change_gender.bind("male"))
+    gm_male.name = "GMMale"
+    gm_panel.add_child(gm_male)
+    var gm_female: Button = btn("ตัวละครหญิง", gm_change_gender.bind("female"))
+    gm_female.name = "GMFemale"
+    gm_panel.add_child(gm_female)
 
     # PNG glyphs stay separate from PNG button bases and live labels.
     for entry in [
@@ -2253,14 +2304,23 @@ func update_sizes() -> void:
     if GM_TEST_MODE:
         set_box(gm_button, w-125.0, badge_y+41.0, 113.0, 34.0)
     var gm_width: float = minf(w-24.0, 365.0)
-    var gm_height: float = minf(h-24.0, 258.0)
+    var gm_height: float = minf(h-24.0, 320.0)
     set_box(gm_panel, (w-gm_width)*0.5, (h-gm_height)*0.5, gm_width, gm_height)
     set_box(gm_header_art, 7, 3, gm_width-14.0, 54.0)
     set_box(gm_title, 14.0, 12.0, gm_width-108.0, 34.0)
     set_box(gm_panel.get_node("GMClose"), gm_width-83.0, 9.0, 73.0, 37.0)
-    set_box(gm_panel.get_node("Add1000"), 13.0, 60.0, gm_width-26.0, 50.0)
-    set_box(gm_panel.get_node("Add10000"), 13.0, 119.0, gm_width-26.0, 50.0)
-    set_box(gm_panel.get_node("Add100000"), 13.0, 178.0, gm_width-26.0, 50.0)
+    var gm_row: float = (gm_height - 72.0) / 5.0
+    var half: float = (gm_width-30.0)/2.0
+    set_box(gm_coin_input, 13, 60, half, gm_row-4)
+    set_box(gm_panel.get_node("GMSetMoney"), 17+half, 60, half, gm_row-4)
+    set_box(gm_panel.get_node("Add1000"), 13, 60+gm_row, half, gm_row-4)
+    set_box(gm_panel.get_node("Add10000"), 17+half, 60+gm_row, half, gm_row-4)
+    set_box(gm_panel.get_node("Add100000"), 13, 60+2*gm_row, half, gm_row-4)
+    set_box(gm_level_input, 17+half, 60+2*gm_row, half, gm_row-4)
+    set_box(gm_panel.get_node("GMLevel"), 13, 60+3*gm_row, half, gm_row-4)
+    set_box(gm_panel.get_node("GMMax"), 17+half, 60+3*gm_row, half, gm_row-4)
+    set_box(gm_panel.get_node("GMMale"), 13, 60+4*gm_row, half, gm_row-4)
+    set_box(gm_panel.get_node("GMFemale"), 17+half, 60+4*gm_row, half, gm_row-4)
     var caption_width: float = minf(w-22.0, 540.0)
     var caption_y: float = 70.0 if not narrow else header_height+56.0
     set_box(voice_caption, (w-caption_width)*0.5, caption_y, caption_width, 53.0)
@@ -2380,6 +2440,9 @@ func _check_voice_context() -> void:
 func refresh_labels() -> void:
     if money_label == null:
         return
+    if sell_button != null:
+        sell_button.text = "ขายผลผลิตทั้งหมด (%d เหรียญ)" % produce_value()
+        sell_button.disabled = produce_value() == 0
     if get_viewport().get_visible_rect().size.x < 960.0:
         money_label.text = "เงิน %d | คอก %d | หมู %d/%d" % [coins, pens, pigs, pens*PEN_CAPACITY]
     else:
@@ -2393,11 +2456,11 @@ func refresh_labels() -> void:
         shop_pig_button.disabled = pigs >= pens*PEN_CAPACITY
     status_label.text = message
     if farm_level >= MAX_FARM_LEVEL:
-        farm_level_label.text = "ฟาร์ม Lv.10 MAX" if get_viewport().get_visible_rect().size.x < 700.0 else "Lv.10 MAX | ที่ดิน %d/100" % unlocked_zones.size()
+        farm_level_label.text = "ฟาร์ม Lv.10 MAX" if get_viewport().get_visible_rect().size.x < 700.0 else "Lv.10 MAX | ที่ดิน %d/324" % unlocked_zones.size()
     elif get_viewport().get_visible_rect().size.x < 700.0:
         farm_level_label.text = "Lv.%d %d/%d | ที่ดิน %d" % [farm_level, farm_xp, xp_to_next_level(), unlocked_zones.size()]
     else:
-        farm_level_label.text = "Lv.%d EXP %d/%d | แปลง %d/50 | ที่ดิน %d/100" % [
+        farm_level_label.text = "Lv.%d EXP %d/%d | แปลง %d/50 | ที่ดิน %d/324" % [
             farm_level, farm_xp, xp_to_next_level(), unlocked_plot_count(), unlocked_zones.size()
         ]
     if not landscaping_mode:
@@ -2409,7 +2472,7 @@ func refresh_labels() -> void:
     elif tool_mode == "place_decor":
         active_seed_label.text = "%s ×%d" % [DECOR_NAMES[selected_decor], int(decor_kits[selected_decor])]
     elif tool_mode == "buy_land":
-        active_seed_label.text = "ที่ดิน %d/100 โซน" % unlocked_zones.size()
+        active_seed_label.text = "ที่ดิน %d/324 โซน" % unlocked_zones.size()
     else:
         active_seed_label.text = "ไม้ %d" % wood
     if landscape_button != null:
@@ -2430,7 +2493,10 @@ func refresh_bag_cards() -> void:
     var total: int = 0
     for i in range(seeds.size()):
         total += int(seeds[i])
-    bag_summary.text = "เมล็ดพันธุ์ %d ชนิด | รวม %d ซอง" % [CROPS.size(), total]
+    var harvest_total: int = 0
+    for quantity in produce:
+        harvest_total += int(quantity)
+    bag_summary.text = "เมล็ด %d ซอง | ผลผลิต %d ชิ้น" % [total, harvest_total]
     var tree_total: int = 0
     for stock in tree_kits:
         tree_total += int(stock)
@@ -2595,6 +2661,8 @@ func toggle_gm_panel() -> void:
     if gm_panel.visible:
         shop_panel.visible = false
         bag_panel.visible = false
+        gm_coin_input.value = coins
+        gm_level_input.value = farm_level
 
 func gm_grant_coins(amount: int) -> void:
     # Never call this in a public economy. A browser-only GM switch is
@@ -2605,6 +2673,61 @@ func gm_grant_coins(amount: int) -> void:
     message = "GM TEST เติมเหรียญทดลอง %d (ยอดรวม %d)" % [amount, coins]
     save_game()
     refresh_labels()
+
+func produce_value() -> int:
+    var value: int = 0
+    for i in range(CROPS.size()):
+        value += int(produce[i]) * int(CROPS[i]["reward"])
+    return value
+
+func sell_produce() -> void:
+    var value: int = produce_value()
+    if value <= 0 or coins > 1000000000 - value:
+        return
+    coins += value
+    produce.fill(0)
+    message = "ขายผลผลิตแล้ว +%d เหรียญ" % value
+    refresh_labels()
+    save_game()
+
+func gm_set_level(amount: int) -> void:
+    if not GM_TEST_MODE:
+        return
+    farm_level = clampi(farm_level + amount, 1, MAX_FARM_LEVEL)
+    farm_xp = 0
+    update_plot_locks()
+    refresh_labels()
+    save_game()
+
+func gm_set_money() -> void:
+    if not GM_TEST_MODE:
+        return
+    coins = clampi(int(gm_coin_input.value), 0, 1000000000)
+    refresh_labels()
+    save_game()
+
+func gm_set_exact_level() -> void:
+    if not GM_TEST_MODE:
+        return
+    farm_level = clampi(int(gm_level_input.value), 1, MAX_FARM_LEVEL)
+    farm_xp = 0
+    update_plot_locks()
+    refresh_labels()
+    save_game()
+
+func gm_change_gender(gender: String) -> void:
+    if not GM_TEST_MODE or gender not in ["male", "female"] or gender == avatar_gender or work_plot >= 0:
+        return
+    avatar_gender = gender
+    var old_position: Vector3 = farmer.position
+    var old_rotation: Vector3 = farmer.rotation
+    farmer.queue_free()
+    farmer_visual = null
+    build_farmer()
+    farmer.position = old_position
+    farmer.rotation = old_rotation
+    refresh_labels()
+    save_game()
 
 func buy_seed(index: int) -> void:
     var price: int = int(CROPS[index]["price"])
@@ -2634,6 +2757,8 @@ func buy_feed() -> void:
 func buy_pen() -> void:
     if pens >= MAX_PENS:
         message = "ขยายคอกครบ %d คอกแล้ว" % MAX_PENS
+    elif not is_land_owned(pen_locations[pens] + Vector3(3.4,0,3.4)) or not is_land_owned(pen_locations[pens] - Vector3(3.4,0,3.4)):
+        message = "ปลดล็อกที่ดินด้านขวาก่อนขยายคอก"
     elif coins < pen_price():
         message = "เหรียญไม่พอสำหรับขยายคอก"
     else:
@@ -2682,6 +2807,9 @@ func snapshot() -> Dictionary:
         free_cells.append(cell)
     return {
         "coins": coins,
+        "land_grid": 2,
+        "produce": produce.duplicate(),
+        "avatar_gender": avatar_gender,
         "feed": feed,
         "pigs": pigs,
         "pens": pens,
@@ -2702,6 +2830,16 @@ func snapshot() -> Dictionary:
 
 func _apply_snapshot(state: Dictionary) -> void:
     coins = int(state["coins"])
+    produce = state.get("produce", [0,0,0,0,0,0]).duplicate()
+    var restored_gender: String = str(state.get("avatar_gender", "female"))
+    if farmer != null and avatar_gender != restored_gender:
+        var old_position: Vector3 = farmer.position
+        farmer.queue_free()
+        farmer_visual = null
+        avatar_gender = restored_gender
+        build_farmer()
+        farmer.position = old_position
+    avatar_gender = restored_gender
     feed = int(state["feed"])
     pigs = int(state["pigs"])
     pens = int(state["pens"])
@@ -2859,6 +2997,8 @@ func _confirm_import_backup() -> void:
     var to_restore: Dictionary = pending_restore.duplicate(true)
     pending_restore.clear()
     _apply_snapshot(to_restore)
+    if not is_land_owned(farmer.position):
+        farmer.position = Vector3(-1,0,7.8)
     _refresh_land_zones()
     update_plot_locks()
     rebuild_livestock()

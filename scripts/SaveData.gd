@@ -17,9 +17,8 @@ const MAX_EXTRA_PLOTS: int = 120
 const MAX_PLANTED_TREES: int = 80
 const TREE_VARIANTS = ["STOak2", "STPine3", "STWillow2", "STColumnar1", "STSwiggly1"]
 const BASE_TREE_COUNT: int = 15
-const WORLD_HALF: float = 200.0
-const ZONE_COUNT: int = 100
-const STARTER_ZONES = [44, 45, 54, 55]
+const ZONE_COUNT: int = 324
+const STARTER_ZONES = [171]
 const DECOR_TYPES: int = 16
 const MAX_DECORATIONS: int = 260
 
@@ -28,6 +27,9 @@ static func _valid_position_number(raw: Variant, bound: float) -> bool:
         return false
     var value: float = float(raw)
     return is_finite(value) and absf(value) <= bound
+
+static func _valid_world_position(raw: Variant) -> bool:
+    return _valid_position_number(raw, 237.5) and float(raw) >= -237.5 and float(raw) < 212.5
 
 static func normalize(raw: Variant) -> Dictionary:
     if not (raw is Dictionary):
@@ -149,7 +151,7 @@ static func normalize(raw: Variant) -> Dictionary:
     for entry in raw_extra:
         if not (entry is Dictionary):
             return {}
-        if not _valid_position_number(entry.get("x"), 199.0) or not _valid_position_number(entry.get("z"), 199.0):
+        if not _valid_world_position(entry.get("x")) or not _valid_world_position(entry.get("z")):
             return {}
         var cell: Dictionary = {"x": float(entry["x"]), "z": float(entry["z"])}
         if entry.has("tilled"):
@@ -179,7 +181,7 @@ static func normalize(raw: Variant) -> Dictionary:
     for entry in raw_trees:
         if not (entry is Dictionary):
             return {}
-        if not _valid_position_number(entry.get("x"), 199.0) or not _valid_position_number(entry.get("z"), 199.0):
+        if not _valid_world_position(entry.get("x")) or not _valid_world_position(entry.get("z")):
             return {}
         var variant: String = str(entry.get("variant", ""))
         if not TREE_VARIANTS.has(variant):
@@ -205,7 +207,8 @@ static func normalize(raw: Variant) -> Dictionary:
         safe_removed_trees.append(index)
 
     # New expansion fields default to the old central farm for existing saves.
-    var unlocked_input: Variant = data.get("unlocked_zones", STARTER_ZONES.duplicate())
+    var legacy: bool = int(data.get("land_grid", 1)) != 2
+    var unlocked_input: Variant = data.get("unlocked_zones", [44,45,54,55] if legacy else STARTER_ZONES.duplicate())
     if not (unlocked_input is Array) or unlocked_input.size() > ZONE_COUNT:
         return {}
     var safe_unlocked_zones: Array = []
@@ -213,9 +216,20 @@ static func normalize(raw: Variant) -> Dictionary:
         if not (raw_id is int or raw_id is float) or not is_finite(float(raw_id)):
             return {}
         var sector: int = int(raw_id)
-        if float(raw_id) != float(sector) or sector < 0 or sector >= ZONE_COUNT or safe_unlocked_zones.has(sector):
+        if float(raw_id) != float(sector) or sector < 0 or sector >= (100 if legacy else ZONE_COUNT) or safe_unlocked_zones.has(sector):
             return {}
         safe_unlocked_zones.append(sector)
+    if legacy:
+        var converted: Array = STARTER_ZONES.duplicate()
+        for old_id in safe_unlocked_zones:
+            var x: float = -200.0 + float(int(old_id) % 10) * 40.0
+            var z: float = -200.0 + float(int(old_id) / 10) * 40.0
+            for row in range(floori((z+237.5)/25.0), floori((z+39.999+237.5)/25.0)+1):
+                for col in range(floori((x+237.5)/25.0), floori((x+39.999+237.5)/25.0)+1):
+                    var id: int = row*18+col
+                    if not converted.has(id):
+                        converted.append(id)
+        safe_unlocked_zones = converted
     for required in STARTER_ZONES:
         if not safe_unlocked_zones.has(required):
             return {}
@@ -245,7 +259,7 @@ static func normalize(raw: Variant) -> Dictionary:
     for entry in input_decor:
         if not (entry is Dictionary):
             return {}
-        if not _valid_position_number(entry.get("x"), 199.0) or not _valid_position_number(entry.get("z"), 199.0):
+        if not _valid_world_position(entry.get("x")) or not _valid_world_position(entry.get("z")):
             return {}
         var type_value: Variant = entry.get("type", -1)
         if not (type_value is int or type_value is float) or not is_finite(float(type_value)):
@@ -274,8 +288,22 @@ static func normalize(raw: Variant) -> Dictionary:
             expanded[new_index] = safe_plots[old_index]
         safe_plots = expanded
 
+    var produce: Variant = data.get("produce", [0,0,0,0,0,0])
+    if not (produce is Array) or produce.size() != NUM_CROPS:
+        return {}
+    var safe_produce: Array = []
+    for qty in produce:
+        if not (qty is int or qty is float) or not is_finite(float(qty)) or float(qty) != float(int(qty)) or int(qty) < 0 or int(qty) > 100000:
+            return {}
+        safe_produce.append(int(qty))
+    var gender: String = str(data.get("avatar_gender", "female"))
+    if gender not in ["male", "female"]:
+        return {}
     return {
         "coins": balance,
+        "land_grid": 2,
+        "produce": safe_produce,
+        "avatar_gender": gender,
         "feed": stock,
         "pigs": animal_count,
         "pens": pen_count,

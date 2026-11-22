@@ -1,4 +1,6 @@
-# Happy Farm - Clean 3D Rebuild
+# FarmFlex — Grow. Dress. Flex.
+
+FarmFlex continues the original Happy Farm Godot project. The private local farm is now 450 × 450 world meters with 324 adjacent 25 × 25 meter parcels. New saves start with one parcel; old land ownership is migrated. Harvested crops go into produce inventory, and the shop sells them for coins. GM TEST can grant coins, advance levels and switch between the original female avatar and a procedural male placeholder. The shared fashion/social plaza and multiplayer accounts are planned, not implemented yet.
 
 A new Godot 4.4.1 project written from scratch on 22 October 2026.
 
