@@ -62,11 +62,11 @@ func initialize(target_host: Node3D, target_skeleton: Skeleton3D, selected_gende
     change_state("Idle")
     return true
 
-func _find_node_by_class(n: Node, class_name: String) -> Node:
-    if n.is_class(class_name):
+func _find_node_by_class(n: Node, expected_class: String) -> Node:
+    if n.is_class(expected_class):
         return n
     for child in n.get_children():
-        var found: Node = _find_node_by_class(child, class_name)
+        var found: Node = _find_node_by_class(child, expected_class)
         if found != null:
             return found
     return null
