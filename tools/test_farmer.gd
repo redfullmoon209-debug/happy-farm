@@ -222,6 +222,43 @@ func _check() -> void:
             for state in ["Idle", "Walk", "Run", "Jump"]:
                 if not farm.farmer_visual.anim_player.has_animation("Farm/" + state):
                     problems.append("missing Mixamo motion " + state)
+    # Male and female must BOTH leave T-pose and remain upright.
+    if ResourceLoader.exists("res://assets/characters/Male_Character_Complete.glb"):
+        var male_script: GDScript = load("res://scripts/ModularVisual.gd") as GDScript
+        var male_avatar: Node3D = male_script.new() as Node3D
+        farm.farmer.add_child(male_avatar)
+        if not male_avatar.initialize("male") or not male_avatar.is_model_ready():
+            problems.append("male GLB rig failed to initialize")
+        elif male_avatar.anim_player == null:
+            problems.append("male rig missing animation player")
+        else:
+            var ms: Skeleton3D = male_avatar.skeleton
+            var male_ids: Dictionary = {}
+            for id in range(ms.get_bone_count()):
+                var bone_name: String = String(ms.get_bone_name(id)).to_lower()
+                for target in ["head", "leftfoot", "leftarm", "lefthand"]:
+                    if bone_name.ends_with(target):
+                        male_ids[target] = id
+            if male_ids.size() < 4:
+                problems.append("male GLB missing essential upright test bones")
+            else:
+                for anim_state in ["Idle", "Walk", "Run", "Jump", "Water", "Dig"]:
+                    male_avatar.set_state(anim_state)
+                    male_avatar.anim_player.advance(0.19)
+                    var hy: float = ms.to_global(ms.get_bone_global_pose(int(male_ids["head"])).origin).y
+                    var fy: float = ms.to_global(ms.get_bone_global_pose(int(male_ids["leftfoot"])).origin).y
+                    print("MALE UPRIGHT TEST: ", anim_state, " head-above-foot=", hy - fy)
+                    if hy - fy <= 0.12:
+                        problems.append("male model tips over in " + anim_state)
+                male_avatar.set_state("Idle")
+                male_avatar.anim_player.advance(0.19)
+                var shoulder_y: float = ms.to_global(ms.get_bone_global_pose(int(male_ids["leftarm"])).origin).y
+                var hand_y: float = ms.to_global(ms.get_bone_global_pose(int(male_ids["lefthand"])).origin).y
+                print("MALE ARM RELAX TEST: drop=", shoulder_y - hand_y)
+                if shoulder_y - hand_y < 0.05:
+                    problems.append("male Idle pose still T-pose")
+        male_avatar.queue_free()
+
     if problems.is_empty():
         print("FARMER TESTS PASS: joystick walking, jumping, FBX fallback and animation libraries")
         quit(0)
