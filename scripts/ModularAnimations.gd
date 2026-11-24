@@ -161,7 +161,7 @@ func _add_generated_clip(library: AnimationLibrary, state: String, sk_path: Stri
         _add_rotation(anim, sk_path, "RightHand", Vector3.FORWARD, t, [0.0, -22.0, -42.0, -22.0, 0.0])
         _add_rotation(anim, sk_path, "LeftArm", Vector3.RIGHT, t, [0.0, -12.0, -17.0, -12.0, 0.0])
     elif state == "Dig":
-        _add_rotation(anim, sk_path, "Spine", Vector3.RIGHT, t, [0.0, 14.0, 29.0, 13.0, 0.0])
+        _add_rotation(anim, sk_path, "Spine", Vector3.RIGHT, t, [0.0, 4.0, 8.0, 4.0, 0.0])
         _add_rotation(anim, sk_path, "RightArm", Vector3.RIGHT, t, [-55.0, -30.0, 24.0, -30.0, -55.0])
         _add_rotation(anim, sk_path, "RightForeArm", Vector3.RIGHT, t, [38.0, 42.0, 62.0, 42.0, 38.0])
         _add_rotation(anim, sk_path, "LeftArm", Vector3.RIGHT, t, [-30.0, -15.0, 12.0, -15.0, -30.0])
@@ -171,16 +171,27 @@ func _add_generated_clip(library: AnimationLibrary, state: String, sk_path: Stri
         _add_rotation(anim, sk_path, "LeftArm", Vector3.FORWARD, t, [-35.0, -37.0, -38.0, -37.0, -35.0])
         _add_rotation(anim, sk_path, "Spine", Vector3.RIGHT, t, [0.0, 1.0, 2.0, 1.0, 0.0])
     elif state in ["Walk", "Run"]:
-        var amount: float = 24.0 if state == "Walk" else 44.0
+        var amount: float = 12.0 if state == "Walk" else 18.0
         _add_rotation(anim, sk_path, "LeftUpLeg", Vector3.RIGHT, t, [-amount, 0.0, amount, 0.0, -amount])
         _add_rotation(anim, sk_path, "RightUpLeg", Vector3.RIGHT, t, [amount, 0.0, -amount, 0.0, amount])
         _add_rotation(anim, sk_path, "LeftArm", Vector3.RIGHT, t, [amount*0.6, 0.0, -amount*0.6, 0.0, amount*0.6])
         _add_rotation(anim, sk_path, "RightArm", Vector3.RIGHT, t, [-amount*0.6, 0.0, amount*0.6, 0.0, -amount*0.6])
     elif state == "Jump":
-        _add_rotation(anim, sk_path, "LeftUpLeg", Vector3.RIGHT, t, [0.0, 22.0, 30.0, 15.0, 0.0])
-        _add_rotation(anim, sk_path, "RightUpLeg", Vector3.RIGHT, t, [0.0, -13.0, -20.0, -10.0, 0.0])
+        _add_rotation(anim, sk_path, "LeftUpLeg", Vector3.RIGHT, t, [0.0, 8.0, 12.0, 8.0, 0.0])
+        _add_rotation(anim, sk_path, "RightUpLeg", Vector3.RIGHT, t, [0.0, -7.0, -11.0, -7.0, 0.0])
         _add_rotation(anim, sk_path, "LeftArm", Vector3.RIGHT, t, [0.0, -30.0, -48.0, -30.0, 0.0])
         _add_rotation(anim, sk_path, "RightArm", Vector3.RIGHT, t, [0.0, -30.0, -48.0, -30.0, 0.0])
+    # Tracks must cover the whole skeleton, otherwise Godot leaves rotations
+    # from the preceding Walk/Run/Jump state on bones missing from Water/Dig.
+    # Every animation is now self-contained and returns to upright rest pose.
+    for i in range(skeleton.get_bone_count()):
+        var full_path: NodePath = NodePath(sk_path + ":" + String(skeleton.get_bone_name(i)))
+        if anim.find_track(full_path, Animation.TYPE_ROTATION_3D) >= 0:
+            continue
+        var neutral_track: int = anim.add_track(Animation.TYPE_ROTATION_3D)
+        anim.track_set_path(neutral_track, full_path)
+        anim.rotation_track_insert_key(neutral_track, 0.0, Quaternion.IDENTITY)
+        anim.rotation_track_insert_key(neutral_track, anim.length, Quaternion.IDENTITY)
     if anim.get_track_count() == 0:
         return false
     return library.add_animation(state, anim) == OK
