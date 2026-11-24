@@ -124,7 +124,9 @@ func _add_rotation(clip: Animation, sk_path: String, tail: String, axis: Vector3
     var bone: String = ""
     for i in range(skeleton.get_bone_count()):
         var name: String = String(skeleton.get_bone_name(i))
-        if name.ends_with(":" + tail) or name == tail:
+        # Godot GLB imports may spell Mixamo bones as "mixamorigRightArm",
+        # "mixamorig_RightArm" or "mixamorig:RightArm".
+        if name.to_lower().ends_with(tail.to_lower()):
             bone = name
             break
     if bone.is_empty():
