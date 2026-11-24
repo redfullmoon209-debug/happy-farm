@@ -53,10 +53,23 @@ jobs:
           BUILD_NAME="farmflex-${GITHUB_SHA:0:8}"
           ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --export-release Web "build/web/${BUILD_NAME}.html" 2>&1 | tee /tmp/export.log
           cp "build/web/${BUILD_NAME}.html" build/web/index.html
+          # First visit: show character creation, never the existing Character Lab.
+          python3 - <<'PY'
+          from pathlib import Path
+          index = Path("build/web/index.html")
+          html = index.read_text(encoding="utf-8")
+          selector = """<script>(function(){try{var p=JSON.parse(localStorage.getItem('farmflex_character_v1')||'null');if(!p||p.locked!==true){location.replace('./create-character.html');}}catch(e){console.warn('Character selection redirect:',e);}})();</script>"""
+          if "</head>" not in html:
+              raise SystemExit("No </head> in Godot export")
+          index.write_text(html.replace("</head>",selector+"</head>",1),encoding="utf-8")
+          PY
+
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/export.log; then exit 1; fi
           test -s build/web/index.html
           # Isolated browser-only character preview; keep the existing Godot game intact.
           cp web/character-preview.html build/web/character-preview.html
+          cp web/create-character.html build/web/create-character.html
+          test -s build/web/create-character.html
           cp web/character-preview.html build/web/farmflex-characters-v2.html
           test -s build/web/character-preview.html
           test -s build/web/farmflex-characters-v2.html

@@ -101,6 +101,7 @@ var placed_tree_nodes: Array[Node3D] = []
 var unlocked_zones: Array = STARTER_ZONES.duplicate()
 var produce: Array = [0,0,0,0,0,0]
 var avatar_gender: String = "female"
+var character_profile: Dictionary = {}
 var sell_button: Button
 var zone_covers: Array[MeshInstance3D] = []
 var zone_signs: Array[Label3D] = []
@@ -247,6 +248,7 @@ func _ready() -> void:
     # Sarabun fully supports Thai, digits, Latin and punctuation.
     ThemeDB.fallback_font = THAI
     load_save()
+    _read_locked_character_from_browser()
     build_scene()
     build_farmer()
     farm_audio = FARM_AUDIO.new()
@@ -265,6 +267,24 @@ func _ready() -> void:
         if web_window != null:
             web_window.happyFarmReceiveSave = browser_import_callback
     _refresh_save_indicator()
+
+
+# Character creation is a distinct page. It never modifies the original Character Lab.
+# The farm save stays intact; only locked appearance fields are imported.
+func _read_locked_character_from_browser() -> void:
+    if not OS.has_feature("web"):
+        return
+    var text_value: Variant = JavaScriptBridge.eval("window.localStorage.getItem('farmflex_character_v1')", true)
+    if typeof(text_value) != TYPE_STRING or str(text_value).is_empty():
+        return
+    var decoded: Variant = JSON.parse_string(str(text_value))
+    if typeof(decoded) != TYPE_DICTIONARY or not bool(decoded.get("locked", false)):
+        return
+    var chosen_gender: String = str(decoded.get("sex", "")).to_lower()
+    if chosen_gender not in ["female", "male"]:
+        return
+    avatar_gender = chosen_gender
+    character_profile = decoded.duplicate(true)
 
 func make_material(color: Color) -> StandardMaterial3D:
     var key: String = color.to_html()
@@ -2830,6 +2850,7 @@ func snapshot() -> Dictionary:
         "land_grid": 2,
         "produce": produce.duplicate(),
         "avatar_gender": avatar_gender,
+        "character_profile": character_profile.duplicate(true),
         "feed": feed,
         "pigs": pigs,
         "pens": pens,
@@ -2860,6 +2881,7 @@ func _apply_snapshot(state: Dictionary) -> void:
         build_farmer()
         farmer.position = old_position
     avatar_gender = restored_gender
+    character_profile = state.get("character_profile", {}).duplicate(true)
     feed = int(state["feed"])
     pigs = int(state["pigs"])
     pens = int(state["pens"])
