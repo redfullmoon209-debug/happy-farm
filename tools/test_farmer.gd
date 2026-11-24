@@ -154,11 +154,14 @@ func _check() -> void:
                 for pose_name in ["Idle", "Walk", "Run", "Jump", "Water", "Dig"]:
                     farm.farmer_visual.set_state(pose_name)
                     farm.farmer_visual.anim_player.advance(0.18)
-                    var head_pos: Vector3 = sk.get_bone_global_pose(head_id).origin
-                    var foot_pos: Vector3 = sk.get_bone_global_pose(foot_id).origin
-                    var height_gap: float = head_pos.y-foot_pos.y
-                    print("UPRIGHT TEST: ", pose_name, " head-above-foot=", height_gap)
-                    if height_gap <= 0.20:
+                    # get_bone_global_pose() is relative to Skeleton3D,
+                    # not Y-up world space. GLB armatures have a rotated
+                    # import root, so raw .y measures the wrong axis.
+                    var head_world: Vector3 = sk.to_global(sk.get_bone_global_pose(head_id).origin)
+                    var foot_world: Vector3 = sk.to_global(sk.get_bone_global_pose(foot_id).origin)
+                    var height_gap: float = head_world.y-foot_world.y
+                    print("UPRIGHT TEST: ", pose_name, " world head-above-foot=", height_gap, " skel-basis=", sk.global_basis)
+                    if height_gap <= 0.12:
                         problems.append("model lying or upside down in " + pose_name)
                 farm.farmer_visual.set_state("Idle")
     elif ResourceLoader.exists("res://assets/characters/femalefarmer.fbx"):
