@@ -103,6 +103,9 @@ var unlocked_zones: Array = STARTER_ZONES.duplicate()
 var produce: Array = [0,0,0,0,0,0]
 var avatar_gender: String = "female"
 var character_profile: Dictionary = {}
+# Temporary browser-only avatar preview; never persisted into the farm save.
+var test_avatar_gender: String = ""
+var original_locked_profile: Dictionary = {}
 var sell_button: Button
 var zone_covers: Array[MeshInstance3D] = []
 var zone_signs: Array[Label3D] = []
@@ -286,6 +289,15 @@ func _read_locked_character_from_browser() -> void:
         return
     avatar_gender = chosen_gender
     character_profile = decoded.duplicate(true)
+    # Preview the other sex using a test URL without changing the locked
+    # player identity or farm save. No GM privileges are granted.
+    var requested_preview: Variant = JavaScriptBridge.eval("(new URLSearchParams(window.location.search)).get('test_gender')", true)
+    if typeof(requested_preview) == TYPE_STRING and str(requested_preview).to_lower() in ["female", "male"]:
+        test_avatar_gender = str(requested_preview).to_lower()
+        original_locked_profile = decoded.duplicate(true)
+        avatar_gender = test_avatar_gender
+        character_profile["sex"] = test_avatar_gender
+        print("FARMFLEX CHARACTER TEST: temporary ", test_avatar_gender, " avatar; locked profile preserved")
 
 func make_material(color: Color) -> StandardMaterial3D:
     var key: String = color.to_html()
@@ -2870,8 +2882,9 @@ func snapshot() -> Dictionary:
         "coins": coins,
         "land_grid": 2,
         "produce": produce.duplicate(),
-        "avatar_gender": avatar_gender,
-        "character_profile": character_profile.duplicate(true),
+        # Never overwrite a player's committed avatar choice during previews.
+        "avatar_gender": str(original_locked_profile.get("sex", avatar_gender)) if not test_avatar_gender.is_empty() else avatar_gender,
+        "character_profile": original_locked_profile.duplicate(true) if not test_avatar_gender.is_empty() else character_profile.duplicate(true),
         "feed": feed,
         "pigs": pigs,
         "pens": pens,
