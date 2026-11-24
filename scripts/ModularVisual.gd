@@ -3,7 +3,9 @@ extends Node3D
 # Animation binding can be added when matching Mixamo clips are provided.
 const FEMALE_PATH = "res://assets/characters/Female_Character_Complete.glb"
 const MALE_PATH = "res://assets/characters/Male_Character_Complete.glb"
-const TARGET_HEIGHT = 1.90
+const TARGET_HEIGHT = 1.12
+const SKIN_SHADER = preload("res://shaders/ModularSkin.gdshader")
+const DEFAULT_SKIN = "#e2b49d"
 var imported_character: Node3D = null
 var skeleton: Skeleton3D = null
 var display_height: float = 0.0
@@ -51,9 +53,10 @@ func initialize(gender: String, appearance: Dictionary = {}) -> bool:
         elif mesh_name.contains("_Outfit_"):
             # Default player appearance uses the starter body, no extra shoes.
             mesh_node.visible = false
-        elif mesh_name.contains("BaseBody") and face_index > 0:
-            if mesh_node.mesh.get_blend_shape_count() >= face_index:
+        elif mesh_name.contains("BaseBody"):
+            if face_index > 0 and mesh_node.mesh.get_blend_shape_count() >= face_index:
                 mesh_node.set_blend_shape_value(face_index - 1, 1.0)
+            _apply_skin_tone(mesh_node, str(appearance.get("skin_color", DEFAULT_SKIN)))
         if mesh_name.contains("_Hair_") and mesh_node.visible:
             _tint_hair(mesh_node, str(appearance.get("hair_color", "#78513d")))
     var low: Vector3 = Vector3(INF, INF, INF)
@@ -93,8 +96,23 @@ func _tint_hair(mesh_node: MeshInstance3D, hex_color: String) -> void:
             recolored.albedo_color = tint
             mesh_node.set_surface_override_material(surface_index, recolored)
 
+func _apply_skin_tone(body: MeshInstance3D, requested_color: String) -> void:
+    var tint: Color = Color(requested_color if Color.html_is_valid(requested_color) else DEFAULT_SKIN)
+    for idx in range(body.mesh.get_surface_count()):
+        var surface: Material = body.get_active_material(idx)
+        if not (surface is BaseMaterial3D):
+            continue
+        var original: BaseMaterial3D = surface as BaseMaterial3D
+        if original.albedo_texture == null:
+            continue
+        var recolored: ShaderMaterial = ShaderMaterial.new()
+        recolored.shader = SKIN_SHADER
+        recolored.set_shader_parameter("body_texture", original.albedo_texture)
+        recolored.set_shader_parameter("skin_tone", tint)
+        body.set_surface_override_material(idx, recolored)
+
 func has_visible_avatar() -> bool:
-    return imported_character != null and mesh_count > 0 and display_height > 1.5
+    return imported_character != null and mesh_count > 0 and display_height >= 0.8 and display_height <= 1.5
 
 func is_model_ready() -> bool:
     return has_visible_avatar()
