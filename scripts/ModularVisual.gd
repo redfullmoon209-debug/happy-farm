@@ -180,12 +180,16 @@ func _tool_part(parent: Node3D, primitive: PrimitiveMesh, local_position: Vector
     return mesh
 
 func _create_hand_tools() -> void:
-    var bone: int = skeleton.find_bone("mixamorig:RightHand")
+    var bone: int = -1
+    for i in range(skeleton.get_bone_count()):
+        if String(skeleton.get_bone_name(i)).to_lower().ends_with("righthand"):
+            bone = i
+            break
     if bone < 0:
         return
     var mount: BoneAttachment3D = BoneAttachment3D.new()
     mount.name = "RightHandEquipment"
-    mount.bone_name = "mixamorig:RightHand"
+    mount.bone_name = String(skeleton.get_bone_name(bone))
     skeleton.add_child(mount)
     can_prop = Node3D.new()
     can_prop.name = "WateringCan"
