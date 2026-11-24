@@ -119,8 +119,8 @@ func _check() -> void:
     if ResourceLoader.exists("res://assets/characters/Female_Character_Complete.glb"):
         if farm.farmer_visual == null or not farm.farmer_visual.is_model_ready():
             problems.append("real Codex GLB character failed to load into the farm")
-        elif farm.farmer_visual.display_height < 1.5 or farm.farmer_visual.display_height > 2.4:
-            problems.append("real Codex GLB model is not at player scale")
+        elif farm.farmer_visual.display_height < 0.95 or farm.farmer_visual.display_height > 1.35:
+            problems.append("real Codex GLB model is not at the new farm-scaled height")
         elif farm.farmer_visual.mesh_count < 2:
             problems.append("hair or body mesh missing from real Codex model")
     elif ResourceLoader.exists("res://assets/characters/femalefarmer.fbx"):
