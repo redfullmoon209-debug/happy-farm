@@ -123,6 +123,19 @@ func _check() -> void:
             problems.append("real Codex GLB model is not at the 0.25-height garden scale")
         elif farm.farmer_visual.mesh_count < 2:
             problems.append("hair or body mesh missing from real Codex model")
+        elif farm.farmer_visual.anim_player == null:
+            problems.append("real Codex GLB has no retargeted AnimationPlayer")
+        else:
+            for required_state in ["Idle", "Walk", "Run", "Jump", "Water", "Dig"]:
+                if not farm.farmer_visual.anim_player.has_animation("Farm/" + required_state):
+                    problems.append("missing modular animation: " + required_state)
+            farm.farmer_visual.set_state("Water")
+            if farm.farmer_visual.current_state != "Water":
+                problems.append("Water work state did not activate")
+            farm.farmer_visual.set_state("Dig")
+            if farm.farmer_visual.current_state != "Dig":
+                problems.append("Dig work state did not activate")
+            farm.farmer_visual.set_state("Idle")
     elif ResourceLoader.exists("res://assets/characters/femalefarmer.fbx"):
         var meshes: Array[MeshInstance3D] = []
         _log_model_nodes(farm.farmer_visual, meshes)

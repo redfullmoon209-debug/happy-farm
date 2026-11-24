@@ -1324,7 +1324,8 @@ func _process(delta: float) -> void:
         work_time -= delta
         arm_r.rotation.x = -0.75+sin(elapsed*11)*0.42
         arm_l.rotation.x = 0.28
-        farmer.position.y = absf(sin(elapsed*5))*0.035
+        # Tiny skinned avatars must stay on the ground during field work.
+        farmer.position.y = 0.0 if (farmer_visual != null and farmer_visual.is_model_ready()) else absf(sin(elapsed*5))*0.035
         if work_time <= 0:
             finish_work()
     else:
@@ -1367,7 +1368,11 @@ func _process(delta: float) -> void:
             farmer.position.z-previous_position.z
         )
         var pose_name: String = "Idle"
-        if jumping > 0.015 or jump_velocity > 0.0:
+        if work_time > 0.0 and tool_mode == "water":
+            pose_name = "Water"
+        elif work_time > 0.0 and tool_mode == "till":
+            pose_name = "Dig"
+        elif jumping > 0.015 or jump_velocity > 0.0:
             pose_name = "Jump"
         elif displacement.length() > 0.001:
             pose_name = "Run" if (running and work_plot < 0) else "Walk"
@@ -1389,7 +1394,9 @@ func move_actor(direction: Vector3, speed: float, delta: float) -> void:
             farmer.position.x = desired.x
         if land_path_owned(farmer.position, Vector3(farmer.position.x, 0, slide_z.z)):
             farmer.position.z = desired.z
-    farmer.position.y = jumping+absf(sin(elapsed*12))*0.035
+    # Walk animations animate the legs; old procedural bob makes 0.25m
+    # characters visibly float above the ground.
+    farmer.position.y = jumping if (farmer_visual != null and farmer_visual.is_model_ready()) else jumping+absf(sin(elapsed*12))*0.035
     farmer.rotation.y = atan2(-direction.x,-direction.z)
     var wave: float = sin(elapsed*(16 if running else 10))
     leg_l.rotation.x = wave*0.60
