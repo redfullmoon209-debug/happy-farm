@@ -15,6 +15,7 @@ var host: Node3D
 var gender: String = "female"
 var available: Dictionary = {}
 var current_state: String = ""
+var original_rotations: Dictionary = {}
 
 func initialize(target_host: Node3D, target_skeleton: Skeleton3D, selected_gender: String) -> bool:
     if target_skeleton == null:
@@ -22,6 +23,12 @@ func initialize(target_host: Node3D, target_skeleton: Skeleton3D, selected_gende
         return false
     host = target_host
     skeleton = target_skeleton
+    # Capture the CORRECT GLB bind-pose rotations before any animation plays.
+    # The initial pose is not identity: setting all bones to Quaternion.IDENTITY
+    # flips the character onto its back.
+    original_rotations.clear()
+    for index in range(skeleton.get_bone_count()):
+        original_rotations[index] = skeleton.get_bone_pose_rotation(index)
     gender = "male" if selected_gender == "male" else "female"
     player = AnimationPlayer.new()
     player.name = "FarmFlex_%s_AnimationPlayer" % gender
@@ -132,19 +139,22 @@ func _import_mixamo(library: AnimationLibrary, state: String, filename: String, 
 
 func _add_rotation(clip: Animation, sk_path: String, tail: String, axis: Vector3, times: Array, angles: Array) -> void:
     var bone: String = ""
+    var bone_index: int = -1
     for i in range(skeleton.get_bone_count()):
         var name: String = String(skeleton.get_bone_name(i))
         # Godot GLB imports may spell Mixamo bones as "mixamorigRightArm",
         # "mixamorig_RightArm" or "mixamorig:RightArm".
         if name.to_lower().ends_with(tail.to_lower()):
             bone = name
+            bone_index = i
             break
-    if bone.is_empty():
+    if bone_index < 0:
         return
     var track: int = clip.add_track(Animation.TYPE_ROTATION_3D)
     clip.track_set_path(track, NodePath(sk_path + ":" + bone))
+    var base_rotation: Quaternion = original_rotations.get(bone_index, Quaternion.IDENTITY)
     for j in range(mini(times.size(), angles.size())):
-        clip.rotation_track_insert_key(track, float(times[j]), Quaternion(axis, deg_to_rad(float(angles[j]))))
+        clip.rotation_track_insert_key(track, float(times[j]), base_rotation * Quaternion(axis, deg_to_rad(float(angles[j]))))
 
 func _add_generated_clip(library: AnimationLibrary, state: String, sk_path: String) -> bool:
     var anim: Animation = Animation.new()
@@ -190,8 +200,9 @@ func _add_generated_clip(library: AnimationLibrary, state: String, sk_path: Stri
             continue
         var neutral_track: int = anim.add_track(Animation.TYPE_ROTATION_3D)
         anim.track_set_path(neutral_track, full_path)
-        anim.rotation_track_insert_key(neutral_track, 0.0, Quaternion.IDENTITY)
-        anim.rotation_track_insert_key(neutral_track, anim.length, Quaternion.IDENTITY)
+        var initial_rotation: Quaternion = original_rotations.get(i, Quaternion.IDENTITY)
+        anim.rotation_track_insert_key(neutral_track, 0.0, initial_rotation)
+        anim.rotation_track_insert_key(neutral_track, anim.length, initial_rotation)
     if anim.get_track_count() == 0:
         return false
     return library.add_animation(state, anim) == OK
