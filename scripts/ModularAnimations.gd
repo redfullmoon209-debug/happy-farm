@@ -3,6 +3,11 @@ extends Node
 # Prefers assets/animations/{female,male}/NAME.fbx, then the existing shared
 # Mixamo clips. Water/Dig have real generated keyframe fallbacks.
 const ACTIONS = ["Idle", "Walk", "Run", "Jump", "Water", "Dig"]
+# Source FBX rotations are expressed in a different rig's rest space. Direct
+# bone-name remapping tips our Codex GLB's Hips over by 90 degrees (lying down).
+# Keep those imports OFF until a proper rest-pose retarget and upright test exist.
+# Generated rotations use our actual GLB skeleton and preserve its Y-up root.
+const USE_DIRECT_MIXAMO_RETARGET: bool = false
 
 var player: AnimationPlayer
 var skeleton: Skeleton3D
@@ -27,8 +32,13 @@ func initialize(target_host: Node3D, target_skeleton: Skeleton3D, selected_gende
     for state in ACTIONS:
         var source: String = _clip_for(state)
         var loaded: bool = false
-        if not source.is_empty():
+        if USE_DIRECT_MIXAMO_RETARGET and not source.is_empty():
             loaded = _import_mixamo(library, state, source, skeleton_path)
+        elif not source.is_empty():
+            # Do not apply an unrelated FBX Hips rotation onto this GLB.
+            # It can rotate the entire skinned mesh onto the ground.
+            if gender == "female" and state == "Idle":
+                print("FARMFLEX MOTION: source FBX retarget disabled for upright GLB safety")
         if not loaded:
             loaded = _add_generated_clip(library, state, skeleton_path)
             if loaded:
@@ -140,6 +150,8 @@ func _add_generated_clip(library: AnimationLibrary, state: String, sk_path: Stri
     var anim: Animation = Animation.new()
     anim.length = 1.2
     anim.loop_mode = Animation.LOOP_NONE if state == "Jump" else Animation.LOOP_LINEAR
+    # Root/Hips are deliberately never keyed: the GLB's upright rest axes
+    # and the farm controller own world translation and orientation.
     var sex_tone: float = 0.82 if gender == "female" else 1.0
     var t: Array = [0.0, 0.3, 0.6, 0.9, 1.2]
     if state == "Water":

@@ -136,6 +136,31 @@ func _check() -> void:
             if farm.farmer_visual.current_state != "Dig":
                 problems.append("Dig work state did not activate")
             farm.farmer_visual.set_state("Idle")
+            # Regression for the 'character lying flat' bug. A valid 3D
+            # animation must leave the Head ABOVE the feet for every action.
+            var sk: Skeleton3D = farm.farmer_visual.skeleton
+            var head_id: int = -1
+            var foot_id: int = -1
+            if sk != null:
+                for idx in range(sk.get_bone_count()):
+                    var label: String = String(sk.get_bone_name(idx)).to_lower()
+                    if label.ends_with("head") and not label.ends_with("headtop_end"):
+                        head_id = idx
+                    if label.ends_with("leftfoot"):
+                        foot_id = idx
+            if sk == null or head_id < 0 or foot_id < 0:
+                problems.append("could not verify modular character upright bones")
+            else:
+                for pose_name in ["Idle", "Walk", "Run", "Jump", "Water", "Dig"]:
+                    farm.farmer_visual.set_state(pose_name)
+                    farm.farmer_visual.anim_player.advance(0.18)
+                    var head_pos: Vector3 = sk.get_bone_global_pose(head_id).origin
+                    var foot_pos: Vector3 = sk.get_bone_global_pose(foot_id).origin
+                    var height_gap: float = head_pos.y-foot_pos.y
+                    print("UPRIGHT TEST: ", pose_name, " head-above-foot=", height_gap)
+                    if height_gap <= 0.20:
+                        problems.append("model lying or upside down in " + pose_name)
+                farm.farmer_visual.set_state("Idle")
     elif ResourceLoader.exists("res://assets/characters/femalefarmer.fbx"):
         var meshes: Array[MeshInstance3D] = []
         _log_model_nodes(farm.farmer_visual, meshes)
