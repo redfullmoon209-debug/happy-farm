@@ -116,7 +116,14 @@ func _check() -> void:
     if farm.run_toggle == initial_running:
         problems.append("run button did not toggle sprint")
     farm.run_button.pressed.emit()
-    if ResourceLoader.exists("res://assets/characters/femalefarmer.fbx"):
+    if ResourceLoader.exists("res://assets/characters/Female_Character_Complete.glb"):
+        if farm.farmer_visual == null or not farm.farmer_visual.is_model_ready():
+            problems.append("real Codex GLB character failed to load into the farm")
+        elif farm.farmer_visual.display_height < 1.5 or farm.farmer_visual.display_height > 2.4:
+            problems.append("real Codex GLB model is not at player scale")
+        elif farm.farmer_visual.mesh_count < 2:
+            problems.append("hair or body mesh missing from real Codex model")
+    elif ResourceLoader.exists("res://assets/characters/femalefarmer.fbx"):
         var meshes: Array[MeshInstance3D] = []
         _log_model_nodes(farm.farmer_visual, meshes)
         print("MODEL DIAGNOSTIC: mesh count=", meshes.size())

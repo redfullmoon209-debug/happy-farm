@@ -49,6 +49,21 @@ jobs:
           mkdir -p "$HOME/.local/share/godot/export_templates/4.4.1.stable"
           unzip -q templates.tpz -d downloaded_templates
           cp -a downloaded_templates/templates/. "$HOME/.local/share/godot/export_templates/4.4.1.stable/"
+      - name: Validate public player creation UI (no local-file uploader)
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html=Path('web/create-character.html').read_text(encoding='utf-8')
+          assert 'type="file"' not in html
+          assert 'getElementById(\'files\')' not in html
+          assert './characters/' in html
+          assert 'Character Lab' not in html
+          scripts=re.findall(r'<script type="module">(.*?)</script>',html,re.S)
+          assert len(scripts)==1
+          Path('/tmp/farmflex-player-creation.mjs').write_text(scripts[0],encoding='utf-8')
+          PY
+          node --check /tmp/farmflex-player-creation.mjs
       - name: Strict GDScript validation
         run: |
           set -o pipefail
@@ -107,7 +122,7 @@ jobs:
           echo "PAGES CONFIGURATION (published URL / source):"
           gh api "repos/$GITHUB_REPOSITORY/pages" --jq '{html_url, build_type, source, status}' || true
           echo "PUBLIC URL CHECKS:"
-          for path in index.html create-character.html character-preview.html farmflex-characters-v2.html; do
+          for path in index.html create-character.html characters/Female_Character_Complete.glb characters/Male_Character_Complete.glb character-preview.html farmflex-characters-v2.html; do
             URL="https://redfullmoon209-debug.github.io/happy-farm/$path?probe=$GITHUB_SHA"
             CODE=$(curl -L -sS --connect-timeout 6 --max-time 20 -o /dev/null -w "%{http_code}" "$URL" || true)
             echo "$path => HTTP $CODE"

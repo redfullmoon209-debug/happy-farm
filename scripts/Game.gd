@@ -5,6 +5,7 @@ const ICON = preload("res://scripts/BadgeIcon.gd")
 const SEED_ICON = preload("res://scripts/SeedIcon.gd")
 const SAVE_DATA = preload("res://scripts/SaveData.gd")
 const FARMER_VISUAL = preload("res://scripts/FarmerVisual.gd")
+const MODULAR_VISUAL = preload("res://scripts/ModularVisual.gd")
 const FARM_AUDIO = preload("res://scripts/FarmAudio.gd")
 const GARDEN_DECOR = preload("res://scripts/GardenDecor.gd")
 # Each visual element is imported from a standalone transparent PNG.
@@ -71,7 +72,7 @@ const DECOR_PRICES = [110, 35, 45, 120, 600, 175, 80, 45, 220, 320, 35, 25, 70, 
 const DECOR_RADII = [1.1, 0.7, 0.9, 0.9, 2.1, 1.0, 0.7, 1.1, 1.8, 1.6, 1.1, 0.9, 0.7, 2.8, 1.5, 0.8]
 # Temporary browser playtest only. Set false AND remove the GM tool before launch.
 # Client-side currency is not secure for real-money or competitive economies.
-const GM_TEST_MODE: bool = true
+var GM_TEST_MODE: bool = not OS.has_feature("web")
 # Close enough to inspect the farmer; wide enough for all 10 x 5 beds.
 # Every zoom input uses the same limits (orthographic size is derived below).
 const CAMERA_ZOOM_MIN: float = 6.0
@@ -1069,6 +1070,19 @@ func build_farmer() -> void:
     nozzle.rotation.z = 1.05
     hoe.visible = false
     can.visible = false
+
+    # Player appearance: actual male/female GLBs from the Codex modular export.
+    # Keep the original actor only as a safe fallback on missing assets.
+    var chosen_model: Node3D = MODULAR_VISUAL.new()
+    chosen_model.name = "FarmFlexModularPlayer"
+    farmer.add_child(chosen_model)
+    if chosen_model.initialize(avatar_gender, character_profile) and chosen_model.has_visible_avatar():
+        farmer_visual = chosen_model
+        for old_part in farmer.get_children():
+            if old_part != farmer_visual:
+                old_part.visible = false
+        return
+    chosen_model.queue_free()
 
     # Swap the placeholder for the player's real skinned Mixamo farmer.
     # The old model remains a safe fallback until the FBX bundle is imported.
@@ -2756,7 +2770,7 @@ func gm_set_exact_level() -> void:
     save_game()
 
 func gm_change_gender(gender: String) -> void:
-    if not GM_TEST_MODE or gender not in ["male", "female"] or gender == avatar_gender or work_plot >= 0:
+    if not GM_TEST_MODE or bool(character_profile.get("locked", false)) or gender not in ["male", "female"] or gender == avatar_gender or work_plot >= 0:
         return
     avatar_gender = gender
     var old_position: Vector3 = farmer.position
