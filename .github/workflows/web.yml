@@ -104,6 +104,12 @@ jobs:
           ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_uploaded_mixamo.gd 2>&1 | tee /tmp/source-mixamo-tests.log
           grep -q 'ORIGINAL MIXAMO IMPORTS PASS' /tmp/source-mixamo-tests.log
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:' /tmp/source-mixamo-tests.log; then exit 1; fi
+      - name: Pre-deployment test - source animations must keep player upright
+        run: |
+          set -o pipefail
+          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_farmer.gd 2>&1 | tee /tmp/early-farmer-test.log
+          grep -q 'FARMER TESTS PASS' /tmp/early-farmer-test.log
+          if grep -E 'FARMER TEST FAIL:|SCRIPT ERROR:|Parse Error:' /tmp/early-farmer-test.log; then exit 1; fi
       - name: Export web
         run: |
           set -o pipefail

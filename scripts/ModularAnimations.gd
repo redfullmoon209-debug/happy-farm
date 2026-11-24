@@ -157,39 +157,37 @@ func _retarget_original(library: AnimationLibrary, state: String, filename: Stri
     animation.length = duration
     animation.loop_mode = Animation.LOOP_LINEAR
     var tracks: Dictionary = {}
-    # Keep source character's natural animation curves: sample all matched
-    # bones at constant intervals (duration and key timing are preserved).
+    var conversion: Dictionary = {}
+    # Original FBX movement only: drive appendages, never the imported Codex
+    # GLB's Hips/Spine/Neck/Head or root. FBX global skeleton rotations
+    # produce 90-degree offsets on this model, even with a name match.
     for target_idx in target_map.keys():
-        var bone_name: String = String(skeleton.get_bone_name(int(target_idx)))
-        if _normalized_bone_name(bone_name) == "hips":
-            continue # Never apply Mixamo root position/heading to farm actor.
+        var idx: int = int(target_idx)
+        var bone_name: String = String(skeleton.get_bone_name(idx))
+        var canonical: String = _normalized_bone_name(bone_name)
+        if not (canonical.begins_with("left") or canonical.begins_with("right")):
+            continue
+        var src_idx: int = int(target_map[idx])
         var tr: int = animation.add_track(Animation.TYPE_ROTATION_3D)
         animation.track_set_path(tr, NodePath(String(host.get_path_to(skeleton)) + ":" + bone_name))
-        tracks[int(target_idx)] = tr
+        tracks[idx] = tr
+        # Converts a source BONE-LOCAL pose delta into the target bone's local
+        # orientation, retaining the actual original source keyframe motion.
+        var src_rest_world: Basis = donor_basis * donor.get_bone_global_rest(src_idx).basis.orthonormalized()
+        var tgt_rest_world: Basis = target_basis * skeleton.get_bone_global_rest(idx).basis.orthonormalized()
+        var change_of_basis: Basis = tgt_rest_world.inverse() * alignment * src_rest_world
+        conversion[idx] = change_of_basis.orthonormalized().get_rotation_quaternion()
     var count: int = maxi(2, ceili(duration * SAMPLE_FPS) + 1)
     for frame in range(count):
         var t: float = minf(duration, float(frame) * duration / float(count - 1))
         donor_player.seek(t, true)
-        var desired: Dictionary = {}
-        for idx in range(skeleton.get_bone_count()):
-            var parent_idx: int = skeleton.get_bone_parent(idx)
-            var parent_basis: Basis = desired.get(parent_idx, Basis.IDENTITY)
-            var rest_local: Basis = skeleton.get_bone_rest(idx).basis.orthonormalized()
-            var wanted: Basis = parent_basis * rest_local
-            if target_map.has(idx) and tracks.has(idx):
-                var source_idx: int = int(target_map[idx])
-                var src_pose: Basis = donor.get_bone_global_pose(source_idx).basis.orthonormalized()
-                var src_rest: Basis = donor.get_bone_global_rest(source_idx).basis.orthonormalized()
-                var delta_skeleton: Basis = src_pose * src_rest.inverse()
-                var delta_world: Basis = donor_basis * delta_skeleton * donor_basis.inverse()
-                var rotated_delta: Basis = alignment * delta_world * alignment.inverse()
-                var base_world: Basis = target_basis * skeleton.get_bone_global_rest(idx).basis.orthonormalized()
-                wanted = target_basis.inverse() * rotated_delta * base_world
-                wanted = wanted.orthonormalized()
-                var local_pose: Basis = rest_local.inverse() * parent_basis.inverse() * wanted
-                var rot: Quaternion = local_pose.orthonormalized().get_rotation_quaternion().normalized()
-                animation.rotation_track_insert_key(int(tracks[idx]), t, rot)
-            desired[idx] = wanted
+        for target_idx in tracks.keys():
+            var idx: int = int(target_idx)
+            var src_idx: int = int(target_map[idx])
+            var source_pose: Quaternion = donor.get_bone_pose_rotation(src_idx)
+            var mapping: Quaternion = conversion[idx]
+            var target_rotation: Quaternion = (mapping * source_pose * mapping.inverse()).normalized()
+            animation.rotation_track_insert_key(int(tracks[idx]), t, target_rotation)
     instance.queue_free()
     if animation.get_track_count() < 10:
         return false
