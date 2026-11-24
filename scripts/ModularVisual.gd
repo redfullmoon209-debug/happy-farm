@@ -3,9 +3,9 @@ extends Node3D
 # Animation binding can be added when matching Mixamo clips are provided.
 const FEMALE_PATH = "res://assets/characters/Female_Character_Complete.glb"
 const MALE_PATH = "res://assets/characters/Male_Character_Complete.glb"
-# The old 0.68 height was still oversized against 1.93-wide garden beds.
+# The old 0.50 height was still oversized against the 1.93-wide garden beds.
 # This scales ONLY the scene instance, never modifies the source GLB vertices.
-const TARGET_HEIGHT = 0.50
+const TARGET_HEIGHT = 0.25
 const DEFAULT_SKIN = "#e2b49d"
 var imported_character: Node3D = null
 var skeleton: Skeleton3D = null
@@ -143,7 +143,7 @@ func _apply_skin_tone(body: MeshInstance3D, hex_color: String, gender: String) -
         body.set_surface_override_material(idx, material_copy)
 
 func has_visible_avatar() -> bool:
-    return imported_character != null and mesh_count > 0 and display_height >= 0.42 and display_height <= 0.58
+    return imported_character != null and mesh_count > 0 and display_height >= 0.20 and display_height <= 0.30
 
 func is_model_ready() -> bool:
     return has_visible_avatar()
