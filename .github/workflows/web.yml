@@ -46,6 +46,23 @@ jobs:
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script' /tmp/import.log; then exit 1; fi
           ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --quit-after 15 2>&1 | tee /tmp/runtime.log
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|Invalid call|Invalid access|ERROR:' /tmp/runtime.log; then exit 1; fi
+      - name: Export web
+        run: |
+          set -o pipefail
+          mkdir -p build/web
+          BUILD_NAME="farmflex-${GITHUB_SHA:0:8}"
+          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --export-release Web "build/web/${BUILD_NAME}.html" 2>&1 | tee /tmp/export.log
+          cp "build/web/${BUILD_NAME}.html" build/web/index.html
+          if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/export.log; then exit 1; fi
+          test -s build/web/index.html
+          # Isolated browser-only character preview; keep the existing Godot game intact.
+          cp web/character-preview.html build/web/character-preview.html
+          touch build/web/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+      - uses: actions/deploy-pages@v4
       - name: Save backup regression tests
         run: |
           set -o pipefail
@@ -96,20 +113,3 @@ jobs:
           ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_wasd_ui.gd 2>&1 | tee /tmp/wasd-ui-tests.log
           grep -q 'WASD UI TESTS PASS' /tmp/wasd-ui-tests.log
           if grep -E 'WASD UI FAIL:|SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/wasd-ui-tests.log; then exit 1; fi
-      - name: Export web
-        run: |
-          set -o pipefail
-          mkdir -p build/web
-          BUILD_NAME="farmflex-${GITHUB_SHA:0:8}"
-          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --export-release Web "build/web/${BUILD_NAME}.html" 2>&1 | tee /tmp/export.log
-          cp "build/web/${BUILD_NAME}.html" build/web/index.html
-          if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/export.log; then exit 1; fi
-          test -s build/web/index.html
-          # Isolated browser-only character preview; keep the existing Godot game intact.
-          cp web/character-preview.html build/web/character-preview.html
-          touch build/web/.nojekyll
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: build/web
-      - uses: actions/deploy-pages@v4
