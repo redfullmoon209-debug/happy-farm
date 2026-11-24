@@ -8,6 +8,10 @@ const ACTIONS = ["Idle", "Walk", "Run", "Jump", "Water", "Dig"]
 # Keep those imports OFF until a proper rest-pose retarget and upright test exist.
 # Generated rotations use our actual GLB skeleton and preserve its Y-up root.
 const USE_DIRECT_MIXAMO_RETARGET: bool = false
+# Emergency upright-safe playback: No bone rotation is applied to the imported
+# Codex GLB until a valid rest-pose retarget is verified. This prevents lying
+# flat and is reversible without modifying source meshes or character saves.
+const PRESERVE_ORIGINAL_BIND_POSE: bool = true
 
 var player: AnimationPlayer
 var skeleton: Skeleton3D
@@ -37,6 +41,15 @@ func initialize(target_host: Node3D, target_skeleton: Skeleton3D, selected_gende
     var library: AnimationLibrary = AnimationLibrary.new()
     var skeleton_path: String = String(host.get_path_to(skeleton))
     for state in ACTIONS:
+        if PRESERVE_ORIGINAL_BIND_POSE:
+            # Keep these state names active for the farm tool UI, but an empty
+            # animation never changes skeleton axes, keeping the base pose upright.
+            var safe_clip: Animation = Animation.new()
+            safe_clip.length = 1.0
+            safe_clip.loop_mode = Animation.LOOP_NONE if state == "Jump" else Animation.LOOP_LINEAR
+            available[state] = library.add_animation(state, safe_clip) == OK
+            print("FARMFLEX MOTION: ", gender, " ", state, " (upright safety pose; awaiting correct retarget)")
+            continue
         var source: String = _clip_for(state)
         var loaded: bool = false
         if USE_DIRECT_MIXAMO_RETARGET and not source.is_empty():
