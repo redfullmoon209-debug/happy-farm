@@ -67,8 +67,11 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: build/web
+      - name: Allow Pages artifact metadata to synchronize
+        run: sleep 15
       - uses: actions/deploy-pages@v4
       - name: Diagnose live Pages publication
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
