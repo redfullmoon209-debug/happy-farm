@@ -66,15 +66,12 @@ jobs:
 
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/export.log; then exit 1; fi
           test -s build/web/index.html
-          # Isolated browser-only character preview; keep the existing Godot game intact.
-          cp web/character-preview.html build/web/character-preview.html
+          # Character Lab is archived at web/character-preview.html but NOT deployed.
+          # Keep first-run creation screen and the actual FarmFlex game available.
           cp web/create-character.html build/web/create-character.html
           test -s build/web/create-character.html
-          cp web/character-preview.html build/web/farmflex-characters-v2.html
-          test -s build/web/character-preview.html
-          test -s build/web/farmflex-characters-v2.html
-          echo 'PREVIEW FILES IN BUILD:'
-          ls -lh build/web/character-preview.html build/web/farmflex-characters-v2.html
+          test ! -e build/web/character-preview.html
+          test ! -e build/web/farmflex-characters-v2.html
           touch build/web/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
@@ -91,7 +88,7 @@ jobs:
           echo "PAGES CONFIGURATION (published URL / source):"
           gh api "repos/$GITHUB_REPOSITORY/pages" --jq '{html_url, build_type, source, status}' || true
           echo "PUBLIC URL CHECKS:"
-          for path in index.html character-preview.html farmflex-characters-v2.html; do
+          for path in index.html create-character.html character-preview.html farmflex-characters-v2.html; do
             URL="https://redfullmoon209-debug.github.io/happy-farm/$path?probe=$GITHUB_SHA"
             CODE=$(curl -L -sS --connect-timeout 6 --max-time 20 -o /dev/null -w "%{http_code}" "$URL" || true)
             echo "$path => HTTP $CODE"
