@@ -11,7 +11,7 @@ const USE_DIRECT_MIXAMO_RETARGET: bool = false
 # Emergency upright-safe playback: No bone rotation is applied to the imported
 # Codex GLB until a valid rest-pose retarget is verified. This prevents lying
 # flat and is reversible without modifying source meshes or character saves.
-const PRESERVE_ORIGINAL_BIND_POSE: bool = true
+const PRESERVE_ORIGINAL_BIND_POSE: bool = false
 
 var player: AnimationPlayer
 var skeleton: Skeleton3D
@@ -150,75 +150,128 @@ func _import_mixamo(library: AnimationLibrary, state: String, filename: String, 
     converted.loop_mode = Animation.LOOP_NONE if state == "Jump" else Animation.LOOP_LINEAR
     return library.add_animation(state, converted) == OK
 
-func _add_rotation(clip: Animation, sk_path: String, tail: String, axis: Vector3, times: Array, angles: Array) -> void:
-    var bone: String = ""
-    var bone_index: int = -1
+# An upright procedural fallback for the actual Codex skeleton. We NEVER
+# animate Hips, Spine, Head or Armature and never use FBX rotations on a
+# foreign GLB rest pose. All six states key the same limited appendage set.
+func _joint(suffix: String) -> int:
     for i in range(skeleton.get_bone_count()):
-        var name: String = String(skeleton.get_bone_name(i))
-        # Godot GLB imports may spell Mixamo bones as "mixamorigRightArm",
-        # "mixamorig_RightArm" or "mixamorig:RightArm".
-        if name.to_lower().ends_with(tail.to_lower()):
-            bone = name
-            bone_index = i
-            break
-    if bone_index < 0:
-        return
-    var track: int = clip.add_track(Animation.TYPE_ROTATION_3D)
-    clip.track_set_path(track, NodePath(sk_path + ":" + bone))
-    var base_rotation: Quaternion = original_rotations.get(bone_index, Quaternion.IDENTITY)
-    for j in range(mini(times.size(), angles.size())):
-        clip.rotation_track_insert_key(track, float(times[j]), base_rotation * Quaternion(axis, deg_to_rad(float(angles[j]))))
+        if String(skeleton.get_bone_name(i)).to_lower().ends_with(suffix.to_lower()):
+            return i
+    return -1
+
+func _bone_axis(index: int, world_axis: Vector3) -> Vector3:
+    if index < 0:
+        return Vector3.RIGHT
+    # Local-bone axis yielding a desired movement in Y-up world coordinates.
+    var joint_basis: Basis = (skeleton.global_basis * skeleton.get_bone_global_pose(index).basis).orthonormalized()
+    return (joint_basis.inverse() * world_axis).normalized()
+
+func _arm_drop_axis(arm_index: int, elbow_index: int) -> Vector3:
+    if arm_index < 0 or elbow_index < 0:
+        return Vector3.FORWARD
+    var origin: Vector3 = skeleton.to_global(skeleton.get_bone_global_pose(arm_index).origin)
+    var tip: Vector3 = skeleton.to_global(skeleton.get_bone_global_pose(elbow_index).origin)
+    var direction: Vector3 = tip - origin
+    direction.y = 0.0
+    if direction.length() < 0.0001:
+        return Vector3.FORWARD
+    # The axis is derived from the arm's actual direction, so a positive
+    # rotation ALWAYS moves either outstretched hand toward the ground.
+    return direction.normalized().cross(Vector3.DOWN).normalized()
+
+func _add_upright_clip(library: AnimationLibrary, state: String, _sk_path: String) -> bool:
+    var clip: Animation = Animation.new()
+    var duration: float = 1.5
+    if state == "Walk":
+        duration = 0.85
+    elif state == "Run":
+        duration = 0.58
+    elif state == "Jump":
+        duration = 0.9
+    elif state in ["Water", "Dig"]:
+        duration = 1.25
+    clip.length = duration
+    clip.loop_mode = Animation.LOOP_NONE if state == "Jump" else Animation.LOOP_LINEAR
+    var lt: int = _joint("LeftArm")
+    var rt: int = _joint("RightArm")
+    var joints: Dictionary = {
+        "LeftArm": lt, "RightArm": rt,
+        "LeftForeArm": _joint("LeftForeArm"),
+        "RightForeArm": _joint("RightForeArm"),
+        "LeftUpLeg": _joint("LeftUpLeg"),
+        "RightUpLeg": _joint("RightUpLeg"),
+        "LeftLeg": _joint("LeftLeg"),
+        "RightLeg": _joint("RightLeg")
+    }
+    var left_drop: Vector3 = _arm_drop_axis(lt, joints["LeftForeArm"])
+    var right_drop: Vector3 = _arm_drop_axis(rt, joints["RightForeArm"])
+    for joint_name in joints:
+        var index: int = int(joints[joint_name])
+        if index < 0:
+            continue
+        var track: int = clip.add_track(Animation.TYPE_ROTATION_3D)
+        clip.track_set_path(track, NodePath(String(host.get_path_to(skeleton)) + ":" + String(skeleton.get_bone_name(index))))
+        var base: Quaternion = original_rotations.get(index, Quaternion.IDENTITY)
+        for f in range(9):
+            var tt: float = duration * float(f) / 8.0
+            var wave: float = sin(TAU * float(f) / 8.0)
+            var drop: float = 58.0 if gender == "male" else 52.0
+            var swing: float = 0.0
+            var bend: float = 0.0
+            if joint_name.ends_with("Arm") and not joint_name.ends_with("ForeArm"):
+                if state == "Idle":
+                    swing = 1.3 * wave
+                elif state == "Walk":
+                    swing = (8.0 if joint_name == "LeftArm" else -8.0) * wave
+                elif state == "Run":
+                    drop = 64.0
+                    swing = (16.0 if joint_name == "LeftArm" else -16.0) * wave
+                elif state == "Jump":
+                    drop = 43.0 - 6.0 * sin(PI * float(f) / 8.0)
+                    swing = -12.0
+                elif state == "Water":
+                    drop = 48.0 if joint_name == "RightArm" else 67.0
+                    swing = (-15.0 - 10.0 * wave) if joint_name == "RightArm" else 0.0
+                elif state == "Dig":
+                    drop = 43.0 if joint_name == "RightArm" else 50.0
+                    swing = -19.0 * wave
+                var drop_axis: Vector3 = left_drop if joint_name == "LeftArm" else right_drop
+                var drop_local: Vector3 = _bone_axis(index, drop_axis)
+                var swing_local: Vector3 = _bone_axis(index, Vector3.RIGHT)
+                var result: Quaternion = base * Quaternion(drop_local, deg_to_rad(drop)) * Quaternion(swing_local, deg_to_rad(swing))
+                clip.rotation_track_insert_key(track, tt, result.normalized())
+                continue
+            if joint_name.ends_with("ForeArm"):
+                if state == "Water":
+                    bend = (20.0 + 7.0 * wave) if joint_name == "RightForeArm" else 7.0
+                elif state == "Dig":
+                    bend = 25.0 + 8.0 * wave
+                else:
+                    bend = 8.0 if state in ["Idle", "Walk", "Run"] else 14.0
+            elif joint_name.ends_with("UpLeg"):
+                var alternate: float = 1.0 if joint_name == "LeftUpLeg" else -1.0
+                if state == "Walk":
+                    bend = alternate * 9.0 * wave
+                elif state == "Run":
+                    bend = alternate * 17.0 * wave
+                elif state == "Jump":
+                    bend = alternate * 7.0 * sin(PI * float(f) / 8.0)
+                elif state == "Dig":
+                    bend = alternate * 3.0
+            elif joint_name.ends_with("Leg"):
+                if state == "Run":
+                    bend = 10.0 * maxf(0.0, wave)
+                elif state == "Walk":
+                    bend = 5.0 * maxf(0.0, wave)
+            var local_axis: Vector3 = _bone_axis(index, Vector3.RIGHT)
+            clip.rotation_track_insert_key(track, tt, (base * Quaternion(local_axis, deg_to_rad(bend))).normalized())
+    if clip.get_track_count() < 4:
+        push_warning("FarmFlex upright clip: missing expected arm/leg bones")
+        return false
+    return library.add_animation(state, clip) == OK
 
 func _add_generated_clip(library: AnimationLibrary, state: String, sk_path: String) -> bool:
-    var anim: Animation = Animation.new()
-    anim.length = 1.2
-    anim.loop_mode = Animation.LOOP_NONE if state == "Jump" else Animation.LOOP_LINEAR
-    # Root/Hips are deliberately never keyed: the GLB's upright rest axes
-    # and the farm controller own world translation and orientation.
-    var sex_tone: float = 0.82 if gender == "female" else 1.0
-    var t: Array = [0.0, 0.3, 0.6, 0.9, 1.2]
-    if state == "Water":
-        _add_rotation(anim, sk_path, "Spine", Vector3.RIGHT, t, [0.0, 5.0, 9.0, 5.0, 0.0])
-        _add_rotation(anim, sk_path, "RightArm", Vector3.RIGHT, t, [-25.0, -44.0*sex_tone, -58.0*sex_tone, -44.0*sex_tone, -25.0])
-        _add_rotation(anim, sk_path, "RightForeArm", Vector3.RIGHT, t, [18.0, 31.0, 45.0, 31.0, 18.0])
-        _add_rotation(anim, sk_path, "RightHand", Vector3.FORWARD, t, [0.0, -22.0, -42.0, -22.0, 0.0])
-        _add_rotation(anim, sk_path, "LeftArm", Vector3.RIGHT, t, [0.0, -12.0, -17.0, -12.0, 0.0])
-    elif state == "Dig":
-        _add_rotation(anim, sk_path, "Spine", Vector3.RIGHT, t, [0.0, 4.0, 8.0, 4.0, 0.0])
-        _add_rotation(anim, sk_path, "RightArm", Vector3.RIGHT, t, [-55.0, -30.0, 24.0, -30.0, -55.0])
-        _add_rotation(anim, sk_path, "RightForeArm", Vector3.RIGHT, t, [38.0, 42.0, 62.0, 42.0, 38.0])
-        _add_rotation(anim, sk_path, "LeftArm", Vector3.RIGHT, t, [-30.0, -15.0, 12.0, -15.0, -30.0])
-        _add_rotation(anim, sk_path, "LeftForeArm", Vector3.RIGHT, t, [15.0, 30.0, 45.0, 30.0, 15.0])
-    elif state == "Idle":
-        _add_rotation(anim, sk_path, "RightArm", Vector3.FORWARD, t, [35.0, 37.0, 38.0, 37.0, 35.0])
-        _add_rotation(anim, sk_path, "LeftArm", Vector3.FORWARD, t, [-35.0, -37.0, -38.0, -37.0, -35.0])
-        _add_rotation(anim, sk_path, "Spine", Vector3.RIGHT, t, [0.0, 1.0, 2.0, 1.0, 0.0])
-    elif state in ["Walk", "Run"]:
-        var amount: float = 12.0 if state == "Walk" else 18.0
-        _add_rotation(anim, sk_path, "LeftUpLeg", Vector3.RIGHT, t, [-amount, 0.0, amount, 0.0, -amount])
-        _add_rotation(anim, sk_path, "RightUpLeg", Vector3.RIGHT, t, [amount, 0.0, -amount, 0.0, amount])
-        _add_rotation(anim, sk_path, "LeftArm", Vector3.RIGHT, t, [amount*0.6, 0.0, -amount*0.6, 0.0, amount*0.6])
-        _add_rotation(anim, sk_path, "RightArm", Vector3.RIGHT, t, [-amount*0.6, 0.0, amount*0.6, 0.0, -amount*0.6])
-    elif state == "Jump":
-        _add_rotation(anim, sk_path, "LeftUpLeg", Vector3.RIGHT, t, [0.0, 8.0, 12.0, 8.0, 0.0])
-        _add_rotation(anim, sk_path, "RightUpLeg", Vector3.RIGHT, t, [0.0, -7.0, -11.0, -7.0, 0.0])
-        _add_rotation(anim, sk_path, "LeftArm", Vector3.RIGHT, t, [0.0, -30.0, -48.0, -30.0, 0.0])
-        _add_rotation(anim, sk_path, "RightArm", Vector3.RIGHT, t, [0.0, -30.0, -48.0, -30.0, 0.0])
-    # Tracks must cover the whole skeleton, otherwise Godot leaves rotations
-    # from the preceding Walk/Run/Jump state on bones missing from Water/Dig.
-    # Every animation is now self-contained and returns to upright rest pose.
-    for i in range(skeleton.get_bone_count()):
-        var full_path: NodePath = NodePath(sk_path + ":" + String(skeleton.get_bone_name(i)))
-        if anim.find_track(full_path, Animation.TYPE_ROTATION_3D) >= 0:
-            continue
-        var neutral_track: int = anim.add_track(Animation.TYPE_ROTATION_3D)
-        anim.track_set_path(neutral_track, full_path)
-        var initial_rotation: Quaternion = original_rotations.get(i, Quaternion.IDENTITY)
-        anim.rotation_track_insert_key(neutral_track, 0.0, initial_rotation)
-        anim.rotation_track_insert_key(neutral_track, anim.length, initial_rotation)
-    if anim.get_track_count() == 0:
-        return false
-    return library.add_animation(state, anim) == OK
+    return _add_upright_clip(library, state, sk_path)
 
 func change_state(state: String) -> void:
     if not available.get(state, false):

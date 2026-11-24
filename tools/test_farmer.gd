@@ -164,6 +164,25 @@ func _check() -> void:
                     if height_gap <= 0.12:
                         problems.append("model lying or upside down in " + pose_name)
                 farm.farmer_visual.set_state("Idle")
+                farm.farmer_visual.anim_player.advance(0.2)
+                # The previous emergency fix passed while playing zero-track
+                # clips (T-pose). Assert the arms actually lower in Idle.
+                var left_shoulder: int = -1
+                var left_hand: int = -1
+                for b in range(sk.get_bone_count()):
+                    var n: String = String(sk.get_bone_name(b)).to_lower()
+                    if n.ends_with("leftarm") and not n.ends_with("forearm"):
+                        left_shoulder = b
+                    if n.ends_with("lefthand"):
+                        left_hand = b
+                if left_shoulder >= 0 and left_hand >= 0:
+                    var shoulder_y: float = sk.to_global(sk.get_bone_global_pose(left_shoulder).origin).y
+                    var hand_y: float = sk.to_global(sk.get_bone_global_pose(left_hand).origin).y
+                    print("ARM RELAX TEST: shoulder=", shoulder_y, " hand=", hand_y, " drop=", shoulder_y-hand_y)
+                    if hand_y >= shoulder_y - 0.05:
+                        problems.append("Idle animation still T-pose: hand not lowered")
+                else:
+                    problems.append("cannot locate left arm/hand for T-pose regression")
     elif ResourceLoader.exists("res://assets/characters/femalefarmer.fbx"):
         var meshes: Array[MeshInstance3D] = []
         _log_model_nodes(farm.farmer_visual, meshes)
