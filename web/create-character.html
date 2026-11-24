@@ -31,6 +31,13 @@
 <div class="section">6 · ดูโมเดล</div><div class="grid3"><button id="front">ด้านหน้า</button><button id="side">ด้านข้าง</button><button id="back">ด้านหลัง</button></div>
 <div class="section">7 · รายละเอียดสี</div><div class="grid"><label>สีตา<select id="eyeColor"><option value="#75503b">น้ำตาล</option><option value="#44342e">น้ำตาลเข้ม</option><option value="#5091af">ฟ้า</option><option value="#658a5e">เขียว</option><option value="#939ba0">เทา</option><option value="#bd8635">อำพัน</option></select></label><label>สีคิ้ว<select id="browColor"><option value="#78513d">น้ำตาล</option><option value="#211c1d">ดำ</option><option value="#433028">น้ำตาลเข้ม</option><option value="#934c38">แดงน้ำตาล</option><option value="#dbba82">บลอนด์</option><option value="#c5c5cf">เงิน</option></select></label></div><label style="display:block;margin-top:7px">สีริมฝีปาก<select id="lipColor"><option value="#cf9686">ธรรมชาติ 01</option><option value="#b77c70">ธรรมชาติ 02</option><option value="#bb6877">ชมพู</option></select></label>
 <div class="section">8 · เริ่มเล่น</div><div class="note">ยืนยันครั้งเดียว จะล็อกเพศ ใบหน้า และทรงผมในเบราว์เซอร์นี้ • เปลี่ยนชุดในคลังเก็บของภายในเกมเมื่อระบบเสื้อผ้าพร้อม</div><button id="confirmCharacter" disabled style="margin-top:9px;background:#396751;border:1px solid #a1d8aa;min-height:48px;font-weight:700">ยืนยันสร้างตัวละคร และเข้าเกม</button><p id="creationStatus" class="tag" role="status">สำหรับการสร้างตัวละครครั้งแรก</p>
+<div id="avatarTestControls" hidden style="display:none;margin-top:14px">
+<div class="section">โหมดทดสอบตัวละคร (ไม่เปลี่ยนตัวละครที่ล็อกไว้)</div>
+<div class="note">สำหรับลองแอนิเมชันชาย–หญิงเท่านั้น ไม่ใช่ GM และไม่แก้เซฟหรือเปลี่ยนเพศถาวร</div>
+<div class="grid" style="margin-top:8px">
+<button type="button" data-preview-sex="male">ทดลองเล่นผู้ชาย</button>
+<button type="button" data-preview-sex="female">ทดลองเล่นผู้หญิง</button>
+</div></div>
 <p class="foot">หมุนดูตัวละคร 3D ได้ • เสื้อผ้าเปลี่ยนในคลังเก็บของของเกมภายหลังเมื่อชิ้นส่วนพร้อม • บัญชีออนไลน์และการล็อกฝั่งเซิร์ฟเวอร์ยังอยู่ระหว่างพัฒนา</p>
 </aside><div id="tip">เลือกตัวละคร → ยืนยันล็อก → เข้าเกม FarmFlex</div>
 <script type="module">
@@ -121,6 +128,23 @@ async function loadSex(){
 document.querySelectorAll('[data-sex]').forEach(b=>b.addEventListener('click',async()=>{sex=b.dataset.sex;setActive('[data-sex]',sex,'sex');await loadSex()}));document.getElementById('hair').addEventListener('change',()=>{updatePoster();updateHair()});document.getElementById('face').addEventListener('change',updateFace);document.getElementById('skinColor').addEventListener('change',updateSkin);document.getElementById('haircolor').addEventListener('input',setHairColor);document.getElementById('resetcolor').addEventListener('click',()=>{document.getElementById('haircolor').value='#78513d';model?.traverse(o=>{if(o.isMesh&&materialCopies.has(o)){o.material=materialCopies.get(o);o.userData.previewMaterial=null}})});
 document.getElementById('front').onclick=()=>{camera.position.set(0,1.4,5.5);controls.update()};document.getElementById('back').onclick=()=>{camera.position.set(0,1.4,-5.5);controls.update()};document.getElementById('side').onclick=()=>{camera.position.set(5.5,1.4,0);controls.update()};document.getElementById('toggle').onclick=()=>{const p=document.getElementById('panel');p.style.display=p.style.display==='none'?'block':'none'};addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 const PROFILE_KEY='farmflex_character_v1';
+// Preview controls exist only at ?test=1; the ordinary first-run UI stays locked.
+const previewPanel=document.getElementById('avatarTestControls');
+if(new URLSearchParams(location.search).get('test')==='1'){
+  previewPanel.hidden=false;previewPanel.style.display='block';
+  previewPanel.querySelectorAll('[data-preview-sex]').forEach(button=>button.addEventListener('click',()=>{
+    try{
+      const profile=JSON.parse(localStorage.getItem(PROFILE_KEY)||'null');
+      if(!profile||profile.locked!==true){
+        statusCreation.textContent='ต้องยืนยันตัวละครครั้งแรกก่อน จึงจะทดลองสลับชาย–หญิงได้';
+        return;
+      }
+      const selected=button.dataset.previewSex;
+      if(!['male','female'].includes(selected))return;
+      window.location.assign('./index.html?test_gender='+selected);
+    }catch(err){statusCreation.textContent='เปิดโหมดทดสอบไม่ได้: '+err.message}
+  }));
+}
 function selectedSex(){return document.querySelector('[data-sex].active')?.dataset.sex||'Female'}
 function makeProfile(){return{schema_version:1,locked:true,sex:selectedSex().toLowerCase(),face:Number(document.getElementById('face').value),hair:document.getElementById('hair').value,hair_color:document.getElementById('haircolor').value,eye_color:document.getElementById('eyeColor').value,brow_color:document.getElementById('browColor').value,lip_color:document.getElementById('lipColor').value,skin_color:document.getElementById('skinColor').value,created_at:new Date().toISOString()}}
 const statusCreation=document.getElementById('creationStatus'),confirmBtn=document.getElementById('confirmCharacter');
