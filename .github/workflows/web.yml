@@ -40,6 +40,33 @@ jobs:
           test -s assets/characters/Female_Character_Complete.glb
           test -s assets/characters/Male_Character_Complete.glb
           echo "EXACT CODEX SOURCE MODEL ASSETS RESTORED"
+      - name: Restore the eight original user-supplied Mixamo FBX files
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,zipfile
+          source=Path('assets/animations/source/Male_Talking.zip')
+          assert source.exists(), 'Original user-uploaded animation bundle missing'
+          assert hashlib.sha256(source.read_bytes()).hexdigest()=='3c4799af829ac4c5083d50252eb4c395e49ba698cd9d26091f4787de1c9a3542', 'Animation ZIP checksum mismatch'
+          layout={
+            'Male_Idle.fbx': 'male/Idle.fbx',
+            'Male_Walking.fbx': 'male/Walk.fbx',
+            'Male_Run Forward.fbx': 'male/Run.fbx',
+            'Male_Talking.fbx': 'male/Talk.fbx',
+            'Female_Idle.fbx': 'female/Idle.fbx',
+            'Female_Walking.fbx': 'female/Walk.fbx',
+            'Female_Running.fbx': 'female/Run.fbx',
+            'Female_Talking.fbx': 'female/Talk.fbx',
+          }
+          with zipfile.ZipFile(source) as archive:
+            for original,new in layout.items():
+              content=archive.read(original)
+              assert content.startswith(b'Kaydara FBX Binary'),original
+              dst=Path('assets/animations')/new
+              dst.parent.mkdir(parents=True,exist_ok=True)
+              dst.write_bytes(content)
+              print('ORIGINAL MIXAMO:', original, '=>', dst, len(content),'bytes')
+          PY
       - name: Download Godot
         run: |
           curl -fLsS --retry 3 https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o editor.zip
@@ -71,6 +98,12 @@ jobs:
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script' /tmp/import.log; then exit 1; fi
           ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --quit-after 15 2>&1 | tee /tmp/runtime.log
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|Invalid call|Invalid access|ERROR:' /tmp/runtime.log; then exit 1; fi
+      - name: Verify original male and female animation sources
+        run: |
+          set -o pipefail
+          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_uploaded_mixamo.gd 2>&1 | tee /tmp/source-mixamo-tests.log
+          grep -q 'ORIGINAL MIXAMO IMPORTS PASS' /tmp/source-mixamo-tests.log
+          if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:' /tmp/source-mixamo-tests.log; then exit 1; fi
       - name: Export web
         run: |
           set -o pipefail
