@@ -105,6 +105,8 @@ jobs:
           cp "build/web/${BUILD_NAME}.html" build/web/index.html
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/export.log; then exit 1; fi
           test -s build/web/index.html
+          # Isolated browser-only character preview; keep the existing Godot game intact.
+          cp web/character-preview.html build/web/character-preview.html
           touch build/web/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
