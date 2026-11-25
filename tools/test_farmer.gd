@@ -272,6 +272,23 @@ func _check() -> void:
         problems.append("right item pane does not occupy 50 percent")
     if farm.character_preview_viewport == null or farm.character_preview_avatar == null:
         problems.append("left panel missing real 3D character preview")
+    else:
+        var original_rotation: float = farm.character_preview_avatar.rotation.y
+        farm.rotate_character_preview(65.0)
+        if absf(farm.character_preview_avatar.rotation.y - original_rotation) < 0.15:
+            problems.append("dragging character preview does not rotate the model")
+        if absf(farm.farmer.rotation.y - farm.character_preview_avatar.rotation.y) < 0.001:
+            print("PREVIEW NOTE: world avatar may coincidentally face same rotation")
+    if farm.character_equipment_buttons.size() != 5:
+        problems.append("missing horizontal 5-slot equipment bar")
+    else:
+        for i in range(farm.CLOTHING_SLOTS.size()-1):
+            var left_btn: Button = farm.character_equipment_buttons[farm.CLOTHING_SLOTS[i]]
+            var right_btn: Button = farm.character_equipment_buttons[farm.CLOTHING_SLOTS[i+1]]
+            if right_btn.position.x <= left_btn.position.x or absf(right_btn.position.y-left_btn.position.y) > 2.0:
+                problems.append("equipment slots are not ordered left to right")
+        if farm.character_info_label == null or not farm.character_info_label.text.contains("EXP"):
+            problems.append("character stats missing beneath equipment slots")
     if farm.gender_item_button.disabled == false:
         problems.append("gender card usable with zero inventory")
     farm.consume_gender_change_ticket()
