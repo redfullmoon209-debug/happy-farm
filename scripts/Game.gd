@@ -890,6 +890,7 @@ func _rebuild_placed_world() -> void:
     for entry in placed_decor_data:
         var pos: Vector3 = Vector3(float(entry["x"]), 0.0, float(entry["z"]))
         decor_nodes.append(GARDEN_DECOR.make(self, pos, int(entry["type"]), float(entry["rotation"])))
+    _gm_rebuild_props()
     for i in range(grow_stages.size()):
         grow_stages[i] = -1
     refresh_plants()
@@ -1565,6 +1566,7 @@ func _camera_overlay_at(pos: Vector2) -> bool:
         or restore_confirm != null and restore_confirm.visible
         or land_confirm != null and land_confirm.visible
         or gm_panel != null and gm_panel.visible
+        or gm_build_panel != null and gm_build_panel.visible
         or bag_panel != null and bag_panel.visible and bag_panel.get_global_rect().has_point(pos))
 
 func _camera_action_at(pos: Vector2) -> Button:
@@ -1772,7 +1774,10 @@ func _input(event: InputEvent) -> void:
             _update_placement_preview(event.position)
 
 func click_plot(pixel: Vector2) -> void:
-    if shop_panel.visible or (gm_panel != null and gm_panel.visible) or (land_confirm != null and land_confirm.visible):
+    if shop_panel.visible or (gm_panel != null and gm_panel.visible) or (gm_build_panel != null and gm_build_panel.visible) or (land_confirm != null and land_confirm.visible):
+        return
+    if GM_TEST_MODE and not gm_build_mode.is_empty():
+        _gm_map_action(pixel)
         return
     if landscaping_mode:
         if bag_panel.visible:
@@ -2906,7 +2911,7 @@ func update_sizes() -> void:
     set_box(gm_header_art, 7, 3, gm_width-14.0, 54.0)
     set_box(gm_title, 14.0, 12.0, gm_width-108.0, 34.0)
     set_box(gm_panel.get_node("GMClose"), gm_width-83.0, 9.0, 73.0, 37.0)
-    var gm_row: float = (gm_height - 72.0) / 5.0
+    var gm_row: float = (gm_height - 120.0) / 5.0
     var half: float = (gm_width-30.0)/2.0
     set_box(gm_coin_input, 13, 60, half, gm_row-4)
     set_box(gm_panel.get_node("GMSetMoney"), 17+half, 60, half, gm_row-4)
@@ -4362,6 +4367,8 @@ func toggle_gm_panel() -> void:
         if gm_panel != null:
             gm_panel.visible = false
         return
+    if gm_build_panel != null:
+        gm_build_panel.visible = false
     gm_panel.visible = not gm_panel.visible
     if gm_panel.visible:
         shop_panel.visible = false
@@ -4538,6 +4545,7 @@ func snapshot() -> Dictionary:
         "removed_trees": removed_trees.duplicate(),
         "unlocked_zones": unlocked_zones.duplicate(),
         "decor_kits": decor_kits.duplicate(),
+        "gm_placed_props": gm_placed_props.duplicate(true),
         "placed_decor": placed_decor_data.duplicate(true),
         "seeds": seeds.duplicate(),
         "plots": plots.slice(0, FARM_ROWS * FARM_COLUMNS).duplicate(true)
@@ -4578,6 +4586,7 @@ func _apply_snapshot(state: Dictionary) -> void:
     unlocked_zones = state.get("unlocked_zones", STARTER_ZONES.duplicate()).duplicate()
     decor_kits = state.get("decor_kits", [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]).duplicate()
     placed_decor_data = state.get("placed_decor", []).duplicate(true)
+    gm_placed_props = state.get("gm_placed_props", []).duplicate(true)
     seeds = state["seeds"].duplicate()
     plots = state["plots"].duplicate(true)
 
