@@ -102,7 +102,7 @@ jobs:
           for name in names:
               path = root / (name + '.png')
               raw = path.read_bytes()
-              assert raw[:8] == b'\\x89PNG\\r\\n\\x1a\\n', f'Not a PNG: {path}'
+              assert raw[:8] == b'\x89PNG\r\n\x1a\n', f'Not a PNG: {path}'
               width, height = struct.unpack('>II', raw[16:24])
               assert (width, height) == (512, 512), (path, width, height)
               assert f'res://assets/ui/farmflex_joystick/{name}.png' in joystick, f'Joystick not wired: {name}'
@@ -168,7 +168,7 @@ jobs:
           # together with a revision marker so old Pages exports are distinguishable.
           mkdir -p build/web/ui/joystick
           cp assets/ui/farmflex_joystick/*.png build/web/ui/joystick/
-          printf '%s\\n' "$GITHUB_SHA" > build/web/farmflex-build.txt
+          printf '%s\n' "$GITHUB_SHA" > build/web/farmflex-build.txt
           touch build/web/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
