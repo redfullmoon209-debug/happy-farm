@@ -90,10 +90,10 @@ msgstr "Female"
 msgid "เดินอิสระ"
 msgstr "Move"
 
-msgid "☰ เครื่องมือ"
+msgid "เครื่องมือ"
 msgstr "Tools"
 
-msgid "▲ ปิดเครื่องมือ"
+msgid "ปิดเครื่องมือ"
 msgstr "Close tools"
 
 msgid "เสียง: ปิด"

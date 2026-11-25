@@ -1824,7 +1824,7 @@ func _cream_style(texture: Texture2D) -> StyleBoxTexture:
     style.region_rect = Rect2(Vector2.ZERO, texture.get_size())
     for side in [SIDE_LEFT, SIDE_RIGHT, SIDE_TOP, SIDE_BOTTOM]:
         style.set_texture_margin(side, 13.0)
-        style.set_content_margin(side, 0.0)
+        style.set_content_margin(side, 6.0 if side in [SIDE_LEFT, SIDE_RIGHT] else 0.0)
     return style
 
 func _select_cream_button(button: Button, selected: bool) -> void:
@@ -2078,7 +2078,7 @@ func build_ui() -> void:
     ui_bottom.visible = tool_menu_open
     # The small standalone PNG button is always accessible even if the
     # large tools panel is collapsed to reveal the game world.
-    tool_menu_toggle_button = btn("☰ เครื่องมือ", toggle_tool_menu, Color("#248b3d"))
+    tool_menu_toggle_button = btn("เครื่องมือ", toggle_tool_menu, Color("#248b3d"))
     ui.add_child(tool_menu_toggle_button)
     _set_icon(tool_menu_toggle_button, "tools")
     status_label = text_label("", 16, Color("#624b39"))
@@ -2225,7 +2225,7 @@ func build_ui() -> void:
     bag_heading = text_label(INV_TEXT.label("bag_title", inventory_language), 23, Color("#624b39"))
     bag_heading.add_theme_font_override("font", THAI_BOLD)
     bag_panel.add_child(bag_heading)
-    bag_close = btn("✕", show_bag, Color("#cf4765"))
+    bag_close = btn("", show_bag, Color("#cf4765"))
     bag_close.add_theme_stylebox_override("normal", _cream_style(UI_ZOOM))
     bag_panel.add_child(bag_close)
     bag_language_button = btn("TH / EN", toggle_inventory_language, Color("#426e92"))
@@ -2423,6 +2423,8 @@ func build_ui() -> void:
         [bag_export_button, "bag"], [bag_import_button, "bag"]
     ]:
         _set_icon(entry[0] as Button, str(entry[1]))
+    bag_close.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    bag_close.tooltip_text = "ปิด"
     for key in action_buttons.keys():
         var art_name: String = {
             "till":"tools", "plant":"plant", "water":"water", "harvest":"harvest",
@@ -2673,7 +2675,7 @@ func point_on_ui(pos: Vector2) -> bool:
 
 func toggle_tool_menu() -> void:
     tool_menu_open = not tool_menu_open
-    tool_menu_toggle_button.text = "▲ ปิดเครื่องมือ" if tool_menu_open else "☰ เครื่องมือ"
+    tool_menu_toggle_button.text = "ปิดเครื่องมือ" if tool_menu_open else "เครื่องมือ"
     ui_bottom.visible = tool_menu_open
     update_sizes()
 
