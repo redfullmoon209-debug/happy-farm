@@ -31,13 +31,11 @@ func _initialize() -> void:
     check(int(updated.get("coins", -1)) == 192, "keep legacy money")
     check(updated.get("seeds", []).size() == 6, "keep old seed inventory")
     check(int(updated.get("gender_change_tickets", -1)) == 0, "old saves begin without gender change tickets")
-    check(int(updated.get("clothing_owned", {}).get("female_survivor_shoes", -1)) == 1, "old saves receive real starter shoes")
-    check(updated.get("clothing_owned", {}).size() == 30,
-        "all three five-piece test outfits exist for both character genders")
-    check(int(updated.get("clothing_owned", {}).get("female_villager_gloves", 0)) == 1,
-        "legacy saves gain separate villager gloves")
-    check(int(updated.get("clothing_owned", {}).get("male_martial_top", 0)) == 1,
-        "legacy saves gain separate martial shirt for male avatar")
+    check(updated.get("wardrobe_market_v1", false), "old saves migrate to purchased wardrobe economy")
+    check(int(updated.get("clothing_owned", {}).get("female_survivor_shoes", -1)) == 0,
+        "legacy free shoes do not bypass the new farm-coin shop")
+    check(int(updated.get("clothing_owned", {}).get("female_villager_gloves", -1)) == 0,
+        "no invented free clothing is granted")
 
     # New saves explicitly carry plot and pen counts.
     var farm: Dictionary = updated.duplicate(true)
@@ -45,6 +43,8 @@ func _initialize() -> void:
     farm["pens"] = 3
     farm["pigs"] = 9
     farm["gender_change_tickets"] = 2
+    farm["clothing_owned"]["female_survivor_shoes"] = 1
+    farm["clothing_owned"]["female_martial_shoes"] = 1
     farm["clothing_equipped"] = {"shoes": "female_survivor_shoes"}
     var normalized: Dictionary = SAVES.normalize(farm)
     check(not normalized.is_empty(), "new 50-plot save with 3 pens and 9 pigs")
@@ -53,24 +53,18 @@ func _initialize() -> void:
     check(int(normalized.get("gender_change_tickets", -1)) == 2, "persist purchased gender cards")
     check(str(normalized.get("clothing_equipped", {}).get("shoes", "")) == "female_survivor_shoes", "persist individual clothing slot")
     var mixed_clothes: Dictionary = farm.duplicate(true)
-    mixed_clothes["clothing_equipped"] = {
-        "top": "female_martial_top",
-        "gloves": "female_villager_gloves",
-        "bottom": "female_survivor_bottom",
-        "shoes": "female_survivor_shoes"
-    }
+    mixed_clothes["clothing_equipped"] = {"shoes": "female_martial_shoes"}
     var mixed_save: Dictionary = SAVES.normalize(mixed_clothes)
-    check(mixed_save.get("clothing_equipped", {}).size() == 4,
-        "four different outfit pieces can be worn independently")
-    var male_save: Dictionary = mixed_clothes.duplicate(true)
-    male_save["avatar_gender"] = "male"
-    male_save["clothing_equipped"] = {"top": "male_survivor_top"}
-    check(SAVES.normalize(male_save).get("clothing_equipped", {}).get("top", "") == "male_survivor_top",
-        "male character can equip matching wardrobe pieces")
-    var forbidden_mix: Dictionary = mixed_clothes.duplicate(true)
+    check(str(mixed_save.get("clothing_equipped", {}).get("shoes", "")) == "female_martial_shoes",
+        "purchased shoes can be switched without replacing the avatar")
+    var unowned: Dictionary = farm.duplicate(true)
+    unowned["clothing_equipped"] = {"top": "female_villager_top"}
+    check(SAVES.normalize(unowned).get("clothing_equipped", {}).is_empty(),
+        "cannot equip unpaid garment from old character page")
+    var forbidden_mix: Dictionary = farm.duplicate(true)
     forbidden_mix["clothing_equipped"] = {"gloves": "male_martial_gloves"}
-    check(SAVES.normalize(forbidden_mix).is_empty(),
-        "reject wearing incompatible gender outfit items")
+    check(SAVES.normalize(forbidden_mix).get("clothing_equipped", {}).is_empty(),
+        "incompatible equipment is not applied")
     var package_data: Dictionary = SAVES.package(farm)
     var export_import: Dictionary = SAVES.normalize(JSON.parse_string(JSON.stringify(package_data)))
     check(export_import.size() > 0, "export and import new format")
