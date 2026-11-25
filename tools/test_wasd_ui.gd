@@ -72,6 +72,13 @@ func _run() -> void:
 
     check(farm.stick != null and farm.stick.BASE_TEXTURE != null, "joystick base uses imported PNG")
     check(farm.stick.THUMB_TEXTURE != null, "joystick thumb is independent PNG")
+    check(farm.stick.ARROWS_TEXTURE != null and farm.stick.EFFECT_TEXTURE != null,
+        "FarmFlex arrows and glow are independent PNG layers")
+    for layer in ["joystick_base", "joystick_arrows", "joystick_thumb", "joystick_effect"]:
+        var png_path: String = "res://assets/ui/farmflex_joystick/%s.png" % layer
+        check(ResourceLoader.exists(png_path), "FarmFlex pearl joystick PNG loads: " + layer)
+    check(farm.stick.BASE_TEXTURE.resource_path.contains("farmflex_joystick"),
+        "active joystick MUST render FarmFlex artwork, never legacy Happy Farm art")
     # Small buttons are allowed to hide PNGs so Thai words stay readable.
     # The independent asset must remain attached for wider layouts.
     check(farm.shop_button.has_meta("happy_icon_texture") and farm.bag_button.has_meta("happy_icon_texture"),
