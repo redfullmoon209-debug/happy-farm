@@ -334,10 +334,10 @@ func _check() -> void:
     farm.equip_clothing(farm.avatar_gender + "_martial_top")
     if farm.clothing_equipped.has("top"):
         problems.append("missing shirt model was marked equipped as if real")
-    if farm.avatar_gender == "male" and farm._inventory_contents().filter(
-        func(entry: Dictionary) -> bool: return str(entry.get("kind", "")) == "clothing"
-    ).size() != 0:
-        problems.append("male backpack displays clothing without any male outfit mesh")
+    if farm.avatar_gender == "male":
+        for item_entry in farm._inventory_contents():
+            if str(item_entry.get("kind", "")) == "clothing":
+                problems.append("male backpack displays clothing without any male outfit mesh")
     farm._close_equipment_picker()
     if farm.gender_item_button.disabled == false:
         problems.append("gender card usable with zero inventory")
