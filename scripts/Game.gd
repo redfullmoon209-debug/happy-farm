@@ -4224,6 +4224,139 @@ func buy_decor_kit(index: int) -> void:
         save_game()
     refresh_labels()
 
+func toggle_gm_construction() -> void:
+    if not GM_TEST_MODE:
+        return
+    gm_build_panel.visible = not gm_build_panel.visible
+    if gm_build_panel.visible:
+        gm_panel.visible = false
+        shop_panel.visible = false
+        bag_panel.visible = false
+        _gm_select_category(gm_build_category)
+
+func _gm_select_category(category: String) -> void:
+    if not GM_TEST_MODE or not GM_PROPS.GROUPS.has(category) or gm_build_grid == null:
+        return
+    gm_build_category = category
+    var count: int = 0
+    for key in gm_build_category_buttons.keys():
+        gm_build_category_buttons[key].modulate = Color("#dec5a2") if str(key) == category else Color.WHITE
+    for key in gm_build_item_buttons.keys():
+        var button: Button = gm_build_item_buttons[key]
+        button.visible = GM_PROPS.GROUPS[category].has(str(key))
+        button.disabled = not GM_PROPS.exists(str(key))
+        button.tooltip_text = "พร้อมวาง" if not button.disabled else "ยังไม่พบ FBX ใน assets/gm_models/"
+        if button.visible and not button.disabled:
+            count += 1
+    gm_build_description.text = "%s • นำเข้าแล้ว %d/%d แบบ" % [GM_PROPS.GROUP_LABELS[category], count, GM_PROPS.GROUPS[category].size()]
+
+func _gm_select_asset(name: String) -> void:
+    if not GM_TEST_MODE or not GM_PROPS.exists(name):
+        message = "ไม่มีไฟล์ต้นฉบับ: " + name + ".fbx"
+        refresh_labels()
+        return
+    gm_selected_asset = name
+    _gm_set_build_mode("place")
+
+func _gm_scale_changed(value: float) -> void:
+    gm_scale_value = clampf(value, 0.1, 10.0)
+
+func _gm_rotation_changed(value: float) -> void:
+    gm_rotation_deg = value
+
+func _gm_set_build_mode(mode: String) -> void:
+    if not GM_TEST_MODE or mode not in ["place", "move", "rotate", "delete"]:
+        return
+    if mode == "place" and (gm_selected_asset.is_empty() or not GM_PROPS.exists(gm_selected_asset)):
+        message = "เลือกไฟล์โมเดลที่นำเข้าแล้วก่อน"
+        refresh_labels()
+        return
+    gm_build_mode = mode
+    gm_target_index = -1
+    gm_build_panel.visible = false
+    message = {"place":"แตะพื้นเพื่อวาง","move":"แตะวัตถุ แล้วแตะจุดใหม่",
+        "rotate":"แตะวัตถุเพื่อหมุน 15 องศา","delete":"แตะวัตถุเพื่อลบ"}[mode]
+    refresh_labels()
+
+func _gm_spawn_prop(entry: Dictionary) -> Node3D:
+    var obj: Node3D = GM_PROPS.create_prop(str(entry["name"]))
+    if obj == null:
+        return null
+    obj.name = "GM_" + str(entry["name"])
+    add_child(obj)
+    obj.position = Vector3(float(entry["x"]), 0.0, float(entry["z"]))
+    obj.rotation_degrees.y = float(entry["rotation"])
+    obj.scale = Vector3.ONE * float(entry["scale"])
+    return obj
+
+func _gm_rebuild_props() -> void:
+    for node in gm_prop_nodes:
+        if node != null and is_instance_valid(node):
+            node.queue_free()
+    gm_prop_nodes.clear()
+    for entry in gm_placed_props:
+        gm_prop_nodes.append(_gm_spawn_prop(entry))
+
+func _gm_map_action(pixel: Vector2) -> void:
+    if not GM_TEST_MODE or gm_build_mode.is_empty():
+        return
+    var pos: Vector3 = _ground_at(pixel)
+    if not is_finite(pos.x) or pos.x < WORLD_MIN or pos.x >= WORLD_MAX or pos.z < WORLD_MIN or pos.z >= WORLD_MAX:
+        return
+    if gm_build_mode == "place":
+        if not GM_PROPS.exists(gm_selected_asset) or gm_placed_props.size() >= 500:
+            return
+        var entry: Dictionary = {"name":gm_selected_asset,"x":pos.x,"z":pos.z,
+            "rotation":gm_rotation_deg,"scale":gm_scale_value}
+        var obj: Node3D = _gm_spawn_prop(entry)
+        if obj == null:
+            message = "โมเดล FBX นำเข้าไม่สำเร็จ"
+            refresh_labels()
+            return
+        gm_placed_props.append(entry)
+        gm_prop_nodes.append(obj)
+        message = "วาง " + gm_selected_asset + " แล้ว"
+    elif gm_build_mode == "move" and gm_target_index >= 0:
+        gm_placed_props[gm_target_index]["x"] = pos.x
+        gm_placed_props[gm_target_index]["z"] = pos.z
+        var obj: Node3D = gm_prop_nodes[gm_target_index]
+        if obj != null and is_instance_valid(obj):
+            obj.position = pos
+        gm_target_index = -1
+        message = "ย้ายวัตถุแล้ว"
+    else:
+        var best: int = -1
+        var distance: float = 2.8
+        for i in range(gm_placed_props.size()):
+            var item: Dictionary = gm_placed_props[i]
+            var d: float = Vector2(float(item["x"])-pos.x,float(item["z"])-pos.z).length()
+            if d < distance:
+                best = i
+                distance = d
+        if best < 0:
+            message = "ไม่พบวัตถุ GM ใกล้จุดที่แตะ"
+            refresh_labels()
+            return
+        match gm_build_mode:
+            "move":
+                gm_target_index = best
+                message = "เลือกแล้ว แตะตำแหน่งใหม่เพื่อย้าย"
+                refresh_labels()
+                return
+            "rotate":
+                gm_placed_props[best]["rotation"] = fposmod(float(gm_placed_props[best]["rotation"])+15.0,360.0)
+                if gm_prop_nodes[best] != null and is_instance_valid(gm_prop_nodes[best]):
+                    gm_prop_nodes[best].rotation_degrees.y = float(gm_placed_props[best]["rotation"])
+                message = "หมุนวัตถุแล้ว"
+            "delete":
+                if gm_prop_nodes[best] != null and is_instance_valid(gm_prop_nodes[best]):
+                    gm_prop_nodes[best].queue_free()
+                gm_prop_nodes.remove_at(best)
+                gm_placed_props.remove_at(best)
+                message = "ลบวัตถุแล้ว"
+    save_game()
+    refresh_labels()
+
 func toggle_gm_panel() -> void:
     if not GM_TEST_MODE:
         if gm_panel != null:
