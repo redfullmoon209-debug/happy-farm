@@ -337,7 +337,7 @@ static func normalize(raw: Variant) -> Dictionary:
         if item_name.is_empty():
             continue
         if not catalog.has(item_name):
-            continue
+            return {}
         var item: Dictionary = catalog[item_name]
         if str(item["slot"]) == slot and str(item["gender"]) == gender and int(safe_clothing.get(item_name, 0)) > 0:
             safe_equipment[slot] = item_name
