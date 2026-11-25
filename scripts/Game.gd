@@ -271,6 +271,7 @@ var shop_sell_title: Label
 var shop_sell_scroll: ScrollContainer
 var shop_sell_grid: GridContainer
 var shop_sell_cards: Array[Button] = []
+var shop_sell_count_labels: Array[Label] = []
 var shop_sell_entries: Array[Dictionary] = []
 var shop_sell_selected: int = -1
 var shop_sell_detail: Label
@@ -2255,6 +2256,21 @@ func build_ui() -> void:
         shop_sell_cards.append(sale_slot)
         _square_shop_slot(sale_slot)
         sale_slot.custom_minimum_size = Vector2(30, 36)
+        var count_chip: Label = Label.new()
+        count_chip.name = "SaleStackCount"
+        count_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        count_chip.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+        count_chip.offset_top = -17
+        count_chip.offset_right = -3
+        count_chip.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+        count_chip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+        count_chip.add_theme_font_override("font", THAI_BOLD)
+        count_chip.add_theme_font_size_override("font_size", 12)
+        count_chip.add_theme_color_override("font_color", Color("#644b37"))
+        count_chip.add_theme_color_override("font_outline_color", Color("#fff5e9"))
+        count_chip.add_theme_constant_override("outline_size", 3)
+        sale_slot.add_child(count_chip)
+        shop_sell_count_labels.append(count_chip)
     shop_sell_detail = text_label("เลือกผลผลิตทางขวาเพื่อขายแลกเหรียญ", 14, Color("#624b39"))
     shop_sell_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     shop_panel.add_child(shop_sell_detail)
@@ -3670,6 +3686,7 @@ func _refresh_shop_sell_grid() -> void:
     for index in range(shop_sell_cards.size()):
         var card: Button = shop_sell_cards[index]
         if index >= shop_sell_entries.size():
+            shop_sell_count_labels[index].text = ""
             card.text = ""
             card.tooltip_text = "ช่องว่าง"
             card.disabled = true
@@ -3681,7 +3698,8 @@ func _refresh_shop_sell_grid() -> void:
             card.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
             card.expand_icon = true
             card.add_theme_constant_override("icon_max_width", 31)
-            card.text = "×%d" % int(entry["count"])
+            card.text = ""
+            shop_sell_count_labels[index].text = str(entry["count"]) if int(entry["count"]) > 1 else ""
             card.tooltip_text = "%s ×%d • ขายได้ %d เหรียญ/ชิ้น" % [str(entry["name"]), int(entry["count"]), int(entry["price"])]
             card.disabled = false
             card.modulate = Color("#f1dbbb") if index == shop_sell_selected else Color.WHITE
