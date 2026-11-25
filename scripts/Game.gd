@@ -7,6 +7,7 @@ const SAVE_DATA = preload("res://scripts/SaveData.gd")
 const WARDROBE = preload("res://scripts/WardrobeCatalog.gd")
 const MODULAR_VISUAL = preload("res://scripts/ModularVisual.gd")
 const EQUIPMENT_THUMBNAIL = preload("res://scripts/EquipmentThumbnail.gd")
+const ITEM_ICONS = preload("res://scripts/FarmItemIcons.gd")
 const FARM_AUDIO = preload("res://scripts/FarmAudio.gd")
 const GARDEN_DECOR = preload("res://scripts/GardenDecor.gd")
 # Each visual element is imported from a standalone transparent PNG.
@@ -281,6 +282,7 @@ var shop_trade_details: Label
 var shop_trade_icon: TextureRect
 var shop_trade_confirm: Button
 var shop_trade_cancel: Button
+var shop_trade_quantity: SpinBox
 var shop_pending_trade: Dictionary = {}
 var shop_livestock_label: Label
 var shop_pen_button: Button
@@ -2350,6 +2352,17 @@ func build_ui() -> void:
     shop_trade_panel.add_child(shop_trade_confirm)
     shop_trade_cancel = btn("ยกเลิก", _cancel_shop_trade, Color("#897d70"))
     shop_trade_panel.add_child(shop_trade_cancel)
+    shop_trade_quantity = SpinBox.new()
+    shop_trade_quantity.name = "ShopTradeQuantity"
+    shop_trade_quantity.min_value = 1
+    shop_trade_quantity.max_value = 9999
+    shop_trade_quantity.step = 1
+    shop_trade_quantity.rounded = true
+    shop_trade_quantity.value = 1
+    shop_trade_quantity.allow_greater = false
+    shop_trade_quantity.allow_lesser = false
+    shop_trade_quantity.value_changed.connect(_shop_trade_quantity_changed)
+    shop_trade_panel.add_child(shop_trade_quantity)
 
     # Dedicated seed inventory in the left-side area shown in the reference.
     # The panel is a fixed-size Panel, not a PanelContainer; it cannot grow.
@@ -2758,9 +2771,10 @@ func update_sizes() -> void:
     var trade_h: float = minf(250.0, shop_h-24.0)
     set_box(shop_trade_panel, (shop_w-trade_w)*0.5, (shop_h-trade_h)*0.5, trade_w, trade_h)
     set_box(shop_trade_title, 14, 12, trade_w-28.0, 30)
-    set_box(shop_trade_icon, 15, 53, 68, 68)
-    set_box(shop_trade_details, 92, 49, trade_w-106.0, trade_h-111.0)
-    var trade_button_w: float = (trade_w-42.0)*0.5
+    set_box(shop_trade_icon, 15, 53, 76, 76)
+    set_box(shop_trade_details, 101, 42, trade_w-115.0, trade_h-111.0)
+    set_box(shop_trade_quantity, 15, trade_h-105.0, 90, 37)
+    var trade_button_w:  = (trade_w-42.0)*0.5
     set_box(shop_trade_confirm, 14, trade_h-57.0, trade_button_w, 42)
     set_box(shop_trade_cancel, 28+trade_button_w, trade_h-57.0, trade_button_w, 42)
 
