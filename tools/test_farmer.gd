@@ -71,6 +71,10 @@ func _check() -> void:
         if farm.shop_sell_entries.size() < 1 or farm.shop_sell_cards[0].disabled:
             problems.append("farm produce not displayed as item in right sale inventory")
         else:
+            if farm.shop_sell_cards[0].icon == null or not farm.shop_sell_cards[0].text.is_empty():
+                problems.append("sale slot shows words instead of a crop illustration")
+            if farm.shop_sell_count_labels[0].text != "3":
+                problems.append("sale stack amount not shown as a corner count")
             farm._select_shop_sale_slot(0)
             if not farm.shop_trade_panel.visible or farm.shop_trade_confirm.text != "ยืนยันขาย":
                 problems.append("tapping sale item did not show details and confirmation")
