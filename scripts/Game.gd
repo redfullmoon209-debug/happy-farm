@@ -2266,7 +2266,7 @@ func build_ui() -> void:
     for slot_index in range(INVENTORY_CAPACITY):
         var slot: Button = btn("", inventory_slot_pressed.bind(slot_index), Color("#34463c"))
         slot.name = "InventorySlot_%03d" % slot_index
-        slot.custom_minimum_size = Vector2(38, 42)
+        slot.custom_minimum_size = Vector2(30, 36)
         slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         slot.add_theme_font_size_override("font_size", 11)
         slot.clip_text = true
