@@ -266,6 +266,18 @@ func _check() -> void:
         problems.append("single split backpack must show model and inventory together")
     if farm.inventory_slots.size() != 200:
         problems.append("MMORPG backpack does not have exactly 200 slots")
+    # Source artwork must be imported into the PLAYABLE backpack, not
+    # merely stored in a ZIP or added as files with no scene references.
+    if farm.bag_metal_edge_overlay == null or farm.bag_metal_edge_overlay.texture != farm.USER_INV_BORDER:
+        problems.append("real user-supplied inventory border image not installed")
+    if farm.bag_character_backdrop == null or farm.bag_character_backdrop.texture != farm.USER_INV_PREVIEW:
+        problems.append("real user-supplied character backdrop not installed")
+    if farm.bag_stats_backdrop == null or farm.bag_stats_backdrop.texture != farm.USER_INV_STATS:
+        problems.append("real user-supplied character stats panel not installed")
+    if farm.inventory_slots.size() > 0:
+        var slot_style: StyleBoxTexture = farm.inventory_slots[0].get_theme_stylebox("normal") as StyleBoxTexture
+        if slot_style == null or slot_style.texture != farm.USER_INV_SLOT:
+            problems.append("200 item slots are not using separated artwork")
     if absf(farm.character_panel.size.x - (farm.bag_panel.size.x-30.0)*0.5) > 2.0:
         problems.append("left model panel does not occupy 50 percent")
     if absf(farm.bag_scroll.size.x - farm.character_panel.size.x) > 14.0:
@@ -283,7 +295,7 @@ func _check() -> void:
         problems.append("missing horizontal 5-slot equipment bar")
     else:
         var glove_button: Button = farm.character_equipment_buttons["gloves"]
-        if glove_button.icon == null or not glove_button.text.contains("ถุงมือ"):
+        if glove_button.icon != farm.USER_EQUIP_GLOVE or not glove_button.text.contains("ถุงมือ"):
             problems.append("glove slot missing one-hand icon or runtime caption")
         farm.toggle_inventory_language()
         if not glove_button.text.contains("Glove") or not farm.bag_heading.text.contains("Inventory"):
