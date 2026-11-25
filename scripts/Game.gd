@@ -3557,6 +3557,10 @@ func _confirm_shop_trade() -> void:
     if shop_pending_trade.is_empty():
         return
     var pending: Dictionary = shop_pending_trade.duplicate()
+    var count: int = int(shop_trade_quantity.value)
+    # Refuse malformed quantities rather than relying on UI clamping alone.
+    if count < 1 or count > 9999:
+        return
     _cancel_shop_trade()
     match str(pending.get("mode", "")):
         "buy":
@@ -3574,8 +3578,29 @@ func _confirm_shop_trade() -> void:
                 "feed": current_price = 35
                 "pen": current_price = pen_price()
                 "pig": current_price = PIG_PRICE
-            if current_price != int(pending["price"]) or current_price < 0 or coins < current_price:
-                message = "ราคาเปลี่ยนหรือเหรียญไม่เพียงพอ กรุณาเลือกใหม่"
+            var total_price: int = current_price * count
+            if current_price != int(pending["price"]) or current_price < 0 or total_price > coins or count > _shop_buy_capacity(kind, item):
+                message = "จำนวนเกินสต็อก ราคาเปลี่ยน หรือเหรียญไม่เพียงพอ"
+                refresh_labels()
+                return
+            if count > 1:
+                # Bulk stock updates use one atomic save (no loop of purchases).
+                match kind:
+                    "seed": seeds[int(item)] = int(seeds[int(item)]) + count
+                    "tree": tree_kits[int(item)] = int(tree_kits[int(item)]) + count
+                    "decor": decor_kits[int(item)] = int(decor_kits[int(item)]) + count
+                    "plot": plot_kits += count
+                    "feed": feed += count * 5
+                    "gender": gender_change_tickets += count
+                    _:
+                        message = "สินค้านี้ซื้อได้ครั้งละ 1 ชิ้น"
+                        refresh_labels()
+                        return
+                coins -= total_price
+                message = "ซื้อสินค้า ×%d สำเร็จ ใช้เงิน %d เหรียญ" % [count, total_price]
+                if farm_audio != null:
+                    farm_audio.play_effect("buy")
+                save_game()
                 refresh_labels()
                 return
             match kind:
@@ -3593,11 +3618,12 @@ func _confirm_shop_trade() -> void:
             if crop_idx < 0 or crop_idx >= CROPS.size():
                 return
             var current_price: int = int(CROPS[crop_idx]["reward"])
-            if current_price != int(pending["price"]) or int(produce[crop_idx]) < 1 or coins > 1000000000 - current_price:
+            var payout: int = current_price * count
+            if current_price != int(pending["price"]) or int(produce[crop_idx]) < count or coins > 1000000000 - payout:
                 return
-            produce[crop_idx] = int(produce[crop_idx])-1
-            coins += current_price
-            message = "ขาย%s +%d เหรียญ" % [str(CROPS[crop_idx]["name"]), current_price]
+            produce[crop_idx] = int(produce[crop_idx]) - count
+            coins += payout
+            message = "ขาย%s ×%d +%d เหรียญ" % [str(CROPS[crop_idx]["name"]), count, payout]
             save_game()
             refresh_labels()
         "sell_all":
