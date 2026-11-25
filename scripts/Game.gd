@@ -244,6 +244,7 @@ var bag_save_status: Label
 var bag_export_button: Button
 var bag_import_button: Button
 var character_button: Button
+var bag_items_tab: Button
 var character_panel: Panel
 var character_title: Label
 var character_close: Button
@@ -284,8 +285,7 @@ func _ready() -> void:
     farm_audio.subtitle.connect(_show_voice_caption)
     build_ui()
     if OS.has_feature("web") and str(JavaScriptBridge.eval("(new URLSearchParams(window.location.search)).get('wardrobe')", true)) == "1":
-        character_panel.visible = true
-        refresh_character_panel()
+        open_wardrobe_tab()
     _focus_game_canvas()
     refresh_plants()
     refresh_labels()
@@ -1955,9 +1955,6 @@ func build_ui() -> void:
     ui_top.add_child(money_label)
     bag_button = btn("กระเป๋า", show_bag, Color("#426d55"))
     ui_top.add_child(bag_button)
-    character_button = btn("เปลี่ยนตัวละคร", toggle_character_panel, Color("#547f78"))
-    character_button.name = "CharacterButton"
-    ui_top.add_child(character_button)
     # The bag button now uses its own imported transparent PNG icon layer.
     shop_button = btn("ร้านค้า", show_shop, Color("#ad7c53"))
     ui_top.add_child(shop_button)
@@ -2118,11 +2115,17 @@ func build_ui() -> void:
     bag_header.color = Color.TRANSPARENT
     bag_header.mouse_filter = Control.MOUSE_FILTER_IGNORE
     bag_panel.add_child(bag_header)
-    bag_heading = text_label("กระเป๋าเมล็ดพันธุ์", 23, Color("#ffffff"))
+    bag_heading = text_label("กระเป๋าไอเทม", 23, Color("#ffffff"))
     bag_heading.add_theme_font_override("font", THAI_BOLD)
     bag_panel.add_child(bag_heading)
     bag_close = btn("ปิด", show_bag, Color("#d4a16b"))
     bag_panel.add_child(bag_close)
+    bag_items_tab = btn("ไอเทมฟาร์ม", show_bag_items_tab, Color("#497958"))
+    bag_items_tab.name = "BagFarmItemsTab"
+    bag_panel.add_child(bag_items_tab)
+    character_button = btn("อุปกรณ์สวมใส่", open_wardrobe_tab, Color("#547f78"))
+    character_button.name = "BagWardrobeTab"
+    bag_panel.add_child(character_button)
     bag_summary = text_label("", 17, Color("#ffffff"))
     bag_panel.add_child(bag_summary)
     bag_scroll = ScrollContainer.new()
@@ -2243,13 +2246,14 @@ func build_ui() -> void:
     # Above the HUD, shop and bag. All equipment is changed inside this window.
     character_panel = panel(Color("#e9f1e6fb"))
     _skin_window(character_panel)
-    ui.add_child(character_panel)
+    bag_panel.add_child(character_panel)
     character_panel.name = "CharacterWardrobe"
+    character_panel.mouse_filter = Control.MOUSE_FILTER_STOP
     character_panel.visible = false
-    character_title = text_label("ตัวละคร • คลังเสื้อผ้า", 23, Color.WHITE)
+    character_title = text_label("ตัวละคร • เสื้อผ้า", 19, Color.WHITE)
     character_title.add_theme_font_override("font", THAI_BOLD)
     character_panel.add_child(character_title)
-    character_close = btn("ปิด", toggle_character_panel, Color("#bd9160"))
+    character_close = btn("ไอเทมฟาร์ม", show_bag_items_tab, Color("#bd9160"))
     character_panel.add_child(character_close)
     character_gender_label = text_label("", 17, Color("#ffefc6"))
     character_panel.add_child(character_gender_label)
@@ -2313,19 +2317,17 @@ func update_sizes() -> void:
         set_box(title_label, 12, 5, 118, 30)
         set_box(ui_top.get_node("CoinIcon"), 132, 8, 24, 24)
         set_box(money_label, 158, 7, maxf(80.0, header_width-169.0), 27)
-        var button_w: float = (header_width-38.0)/4.0
-        set_box(bag_button, 8, 44, button_w, 39)
-        set_box(shop_button, 14+button_w, 44, button_w, 39)
-        set_box(feed_button, 20+2.0*button_w, 44, button_w, 39)
-        set_box(character_button, 26+3.0*button_w, 44, button_w, 39)
+        var button_w: float = (header_width-32.0)/3.0
+        set_box(bag_button, 9, 44, button_w, 39)
+        set_box(shop_button, 16+button_w, 44, button_w, 39)
+        set_box(feed_button, 23+2.0*button_w, 44, button_w, 39)
     else:
         set_box(title_label, 12, 12, 115, 30)
         set_box(ui_top.get_node("CoinIcon"), 131, 15, 24, 24)
-        set_box(money_label, 158, 13, 246, 30)
-        set_box(bag_button, 413, 8, 101, 43)
-        set_box(shop_button, 518, 8, 101, 43)
-        set_box(feed_button, 623, 8, 126, 43)
-        set_box(character_button, 753, 8, 168, 43)
+        set_box(money_label, 158, 13, 348, 30)
+        set_box(bag_button, 517, 8, 115, 43)
+        set_box(shop_button, 640, 8, 113, 43)
+        set_box(feed_button, 761, 8, 150, 43)
 
     # Small tool tray keeps the working 3D farm visible.
     var toolbar_width: float = minf(650.0, maxf(300.0, w-20.0))
@@ -2447,20 +2449,21 @@ func update_sizes() -> void:
     set_box(voice_caption_label, 9, 7, caption_width-18.0, 37.0)
 
     # Inventory lives on the left. Never stretch it to the full game screen.
-    var bag_top: float = 118.0 if narrow else 75.0
-    var bag_width: float = minf(440.0, w*0.43) if w >= 900.0 else minf(385.0, w-20.0)
-    var bag_x: float = 13.0 if w >= 900.0 else 9.0
-    var bag_bottom_margin: float = 155.0
-    if touch_controls and w < 900.0:
-        bag_bottom_margin = 303.0
-    var bag_height: float = maxf(278.0, minf(h-bag_top-12.0, h-bag_top-bag_bottom_margin))
+    # One backpack window with farm-items and equipment tabs.
+    var bag_top: float = 104.0 if narrow else 69.0
+    var bag_width: float = minf(560.0, w-20.0)
+    var bag_height: float = maxf(200.0, minf(570.0, h-bag_top-10.0))
+    var bag_x: float = (w-bag_width)*0.5
     set_box(bag_panel, bag_x, bag_top, bag_width, bag_height)
-    set_box(bag_header_art, 7, 2, bag_width-14.0, 62)
+    set_box(bag_header_art, 7, 2, bag_width-14.0, 59)
     set_box(bag_header, 0, 0, bag_width, 60)
-    set_box(bag_heading, 16, 12, bag_width-104, 35)
-    set_box(bag_close, bag_width-76, 11, 63, 37)
-    set_box(bag_summary, 15, 68, bag_width-30, 27)
-    set_box(bag_scroll, 12, 103, bag_width-24, maxf(55.0, bag_height-220.0))
+    set_box(bag_heading, 15, 9, bag_width-95.0, 34)
+    set_box(bag_close, bag_width-75.0, 9, 63, 36)
+    var tab_width: float = (bag_width-31.0)*0.5
+    set_box(bag_items_tab, 10, 55, tab_width, 40)
+    set_box(character_button, 21+tab_width, 55, tab_width, 40)
+    set_box(bag_summary, 15, 102, bag_width-30, 27)
+    set_box(bag_scroll, 12, 135, bag_width-24, maxf(40.0, bag_height-251.0))
     set_box(bag_footer, 14, bag_height-111.0, bag_width-28, 23)
     set_box(bag_save_status, 14, bag_height-85.0, bag_width-28, 24)
     var backup_button_width: float = (bag_width-36.0)*0.5
@@ -2468,14 +2471,14 @@ func update_sizes() -> void:
     set_box(bag_import_button, 24.0+backup_button_width, bag_height-54.0, backup_button_width, 41)
     bag_grid.columns = 3 if bag_width >= 345.0 else 2
     if character_panel != null:
-        var character_w: float = minf(w-20.0, 590.0)
-        var character_h: float = minf(h-20.0, 575.0)
-        set_box(character_panel, (w-character_w)*0.5, (h-character_h)*0.5, character_w, character_h)
-        set_box(character_title, 17, 12, character_w-108, 36)
-        set_box(character_close, character_w-83, 10, 68, 37)
-        set_box(character_gender_label, 17, 56, character_w-34, 28)
-        set_box(gender_item_button, 17, 91, character_w-34, 49)
-        set_box(character_scroll, 15, 149, character_w-30, maxf(50.0, character_h-164))
+        var character_w: float = bag_width-20.0
+        var character_h: float = maxf(80.0, bag_height-109.0)
+        set_box(character_panel, 10.0, 101.0, character_w, character_h)
+        set_box(character_title, 10, 8, character_w-126, 28)
+        set_box(character_close, character_w-126, 7, 116, 32)
+        set_box(character_gender_label, 12, 41, character_w-24, 25)
+        set_box(gender_item_button, 12, 68, character_w-24, 41)
+        set_box(character_scroll, 12, 115, character_w-24, maxf(35.0, character_h-123.0))
     for card in bag_cards:
         card.custom_minimum_size = Vector2(95.0, 119.0)
     _fit_all_ui_text()
@@ -2486,7 +2489,7 @@ func point_on_ui(pos: Vector2) -> bool:
     for panel_node in [ui_top,ui_bottom,tool_menu_toggle_button,save_chip,stick_label,voice_caption]:
         if panel_node != null and panel_node.is_visible_in_tree() and panel_node.get_global_rect().has_point(pos):
             return true
-    if character_panel != null and character_panel.is_visible_in_tree() and character_panel.get_global_rect().has_point(pos):
+    if bag_panel != null and bag_panel.is_visible_in_tree() and bag_panel.get_global_rect().has_point(pos):
         return true
     if GM_TEST_MODE and gm_button != null and gm_button.visible and gm_button.get_global_rect().has_point(pos):
         return true
@@ -2579,7 +2582,7 @@ func refresh_labels() -> void:
     else:
         money_label.text = "เงิน %d | คอก %d/%d | หมู %d/%d | อาหาร %d" % [coins, pens, MAX_PENS, pigs, pens*PEN_CAPACITY, feed]
     money_label.add_theme_font_size_override("font_size", 16)
-    if character_panel != null and character_panel.visible:
+    if character_panel != null and character_panel.is_visible_in_tree():
         refresh_character_panel()
     if shop_livestock_label != null:
         shop_livestock_label.text = "คอก %d/%d  |  หมู %d/%d ตัว" % [pens, MAX_PENS, pigs, pens*PEN_CAPACITY]
@@ -2718,35 +2721,57 @@ func toggle_run() -> void:
     run_button.modulate = Color.WHITE if run_toggle else Color("#aeb9a8")
 
 func show_bag() -> void:
-    if character_panel != null:
-        character_panel.visible = false
     if shop_panel.visible:
         shop_panel.visible = false
-    bag_panel.visible = not bag_panel.visible
+    var opening: bool = not bag_panel.visible
+    bag_panel.visible = opening
+    if opening:
+        show_bag_items_tab()
+
+func show_bag_items_tab() -> void:
+    if bag_panel == null:
+        return
+    bag_panel.visible = true
+    character_panel.visible = false
+    bag_summary.visible = true
+    bag_scroll.visible = true
+    bag_footer.visible = true
+    bag_save_status.visible = true
+    bag_export_button.visible = true
+    bag_import_button.visible = true
+    bag_items_tab.modulate = Color.WHITE
+    character_button.modulate = Color("#bdccbe")
     refresh_bag_cards()
 
+func open_wardrobe_tab() -> void:
+    if bag_panel == null or character_panel == null:
+        return
+    bag_panel.visible = true
+    if shop_panel != null:
+        shop_panel.visible = false
+    if gm_panel != null:
+        gm_panel.visible = false
+    character_panel.visible = true
+    bag_summary.visible = false
+    bag_scroll.visible = false
+    bag_footer.visible = false
+    bag_save_status.visible = false
+    bag_export_button.visible = false
+    bag_import_button.visible = false
+    bag_items_tab.modulate = Color("#bdccbe")
+    character_button.modulate = Color.WHITE
+    refresh_character_panel()
+
 func show_shop() -> void:
-    if character_panel != null:
-        character_panel.visible = false
     if bag_panel != null:
         bag_panel.visible = false
     shop_panel.visible = not shop_panel.visible
 
-
-# The character button opens the item-gated gender switch and modular slots.
 func toggle_character_panel() -> void:
-    if character_panel == null:
-        return
-    var should_open: bool = not character_panel.visible
-    character_panel.visible = should_open
-    if should_open:
-        if bag_panel != null:
-            bag_panel.visible = false
-        if shop_panel != null:
-            shop_panel.visible = false
-        if gm_panel != null:
-            gm_panel.visible = false
-        refresh_character_panel()
+    if bag_panel != null and bag_panel.visible and character_panel.visible:
+        show_bag_items_tab()
+    else:
+        open_wardrobe_tab()
 
 func refresh_character_panel() -> void:
     if character_panel == null or character_slot_list == null:
