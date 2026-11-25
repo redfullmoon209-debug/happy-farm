@@ -2558,12 +2558,16 @@ func build_ui() -> void:
     gm_build_scale.max_value = 10.0
     gm_build_scale.step = 0.1
     gm_build_scale.value = 1.0
+    gm_build_scale.tooltip_text = "ขนาดโมเดล (Scale) 0.1 ถึง 10"
+    gm_build_scale.prefix = "ขนาด "
     gm_build_scale.value_changed.connect(_gm_scale_changed)
     gm_build_panel.add_child(gm_build_scale)
     gm_build_rotate = SpinBox.new()
     gm_build_rotate.min_value = -360.0
     gm_build_rotate.max_value = 360.0
     gm_build_rotate.step = 15.0
+    gm_build_rotate.tooltip_text = "ทิศทางวางโมเดล (องศา)"
+    gm_build_rotate.suffix = "°"
     gm_build_rotate.value_changed.connect(_gm_rotation_changed)
     gm_build_panel.add_child(gm_build_rotate)
     _gm_select_category("trees")
