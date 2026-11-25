@@ -283,6 +283,7 @@ var shop_trade_icon: TextureRect
 var shop_trade_confirm: Button
 var shop_trade_cancel: Button
 var shop_trade_quantity: SpinBox
+var shop_trade_quantity_label: Label
 var shop_pending_trade: Dictionary = {}
 var shop_livestock_label: Label
 var shop_pen_button: Button
@@ -2371,6 +2372,8 @@ func build_ui() -> void:
     shop_trade_quantity.allow_lesser = false
     shop_trade_quantity.value_changed.connect(_shop_trade_quantity_changed)
     shop_trade_panel.add_child(shop_trade_quantity)
+    shop_trade_quantity_label = text_label("จำนวน", 15, Color("#624b39"))
+    shop_trade_panel.add_child(shop_trade_quantity_label)
 
     # Dedicated seed inventory in the left-side area shown in the reference.
     # The panel is a fixed-size Panel, not a PanelContainer; it cannot grow.
@@ -2781,6 +2784,7 @@ func update_sizes() -> void:
     set_box(shop_trade_title, 14, 12, trade_w-28.0, 30)
     set_box(shop_trade_icon, 15, 53, 76, 76)
     set_box(shop_trade_details, 101, 42, trade_w-115.0, trade_h-111.0)
+    set_box(shop_trade_quantity_label, 15, trade_h-130.0, 90, 23)
     set_box(shop_trade_quantity, 15, trade_h-105.0, 90, 37)
     var trade_button_w: float = (trade_w-42.0)*0.5
     set_box(shop_trade_confirm, 14, trade_h-57.0, trade_button_w, 42)
@@ -3476,7 +3480,7 @@ func _request_shop_buy(kind: String, item: Variant) -> void:
                 return
             item_name = "เมล็ด" + str(CROPS[idx]["name"])
             item_price = int(CROPS[idx]["price"])
-            item_description = "เมล็ดพันธุ์สำหรับปลูกในฟาร์ม • จำนวน 1"
+            item_description = "เมล็ดพันธุ์สำหรับปลูกในฟาร์ม"
         "plot":
             item_name = "ชุดแปลงปลูก"
             item_price = PLOT_KIT_PRICE
@@ -3567,7 +3571,7 @@ func _confirm_shop_trade() -> void:
     var pending: Dictionary = shop_pending_trade.duplicate()
     var count: int = int(shop_trade_quantity.value)
     # Refuse malformed quantities rather than relying on UI clamping alone.
-    if count < 1 or count > 9999:
+    if count < 1 or (count > 9999 and str(pending.get("mode", "")) != "sell_all"):
         return
     _cancel_shop_trade()
     match str(pending.get("mode", "")):
@@ -3635,6 +3639,11 @@ func _confirm_shop_trade() -> void:
             save_game()
             refresh_labels()
         "sell_all":
+            var total_produce: int = 0
+            for qty in produce:
+                total_produce += int(qty)
+            if count != total_produce:
+                return
             if produce_value() != int(pending["expected_value"]):
                 message = "จำนวนผลผลิตเปลี่ยน กรุณาเลือกขายอีกครั้ง"
                 refresh_labels()
