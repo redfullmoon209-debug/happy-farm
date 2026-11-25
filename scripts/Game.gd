@@ -311,6 +311,7 @@ var character_preview_viewport: SubViewport
 var character_preview_avatar: Node3D
 var character_preview_gender: String = ""
 var character_preview_shoes: String = ""
+var character_preview_equipment: Dictionary = {}
 var character_preview_rotation_y: float = PI
 var character_preview_dragging: bool = false
 var character_equipment_buttons: Dictionary = {}
@@ -3096,9 +3097,13 @@ func _on_equipment_picker_choice(choice_index: int) -> void:
 func refresh_character_preview() -> void:
     if character_preview_viewport == null or not character_panel.visible:
         return
-    var selected_shoes: String = str(clothing_equipped.get("shoes", ""))
+    # Apply every equipped slot to the existing 3D avatar immediately.
+    # Recreate the preview only when avatar gender changes; never rely on
+    # shoes-only cache because shirts/gloves/pants/headwear are independent.
     if character_preview_avatar != null and is_instance_valid(character_preview_avatar):
-        if character_preview_gender == avatar_gender and character_preview_shoes == selected_shoes:
+        if character_preview_gender == avatar_gender:
+            character_preview_avatar.apply_equipment(clothing_equipped)
+            character_preview_equipment = clothing_equipped.duplicate(true)
             return
         character_preview_viewport.remove_child(character_preview_avatar)
         character_preview_avatar.queue_free()
@@ -3115,7 +3120,8 @@ func refresh_character_preview() -> void:
         preview_model.rotation.y = character_preview_rotation_y
         character_preview_avatar = preview_model
         character_preview_gender = avatar_gender
-        character_preview_shoes = selected_shoes
+        character_preview_shoes = str(clothing_equipped.get("shoes", ""))
+        character_preview_equipment = clothing_equipped.duplicate(true)
     else:
         preview_model.queue_free()
 
@@ -3222,7 +3228,7 @@ func equip_clothing(item_id: String) -> void:
     _close_equipment_picker()
     if farmer_visual != null and farmer_visual.has_method("apply_equipment"):
         farmer_visual.apply_equipment(clothing_equipped)
-    character_preview_gender = ""
+    refresh_character_preview()
     var real_mesh: bool = farmer_visual != null and farmer_visual.has_method("has_equipment_mesh") and farmer_visual.has_equipment_mesh(item_id)
     message = "สวม%sแล้ว" % str(data["name"]) if real_mesh else "เลือก%sแล้ว (กำลังรอโมเดลชิ้นนี้)" % str(data["name"])
     save_game()
@@ -3235,7 +3241,7 @@ func unequip_clothing(slot: String) -> void:
     _close_equipment_picker()
     if farmer_visual != null and farmer_visual.has_method("apply_equipment"):
         farmer_visual.apply_equipment(clothing_equipped)
-    character_preview_gender = ""
+    refresh_character_preview()
     message = "ถอด%sแล้ว" % str(CLOTHING_SLOT_NAMES[slot])
     save_game()
     refresh_labels()
