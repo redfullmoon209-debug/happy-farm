@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+<defs>
+<linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f5fbff"/><stop offset=".32" stop-color="#9ab9d4"/><stop offset=".64" stop-color="#485f79"/><stop offset="1" stop-color="#d6e8f5"/></linearGradient>
+<linearGradient id="leather" x1=".2" y1="0" x2=".8" y2="1"><stop stop-color="#3d586e"/><stop offset="1" stop-color="#142332"/></linearGradient>
+</defs>
+<!-- SINGLE RIGHT GAUNTLET ONLY. No lettering, no duplicate glove. -->
+<g transform="translate(10 6) rotate(14 54 56)" stroke="#0a1a29" stroke-width="3" stroke-linejoin="round">
+<path fill="url(#leather)" d="M25 114 12 91 19 72 30 63 22 38Q21 32 28 29Q35 28 39 39L45 53 40 16Q41 8 49 9Q57 9 57 17L63 50 63 10Q65 2 73 4Q81 6 81 14L81 52 86 25Q89 18 95 21Q102 25 100 32L96 72Q102 63 108 66Q116 71 110 80L85 106 69 119Z"/>
+<path fill="url(#metal)" d="M25 111 14 90 30 85 47 106 40 117Z"/>
+<path fill="url(#metal)" d="M25 74 30 64 45 55 77 53 94 62 91 80 77 93 51 95Z"/>
+<path fill="#19374d" stroke="#5a9bbd" d="M34 68 47 61 74 60 86 68 79 81 52 84Z"/>
+<path fill="#19c9f2" stroke="#c8ffff" stroke-width="2" d="M55 68 66 64 73 71 65 79 55 75Z"/>
+<path fill="url(#metal)" d="M21 36Q28 25 38 39L42 48 28 53Z"/>
+<path fill="url(#metal)" d="M41 17Q48 8 56 17L58 35 44 38Z"/>
+<path fill="url(#metal)" d="M64 12Q72 2 81 13L81 35 64 36Z"/>
+<path fill="url(#metal)" d="M85 28Q91 19 100 29L97 46 85 45Z"/>
+<path fill="#071928" stroke="#26d5ff" stroke-width="2" d="M22 93 33 88 46 105 39 109Z"/>
+</g>
+</svg>
