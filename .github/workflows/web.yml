@@ -62,6 +62,22 @@ jobs:
               dst.write_bytes(content)
               print('ORIGINAL MIXAMO:', original, '=>', dst, len(content),'bytes')
           PY
+      - name: Import the owner's optional GM construction FBX pack
+        run: |
+          set -euo pipefail
+          mkdir -p assets/gm_models
+          if test -f FBX.zip; then
+            # Source archive supplied by the owner: 68 FBX files under FBX/.
+            unzip -jo FBX.zip '*.fbx' -d assets/gm_models
+          elif test -f FarmFlex_GM_68_FBX_Import.zip; then
+            unzip -jo FarmFlex_GM_68_FBX_Import.zip 'assets/gm_models/*.fbx' -d assets/gm_models
+          fi
+          count=$(find assets/gm_models -maxdepth 1 -iname '*.fbx' | wc -l)
+          echo "GM MODEL FILES PRESENT: $count/68"
+          if [ "$count" -gt 0 ] && [ "$count" -ne 68 ]; then
+            echo "Incomplete GM model pack: expected all 68 supplied FBX assets" >&2
+            exit 1
+          fi
       - name: Download Godot
         run: |
           curl -fLsS --retry 3 https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o editor.zip
