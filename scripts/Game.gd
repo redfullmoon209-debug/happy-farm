@@ -257,6 +257,17 @@ var shop_feed: Button
 var shop_scroll: ScrollContainer
 var shop_grid: GridContainer
 var shop_wardrobe_buttons: Dictionary = {}
+# Equal-width shop halves: shop goods on left, farm produce sell inventory on right.
+var shop_buy_title: Label
+var shop_sell_title: Label
+var shop_sell_scroll: ScrollContainer
+var shop_sell_grid: GridContainer
+var shop_sell_cards: Array[Button] = []
+var shop_sell_entries: Array[Dictionary] = []
+var shop_sell_selected: int = -1
+var shop_sell_detail: Label
+var shop_sell_one_button: Button
+var shop_buy_information: Label
 var shop_livestock_label: Label
 var shop_pen_button: Button
 var shop_pig_button: Button
@@ -2173,9 +2184,40 @@ func build_ui() -> void:
     shop_grid.add_theme_constant_override("v_separation", 7)
     shop_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     shop_scroll.add_child(shop_grid)
+    shop_buy_title = text_label("ซื้อสินค้า", 18, Color("#624b39"))
+    shop_buy_title.add_theme_font_override("font", THAI_BOLD)
+    shop_panel.add_child(shop_buy_title)
+    shop_sell_title = text_label("ขายผลผลิตแลกเหรียญ", 18, Color("#624b39"))
+    shop_sell_title.add_theme_font_override("font", THAI_BOLD)
+    shop_panel.add_child(shop_sell_title)
+    shop_buy_information = text_label("เลือกสินค้าจากช่องด้านซ้ายเพื่อซื้อ", 14, Color("#624b39"))
+    shop_buy_information.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    shop_panel.add_child(shop_buy_information)
+    shop_sell_scroll = ScrollContainer.new()
+    shop_sell_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    shop_sell_scroll.clip_contents = true
+    shop_panel.add_child(shop_sell_scroll)
+    shop_sell_grid = GridContainer.new()
+    shop_sell_grid.columns = 5
+    shop_sell_grid.add_theme_constant_override("h_separation", 4)
+    shop_sell_grid.add_theme_constant_override("v_separation", 4)
+    shop_sell_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    shop_sell_scroll.add_child(shop_sell_grid)
+    for sale_slot_index in range(50):
+        var sale_slot: Button = btn("", _select_shop_sale_slot.bind(sale_slot_index))
+        sale_slot.name = "ShopSellSlot_%02d" % sale_slot_index
+        sale_slot.custom_minimum_size = Vector2(40, 44)
+        sale_slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        _metal_button_skin(sale_slot, USER_INV_SLOT)
+        shop_sell_grid.add_child(sale_slot)
+        shop_sell_cards.append(sale_slot)
+    shop_sell_detail = text_label("เลือกผลผลิตทางขวาเพื่อขายแลกเหรียญ", 14, Color("#624b39"))
+    shop_sell_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    shop_panel.add_child(shop_sell_detail)
+    shop_sell_one_button = btn("ขาย 1 ชิ้น", _sell_selected_shop_item, Color("#ad7c53"))
+    shop_panel.add_child(shop_sell_one_button)
     sell_button = btn("ขายผลผลิตทั้งหมด", sell_produce, Color("#ad7c53"))
-    sell_button.custom_minimum_size = Vector2(145, 55)
-    shop_grid.add_child(sell_button)
+    shop_panel.add_child(sell_button)
     # Earn coins from farm produce, then buy each individual gear piece.
     # These test pieces use new generated modular 3D meshes; default GLB
     # body/face/hair remain untouched.
@@ -2588,18 +2630,35 @@ func update_sizes() -> void:
         zoom_button.add_theme_stylebox_override("pressed", square_down)
     stick.queue_redraw()
 
-    var shop_w: float = minf(w-24.0, 490.0)
-    var shop_h: float = minf(h-24.0, 560.0)
+    # Shop is a real 50/50 split like the MMORPG inventory:
+    # LEFT = items for purchase, RIGHT = sellable items carried by the player.
+    var shop_w: float = minf(w-18.0, 1040.0)
+    var shop_h: float = minf(h-18.0, 660.0)
+    var shop_half: float = (shop_w-28.0)*0.5
+    var shop_left_x: float = 10.0
+    var shop_right_x: float = 18.0+shop_half
+    var shop_body_top: float = 105.0
+    var shop_body_h: float = maxf(58.0, shop_h-239.0)
     set_box(shop_panel, (w-shop_w)*0.5, (h-shop_h)*0.5, shop_w, shop_h)
     set_box(shop_header_art, 7, 3, shop_w-14, 57)
     set_box(shop_heading, 15, 10, shop_w-105, 33)
     set_box(shop_close, shop_w-85, 8, 73, 37)
-    set_box(shop_livestock_label, 15, 48, shop_w-30, 28)
-    set_box(shop_scroll, 14, 79, shop_w-28, maxf(57.0, shop_h-260.0))
-    set_box(shop_feed, 14, shop_h-169, shop_w-28, 45)
-    set_box(shop_pen_button, 14, shop_h-116, shop_w-28, 45)
-    set_box(shop_pig_button, 14, shop_h-63, shop_w-28, 45)
-    shop_grid.columns = 1 if w < 440.0 else 2
+    set_box(shop_livestock_label, 15, 44, shop_w-30, 25)
+    set_box(shop_buy_title, shop_left_x+3.0, 76.0, shop_half-6.0, 25.0)
+    set_box(shop_sell_title, shop_right_x+3.0, 76.0, shop_half-6.0, 25.0)
+    set_box(shop_scroll, shop_left_x, shop_body_top, shop_half, shop_body_h)
+    set_box(shop_sell_scroll, shop_right_x, shop_body_top, shop_half, shop_body_h)
+    var shop_grid_cols: int = 5 if shop_half >= 345.0 else (4 if shop_half >= 255.0 else 3)
+    shop_grid.columns = shop_grid_cols
+    shop_sell_grid.columns = shop_grid_cols
+    set_box(shop_buy_information, shop_left_x+2.0, shop_h-126.0, shop_half-4.0, 36.0)
+    set_box(shop_sell_detail, shop_right_x+2.0, shop_h-126.0, shop_half-4.0, 36.0)
+    set_box(sell_button, shop_right_x+2.0, shop_h-81.0, shop_half-4.0, 31.0)
+    set_box(shop_sell_one_button, shop_right_x+2.0, shop_h-45.0, shop_half-4.0, 33.0)
+    var extra_width: float = (shop_half-12.0)/3.0
+    set_box(shop_feed, shop_left_x, shop_h-78.0, extra_width, 62.0)
+    set_box(shop_pen_button, shop_left_x+extra_width+6.0, shop_h-78.0, extra_width, 62.0)
+    set_box(shop_pig_button, shop_left_x+2.0*(extra_width+6.0), shop_h-78.0, extra_width, 62.0)
 
     # On narrow screens the badge sits below the header.
     var badge_y: float = 8.0 if w > 960.0 else header_height+15.0
