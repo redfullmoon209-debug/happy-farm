@@ -141,11 +141,9 @@ const CLOTHING_SLOT_NAMES: Dictionary = {
     "bottom": "กางเกง/กระโปรง", "shoes": "รองเท้า"
 }
 var CLOTHING_CATALOG: Dictionary = WARDROBE.all_items()
-# Verified directly against 04_FarmFlex_Game_Ready/character_manifest.json.
-# Current character GLBs contain only these two independent apparel variants.
-const REAL_CLOTHING_MESH_IDS: Array[String] = [
-    "female_martial_shoes", "female_survivor_shoes"
-]
+# 3D garments for both sexes are created by FarmFlexGarments.gd, using the
+# same geometry for equipment and inventory thumbnails.
+var REAL_CLOTHING_MESH_IDS: Array[String] = WARDROBE.available_item_ids()
 var gender_change_tickets: int = 0
 var clothing_owned: Dictionary = WARDROBE.starter_inventory()
 var clothing_equipped: Dictionary = {}
@@ -2195,13 +2193,14 @@ func build_ui() -> void:
         decor_buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         shop_grid.add_child(decor_buy)
         shop_decor_buttons.append(decor_buy)
-    # Clothing is bought with coins earned by selling farm produce.
-    # Show only garments with matching source meshes in the character GLB.
-    var wardrobe_note: Label = text_label("ชุด 3 แบบจาก Character Test: ตอนนี้มีโมเดลแยกจริงเฉพาะรองเท้าผู้หญิง 2 คู่", 15, Color("#674e3c"))
+    # Earn coins from farm produce, then buy each individual gear piece.
+    # These test pieces use new generated modular 3D meshes; default GLB
+    # body/face/hair remain untouched.
+    var wardrobe_note: Label = text_label("เสื้อผ้า 3 ชุด • ซื้อทีละชิ้นด้วยเหรียญฟาร์ม", 15, Color("#674e3c"))
     wardrobe_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     wardrobe_note.custom_minimum_size = Vector2(145, 48)
     shop_grid.add_child(wardrobe_note)
-    for item_id in ["female_martial_shoes", "female_survivor_shoes"]:
+    for item_id in WARDROBE.available_item_ids():
         var gear_data: Dictionary = CLOTHING_CATALOG[item_id]
         var price: int = WARDROBE.shop_price(item_id)
         var wardrobe_buy: Button = btn("%s\n%d เหรียญ" % [str(gear_data["name"]), price], buy_clothing.bind(item_id))
@@ -2811,8 +2810,9 @@ func refresh_labels() -> void:
         var buy_button: Button = shop_wardrobe_buttons[garment_id]
         var gender_ok: bool = str(CLOTHING_CATALOG[garment_id].get("gender", "")) == avatar_gender
         var already_owned: bool = int(clothing_owned.get(garment_id, 0)) > 0
-        buy_button.disabled = not gender_ok or already_owned
-        buy_button.tooltip_text = "ซื้อแล้ว อยู่ในกระเป๋า" if already_owned else ("สำหรับตัวละครหญิง" if not gender_ok else "ปลูกผักขายเพื่อหาเหรียญซื้อชุด")
+        buy_button.visible = gender_ok
+        buy_button.disabled = already_owned
+        buy_button.tooltip_text = "ซื้อแล้ว อยู่ในกระเป๋า" if already_owned else "ทำฟาร์มขายผลผลิตเพื่อซื้อเสื้อผ้า"
     if get_viewport().get_visible_rect().size.x < 960.0:
         money_label.text = "เงิน %d | คอก %d | หมู %d/%d" % [coins, pens, pigs, pens*PEN_CAPACITY]
     else:
@@ -2863,9 +2863,7 @@ func refresh_labels() -> void:
 # No fake gear: unprovided models remain empty equipment slots on the left.
 func _inventory_contents() -> Array[Dictionary]:
     var out: Array[Dictionary] = []
-    # Only display garment items backed by a real skinned mesh in the shipped
-    # source GLB. Keep other planned set IDs in save data for later asset import,
-    # but never present invented items as real equipment to the player.
+    # Purchased 3D garments appear in the right-hand MMORPG inventory only.
     for id in REAL_CLOTHING_MESH_IDS:
         var item: Dictionary = CLOTHING_CATALOG[id]
         if str(item.get("gender", "")) == avatar_gender and int(clothing_owned.get(id, 0)) > 0:
@@ -2913,12 +2911,11 @@ func inventory_slot_pressed(index: int) -> void:
             message = str(item.get("name", "ไอเทม"))
             refresh_labels()
 
-# Render a thumbnail once per item from its imported 3D garment Mesh.
-# The supplied GLBs only have two confirmed real shoe variants.
+# Render thumbnails from the exact generated 3D garment meshes worn in game.
 func _real_equipment_thumbnail(item_id: String) -> Texture2D:
     if equipment_thumbnail_cache.has(item_id):
         return equipment_thumbnail_cache[item_id] as Texture2D
-    if item_id not in ["female_martial_shoes", "female_survivor_shoes"]:
+    if not REAL_CLOTHING_MESH_IDS.has(item_id):
         return null
     if bag_panel == null:
         return null
@@ -2941,7 +2938,7 @@ func refresh_bag_cards() -> void:
         if str(item_entry.get("kind", "")) == "clothing":
             actual_outfits += 1
     bag_summary.text = "ชุดที่ซื้อแล้ว %d ชิ้น | %d/%d" % [actual_outfits, inventory_entries.size(), INVENTORY_CAPACITY]
-    bag_footer.text = "โมเดลชายยังไม่มีชุดแยกวางขาย" if avatar_gender == "male" else "ทำฟาร์มขายผลผลิต แล้วซื้อเสื้อผ้าที่ร้านค้า"
+    bag_footer.text = "แตะไอเทมเพื่อดูรายละเอียด แล้วกดสวมใส่ • ทำฟาร์มหาเงินซื้อชุดในร้านค้า"
     if inventory_selected_index >= 0 and inventory_selected_index < inventory_entries.size():
         var selected_entry: Dictionary = inventory_entries[inventory_selected_index]
         if str(selected_entry.get("kind", "")) == "clothing":
@@ -3303,7 +3300,7 @@ func refresh_character_panel() -> void:
         if not found_for_slot:
             var no_asset: Label = text_label("   ยังไม่มีชิ้นส่วนโมเดลสำหรับช่องนี้", 15, Color("#627566"))
             character_slot_list.add_child(no_asset)
-    var note: Label = text_label("ชุดเริ่มต้นอยู่ที่ BaseBody • ชุดทดสอบ 3 แบบแยกชิ้นในกระเป๋า (ชิ้นที่ยังไม่มี Mesh จะเปลี่ยนสถานะการสวมเท่านั้น)", 15, Color("#445849"))
+    var note: Label = text_label("ชุดใหม่ 3 แบบ • ซื้อทีละชิ้นจากร้านค้า แล้วกดสวมใส่ในกระเป๋า", 15, Color("#445849"))
     note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     character_slot_list.add_child(note)
     refresh_character_preview()
