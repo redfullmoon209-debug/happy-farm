@@ -23,17 +23,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Bundle original music, sound effects and recorded Thai voice
         run: bash tools/prepare_audio.sh
-      - name: Store WAV sound assets permanently in the repository
-        run: |
-          git add assets/audio
-          if git diff --cached --quiet; then
-            echo "Audio assets already committed."
-          else
-            git config user.name "happy-farm-audio-bot"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git commit -m "Bundle original music, farm Foley and Thai farmer voice audio"
-            git push origin HEAD:main || echo "Audio stays in this web build; repository upload was blocked."
-          fi
+      # Audio generation remains part of this build, but never pushes a second
+      # commit while the same branch is being exported/deployed.
       - name: Restore exact Codex male and female GLB assets
         run: |
           set -euo pipefail
