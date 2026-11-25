@@ -4,6 +4,7 @@ const JOYSTICK = preload("res://scripts/Joystick.gd")
 const ICON = preload("res://scripts/BadgeIcon.gd")
 const SEED_ICON = preload("res://scripts/SeedIcon.gd")
 const SAVE_DATA = preload("res://scripts/SaveData.gd")
+const WARDROBE = preload("res://scripts/WardrobeCatalog.gd")
 const MODULAR_VISUAL = preload("res://scripts/ModularVisual.gd")
 const FARM_AUDIO = preload("res://scripts/FarmAudio.gd")
 const GARDEN_DECOR = preload("res://scripts/GardenDecor.gd")
@@ -138,13 +139,9 @@ const CLOTHING_SLOT_NAMES: Dictionary = {
     "headwear": "หมวก", "top": "เสื้อ", "gloves": "ถุงมือ",
     "bottom": "กางเกง/กระโปรง", "shoes": "รองเท้า"
 }
-const CLOTHING_CATALOG: Dictionary = {
-    # These are the only separate skinned footwear meshes in the source GLB.
-    "female_survivor_shoes": {"name": "รองเท้าผู้รอดชีวิต", "slot": "shoes", "gender": "female"},
-    "female_martial_shoes": {"name": "รองเท้าจอมยุทธ์", "slot": "shoes", "gender": "female"}
-}
+var CLOTHING_CATALOG: Dictionary = WARDROBE.all_items()
 var gender_change_tickets: int = 0
-var clothing_owned: Dictionary = {"female_survivor_shoes": 1, "female_martial_shoes": 1}
+var clothing_owned: Dictionary = WARDROBE.starter_inventory()
 var clothing_equipped: Dictionary = {}
 # Temporary browser-only avatar preview; never persisted into the farm save.
 var test_avatar_gender: String = ""
@@ -2839,8 +2836,11 @@ func inventory_slot_pressed(index: int) -> void:
             select_seed(int(item["index"]))
         "clothing":
             var id: String = str(item["item_id"])
-            if str(clothing_equipped.get("shoes", "")) == id:
-                unequip_clothing("shoes")
+            var clothing_slot: String = str(CLOTHING_CATALOG.get(id, {}).get("slot", ""))
+            if clothing_slot.is_empty():
+                return
+            if str(clothing_equipped.get(clothing_slot, "")) == id:
+                unequip_clothing(clothing_slot)
             else:
                 equip_clothing(id)
         "gender":
@@ -2867,14 +2867,24 @@ func refresh_bag_cards() -> void:
             slot.add_theme_stylebox_override("disabled", displayed_skin)
         if i >= inventory_entries.size():
             slot.text = ""
+            slot.icon = null
             slot.tooltip_text = "ช่องว่าง %d" % (i+1)
             slot.disabled = true
             slot.modulate = Color.WHITE
             continue
         var entry: Dictionary = inventory_entries[i]
-        # A ten-column inventory cannot fit full item names inside each cell.
-        # Keep the names in tooltips and display a legible quantity on the art.
-        slot.text = "×%d" % int(entry["count"])
+        # Render clothing type + collection as live text, not baked into art.
+        slot.icon = null
+        if str(entry.get("kind", "")) == "clothing":
+            var outfit: Dictionary = CLOTHING_CATALOG.get(str(entry["item_id"]), {})
+            var slot_id: String = str(outfit.get("slot", ""))
+            var piece_code: String = {"headwear":"H", "top":"T", "gloves":"G", "bottom":"B", "shoes":"S"}.get(slot_id, "?")
+            var set_code: String = {"villager":"V", "martial":"M", "survivor":"R"}.get(str(outfit.get("set", "")), "?")
+            var worn: bool = str(clothing_equipped.get(slot_id, "")) == str(entry["item_id"])
+            slot.text = "%s%s%s" % [set_code, piece_code, "✓" if worn else ""]
+            slot.add_theme_font_size_override("font_size", 12)
+        else:
+            slot.text = "×%d" % int(entry["count"])
         slot.tooltip_text = "%s (%d) • ช่อง %d" % [str(entry["name"]), int(entry["count"]), i+1]
         slot.disabled = false
         slot.modulate = Color.WHITE
@@ -3127,7 +3137,7 @@ func refresh_character_panel() -> void:
         if not found_for_slot:
             var no_asset: Label = text_label("   ยังไม่มีชิ้นส่วนโมเดลสำหรับช่องนี้", 15, Color("#627566"))
             character_slot_list.add_child(no_asset)
-    var note: Label = text_label("ชุดเริ่มต้นฝังใน BaseBody • ไอเทมแยกที่มีจริงตอนนี้คือรองเท้าผู้หญิง 2 คู่", 15, Color("#445849"))
+    var note: Label = text_label("ชุดเริ่มต้นอยู่ที่ BaseBody • ชุดทดสอบ 3 แบบแยกชิ้นในกระเป๋า (ชิ้นที่ยังไม่มี Mesh จะเปลี่ยนสถานะการสวมเท่านั้น)", 15, Color("#445849"))
     note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     character_slot_list.add_child(note)
     refresh_character_preview()
@@ -3478,7 +3488,7 @@ func _apply_snapshot(state: Dictionary) -> void:
     avatar_gender = restored_gender
     character_profile = state.get("character_profile", {}).duplicate(true)
     gender_change_tickets = int(state.get("gender_change_tickets", 0))
-    clothing_owned = state.get("clothing_owned", {"female_survivor_shoes": 1, "female_martial_shoes": 1}).duplicate(true)
+    clothing_owned = WARDROBE.migrate_inventory(state.get("clothing_owned", {}))
     clothing_equipped = state.get("clothing_equipped", {}).duplicate(true)
     if farmer != null:
         if previous_gender != restored_gender:
