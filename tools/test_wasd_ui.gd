@@ -99,6 +99,13 @@ func _run() -> void:
         "three separate matching ivory farm UI graphic layers load")
     check(farm.UI_BUTTON.resource_path.contains("farmflex_cream"),
         "all active HUD buttons use the new cream PNG instead of glossy green")
+    # Graphic is only the background; Godot Button owns live labels and icon assets.
+    check(farm.bag_button.text == "กระเป๋า" and farm.shop_button.text == "ร้านค้า",
+        "Thai button labels are live Godot text, not baked into background art")
+    check(farm.bag_button.get_theme_stylebox("normal") is StyleBoxTexture,
+        "standalone cream background remains independent from text")
+    check(farm.bag_button.has_meta("happy_icon_texture"),
+        "bag icon is an independent texture, not part of the cream button PNG")
     for name in ["cream_button", "cream_square", "cream_bar", "cream_hud"]:
         check(ResourceLoader.exists("res://assets/ui/farmflex_cream/%s.png" % name),
             "standalone cream PNG exists: " + name)
