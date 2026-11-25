@@ -48,7 +48,8 @@ func set_equipment_item(item_id: String) -> bool:
     size = Vector2i(144, 144)
     transparent_bg = true
     own_world_3d = true
-    render_target_update_mode = SubViewport.UPDATE_ALWAYS
+    # Render the icon once: keeping 3D thumbnails animating wastes mobile GPU.
+    render_target_update_mode = SubViewport.UPDATE_ONCE
     var center: Vector3 = (low + high) * 0.5
     var dimensions: Vector3 = high - low
     var frame_size: float = maxf(0.12, maxf(dimensions.x, maxf(dimensions.y, dimensions.z))) * 1.6
