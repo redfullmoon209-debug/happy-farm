@@ -2253,9 +2253,9 @@ func build_ui() -> void:
     character_preview_frame.add_child(character_preview_viewport)
     var preview_camera: Camera3D = Camera3D.new()
     preview_camera.position = Vector3(0.0, 0.62, 2.15)
-    preview_camera.look_at(Vector3(0.0, 0.46, 0.0))
     preview_camera.fov = 34.0
     character_preview_viewport.add_child(preview_camera)
+    preview_camera.look_at(Vector3(0.0, 0.46, 0.0))
     preview_camera.current = true
     var preview_light: DirectionalLight3D = DirectionalLight3D.new()
     preview_light.rotation_degrees = Vector3(-38.0, -25.0, 0.0)
@@ -2476,7 +2476,7 @@ func update_sizes() -> void:
     set_box(gender_item_button, 12.0, 70.0+preview_h, side_w-24.0, 37.0)
     set_box(character_scroll, 12.0, 113.0+preview_h, side_w-24.0,
         maxf(30.0, left_inner_h-122.0-preview_h))
-    character_preview_viewport.size = Vector2i(maxi(80, int(side_w-24.0)), maxi(80, int(preview_h)))
+    # SubViewportContainer.stretch adjusts the viewport automatically.
     # RIGHT: exactly 200 slots in a responsive grid, always visible with scrollbar.
     var inventory_x: float = 20.0+side_w
     var inventory_w: float = side_w
