@@ -91,6 +91,23 @@ jobs:
           Path('/tmp/farmflex-player-creation.mjs').write_text(scripts[0],encoding='utf-8')
           PY
           node --check /tmp/farmflex-player-creation.mjs
+      - name: Verify FarmFlex joystick PNG layers before Godot export
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          root = Path('assets/ui/farmflex_joystick')
+          names = ('joystick_base', 'joystick_arrows', 'joystick_thumb', 'joystick_effect')
+          joystick = Path('scripts/Joystick.gd').read_text(encoding='utf-8')
+          for name in names:
+              path = root / (name + '.png')
+              raw = path.read_bytes()
+              assert raw[:8] == b'\\x89PNG\\r\\n\\x1a\\n', f'Not a PNG: {path}'
+              width, height = struct.unpack('>II', raw[16:24])
+              assert (width, height) == (512, 512), (path, width, height)
+              assert f'res://assets/ui/farmflex_joystick/{name}.png' in joystick, f'Joystick not wired: {name}'
+              print('FARMFLEX JOYSTICK PNG VERIFIED:', path, width, height)
+          PY
       - name: Strict GDScript validation
         run: |
           set -o pipefail
@@ -147,6 +164,11 @@ jobs:
           test -s build/web/create-character.html
           test ! -e build/web/character-preview.html
           test ! -e build/web/farmflex-characters-v2.html
+          # Publish the separately imported textures for direct visual verification,
+          # together with a revision marker so old Pages exports are distinguishable.
+          mkdir -p build/web/ui/joystick
+          cp assets/ui/farmflex_joystick/*.png build/web/ui/joystick/
+          printf '%s\\n' "$GITHUB_SHA" > build/web/farmflex-build.txt
           touch build/web/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
