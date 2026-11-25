@@ -17,6 +17,16 @@ const UI_HUD: Texture2D = preload("res://assets/ui/happy/hud_bar.png")
 const UI_TOP: Texture2D = preload("res://assets/ui/happy/hud_top.png")
 const UI_ZOOM: Texture2D = preload("res://assets/ui/happy/button_zoom.png")
 const INV_TEXT = preload("res://scripts/InventoryI18n.gd")
+# New separated metallic-blue inventory art. Text is always rendered by Godot.
+const INV_FRAME: Texture2D = preload("res://assets/ui/metal/inventory_window.svg")
+const INV_CHARACTER: Texture2D = preload("res://assets/ui/metal/character_display.svg")
+const INV_RIGHT: Texture2D = preload("res://assets/ui/metal/right_items_panel.svg")
+const INV_SLOT: Texture2D = preload("res://assets/ui/metal/slot_empty.svg")
+const INV_SLOT_SELECTED: Texture2D = preload("res://assets/ui/metal/slot_selected.svg")
+const INV_EQUIPMENT: Texture2D = preload("res://assets/ui/metal/equipment_slot.svg")
+const INV_BUTTON: Texture2D = preload("res://assets/ui/metal/blue_button.svg")
+const INV_CLOSE: Texture2D = preload("res://assets/ui/metal/close_button.svg")
+const INV_TITLE: Texture2D = preload("res://assets/ui/metal/title_bar.svg")
 const ICON_GLOVE_SINGLE: Texture2D = preload("res://assets/ui/metal/glove_single.svg")
 const THAI = preload("res://assets/Sarabun-Regular.ttf")
 const THAI_BOLD = preload("res://assets/Sarabun-SemiBold.ttf")
@@ -236,6 +246,8 @@ var bag_button: Button
 var change_seed_button: Button
 var active_seed_label: Label
 var bag_panel: Panel
+var bag_right_decoration: Panel
+var bag_title_decoration: TextureRect
 var bag_header: ColorRect
 var bag_heading: Label
 var bag_close: Button
@@ -1806,6 +1818,43 @@ func _skin_window(p: Panel) -> void:
     frame.texture_margin_bottom = 28.0
     p.add_theme_stylebox_override("panel", frame)
 
+# Nine-slice textures allow real independent UI art to resize without cutting corners.
+func _metal_panel_skin(p: Panel, art: Texture2D, margin: float = 12.0) -> void:
+    var style: StyleBoxTexture = StyleBoxTexture.new()
+    style.texture = art
+    style.texture_margin_left = margin
+    style.texture_margin_right = margin
+    style.texture_margin_top = margin
+    style.texture_margin_bottom = margin
+    p.add_theme_stylebox_override("panel", style)
+
+func _metal_button_skin(b: Button, art: Texture2D = INV_EQUIPMENT) -> void:
+    var normal: StyleBoxTexture = StyleBoxTexture.new()
+    normal.texture = art
+    normal.texture_margin_left = 9.0
+    normal.texture_margin_right = 9.0
+    normal.texture_margin_top = 9.0
+    normal.texture_margin_bottom = 9.0
+    b.add_theme_stylebox_override("normal", normal)
+    b.add_theme_stylebox_override("disabled", normal)
+    var hover: StyleBoxTexture = normal.duplicate()
+    hover.texture = INV_SLOT_SELECTED
+    b.add_theme_stylebox_override("hover", hover)
+    b.add_theme_stylebox_override("pressed", hover)
+    b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+    b.add_theme_color_override("font_color", Color("#d9f4ff"))
+    b.add_theme_color_override("font_disabled_color", Color("#7da5b7"))
+
+func _metal_right_overlay() -> void:
+    if bag_right_decoration != null:
+        return
+    bag_right_decoration = panel(Color("#051322"))
+    _metal_panel_skin(bag_right_decoration, INV_RIGHT, 10.0)
+    bag_right_decoration.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    bag_panel.add_child(bag_right_decoration)
+    # Move the decoration BEHIND the 200 independent interactive slots.
+    bag_panel.move_child(bag_right_decoration, 0)
+
 func _skin_hud(p: Panel) -> void:
     var frame: StyleBoxTexture = StyleBoxTexture.new()
     frame.texture = UI_HUD
@@ -2132,10 +2181,19 @@ func build_ui() -> void:
     # Dedicated seed inventory in the left-side area shown in the reference.
     # The panel is a fixed-size Panel, not a PanelContainer; it cannot grow.
     bag_panel = panel(Color("#ecf1e6fb"))
-    _skin_window(bag_panel)
+    _metal_panel_skin(bag_panel, INV_FRAME, 17.0)
     ui.add_child(bag_panel)
+    _metal_right_overlay()
     bag_panel.visible = false
+    # Old farm-wood header must not cover the metallic frame.
     bag_header_art = _header_layer(bag_panel)
+    bag_header_art.visible = false
+    bag_title_decoration = TextureRect.new()
+    bag_title_decoration.texture = INV_TITLE
+    bag_title_decoration.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    bag_title_decoration.stretch_mode = TextureRect.STRETCH_SCALE
+    bag_title_decoration.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    bag_panel.add_child(bag_title_decoration)
     bag_header = ColorRect.new()
     bag_header.color = Color.TRANSPARENT
     bag_header.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2143,10 +2201,12 @@ func build_ui() -> void:
     bag_heading = text_label(INV_TEXT.label("bag_title", inventory_language), 23, Color("#ffffff"))
     bag_heading.add_theme_font_override("font", THAI_BOLD)
     bag_panel.add_child(bag_heading)
-    bag_close = btn("ปิด", show_bag, Color("#d4a16b"))
+    bag_close = btn("✕", show_bag, Color("#cf4765"))
+    _metal_button_skin(bag_close, INV_CLOSE)
     bag_panel.add_child(bag_close)
     bag_language_button = btn("TH / EN", toggle_inventory_language, Color("#426e92"))
     bag_language_button.name = "InventoryLanguageToggle"
+    _metal_button_skin(bag_language_button, INV_BUTTON)
     bag_panel.add_child(bag_language_button)
     # No extra wardrobe tab: MMO split screen always shows the player on
     # the left and all 200 item slots on the right.
@@ -2169,6 +2229,7 @@ func build_ui() -> void:
         slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         slot.add_theme_font_size_override("font_size", 11)
         slot.clip_text = true
+        _metal_button_skin(slot, INV_SLOT)
         bag_grid.add_child(slot)
         inventory_slots.append(slot)
     bag_footer = text_label("แตะซองเมล็ดเพื่อเลือกไปปลูก", 16, Color("#ffffff"))
@@ -2249,7 +2310,7 @@ func build_ui() -> void:
 
     # Above the HUD, shop and bag. All equipment is changed inside this window.
     character_panel = panel(Color("#e9f1e6fb"))
-    _skin_window(character_panel)
+    _metal_panel_skin(character_panel, INV_CHARACTER, 9.0)
     bag_panel.add_child(character_panel)
     character_panel.name = "CharacterWardrobe"
     character_panel.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -2292,12 +2353,14 @@ func build_ui() -> void:
         slot_button.name = "EquipmentSlot_" + slot_name
         slot_button.clip_text = true
         slot_button.add_theme_font_size_override("font_size", 11)
+        _metal_button_skin(slot_button, INV_EQUIPMENT)
         character_panel.add_child(slot_button)
         character_equipment_buttons[slot_name] = slot_button
-    character_info_label = text_label("", 15, Color("#324d39"))
+    character_info_label = text_label("", 15, Color("#e3f1ff"))
     character_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     character_panel.add_child(character_info_label)
     gender_item_button = btn("", request_gender_change, Color("#487f72"))
+    _metal_button_skin(gender_item_button, INV_BUTTON)
     character_panel.add_child(gender_item_button)
     character_scroll = ScrollContainer.new()
     character_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -2497,12 +2560,15 @@ func update_sizes() -> void:
     var side_w: float = (bag_width-30.0)*0.5
     set_box(bag_panel, bag_x, bag_y, bag_width, bag_height)
     set_box(bag_header_art, 6.0, 2.0, bag_width-12.0, 51.0)
+    set_box(bag_title_decoration, (bag_width-300.0)*0.5, 0.0, 300.0, 51.0)
     set_box(bag_header, 0, 0, bag_width, 53)
-    set_box(bag_heading, 16, 7, bag_width-104.0, 33)
-    set_box(bag_close, bag_width-75.0, 7, 64, 36)
+    set_box(bag_heading, (bag_width-290.0)*0.5, 6.0, 290.0, 35.0)
+    bag_heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    set_box(bag_close, bag_width-60.0, 6, 48, 42)
     set_box(bag_language_button, bag_width-164.0, 7, 83, 36)
     # LEFT: 3D character and 5 independently equipped gear slots
     set_box(character_panel, 10.0, 52.0, side_w, bag_height-65.0)
+    set_box(bag_right_decoration, 20.0+side_w, 52.0, side_w, bag_height-65.0)
     set_box(character_title, 12.0, 8.0, side_w-24.0, 28.0)
     var left_inner_h: float = bag_height-65.0
     # Reserve the lower part for gear row, character data and gender-card action.
