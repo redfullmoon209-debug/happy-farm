@@ -59,6 +59,11 @@ func _check() -> void:
             problems.append("shop selling inventory is not on the right")
         if farm.shop_sell_cards.size() != 50:
             problems.append("shop selling grid missing 50 inventory slots")
+        if farm.shop_sell_grid.columns != farm.bag_grid.columns:
+            problems.append("shop selling grid must use the same responsive columns as backpack")
+        if farm.shop_sell_cards.size() > 0 and farm.inventory_slots.size() > 0:
+            if farm.shop_sell_cards[0].custom_minimum_size != farm.inventory_slots[0].custom_minimum_size:
+                problems.append("shop selling slots must match backpack slot dimensions")
         var crop_value: int = int(farm.CROPS[0]["reward"])
         farm.produce[0] = 3
         var money_before_sale: int = farm.coins
