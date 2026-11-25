@@ -2799,6 +2799,15 @@ func refresh_labels() -> void:
 # No fake gear: unprovided models remain empty equipment slots on the left.
 func _inventory_contents() -> Array[Dictionary]:
     var out: Array[Dictionary] = []
+    # All three complete sets belong in the bag; show the current gender's
+    # fifteen pieces so the grid stays usable on landscape mobile screens.
+    for set_id in ["villager", "martial", "survivor"]:
+        for slot_id in CLOTHING_SLOTS:
+            var id: String = WARDROBE.item_id(avatar_gender, set_id, slot_id)
+            if int(clothing_owned.get(id, 0)) > 0:
+                var item: Dictionary = CLOTHING_CATALOG[id]
+                out.append({"kind": "clothing", "item_id": id,
+                    "name": str(item["name"]), "count": int(clothing_owned[id])})
     for i in range(CROPS.size()):
         if int(seeds[i]) > 0:
             out.append({"kind": "seed", "index": i, "name": str(CROPS[i]["name"]), "count": int(seeds[i])})
@@ -2807,14 +2816,6 @@ func _inventory_contents() -> Array[Dictionary]:
             out.append({"kind": "produce", "index": i, "name": str(CROPS[i]["name"])+" ผลผลิต", "count": int(produce[i])})
     if gender_change_tickets > 0:
         out.append({"kind": "gender", "name": "บัตรเปลี่ยนเพศ", "count": gender_change_tickets})
-    # All three complete sets belong in the bag; show the current gender's
-    # fifteen pieces so the grid stays usable on landscape mobile screens.
-    for id in CLOTHING_CATALOG:
-        var item: Dictionary = CLOTHING_CATALOG[id]
-        if str(item.get("gender", "")) != avatar_gender:
-            continue
-        if int(clothing_owned.get(id, 0)) > 0:
-            out.append({"kind": "clothing", "item_id": id, "name": str(item["name"]), "count": int(clothing_owned[id])})
     if plot_kits > 0:
         out.append({"kind": "plot", "name": "ชุดแปลง", "count": plot_kits})
     for i in range(tree_kits.size()):
@@ -2857,8 +2858,12 @@ func refresh_bag_cards() -> void:
     if bag_summary == null:
         return
     inventory_entries = _inventory_contents()
-    bag_summary.text = "%s  %d/%d" % [INV_TEXT.label("bag_full", inventory_language), inventory_entries.size(), INVENTORY_CAPACITY]
-    bag_footer.text = INV_TEXT.label("click_hint", inventory_language)
+    bag_summary.text = "ชุด 3 แบบ • ชาวบ้าน / จอมยุทธ์ / ผู้รอดชีวิต | %d/%d" % [inventory_entries.size(), INVENTORY_CAPACITY]
+    bag_footer.text = "แตะไอเทมชุดใน 15 ช่องแรกเพื่อสวมหรือถอดทีละชิ้น"
+    if inventory_selected_index >= 0 and inventory_selected_index < inventory_entries.size():
+        var selected_entry: Dictionary = inventory_entries[inventory_selected_index]
+        if str(selected_entry.get("kind", "")) == "clothing":
+            bag_footer.text = str(selected_entry["name"]) + " • แตะซ้ำเพื่อถอด"
     for i in range(inventory_slots.size()):
         var slot: Button = inventory_slots[i]
         var selected: bool = i == inventory_selected_index and i < inventory_entries.size()
@@ -2885,6 +2890,8 @@ func refresh_bag_cards() -> void:
             var piece_code: String = {"headwear":"H", "top":"T", "gloves":"G", "bottom":"B", "shoes":"S"}.get(slot_id, "?")
             var set_code: String = {"villager":"V", "martial":"M", "survivor":"R"}.get(str(outfit.get("set", "")), "?")
             var worn: bool = str(clothing_equipped.get(slot_id, "")) == str(entry["item_id"])
+            # Prefix V/M/R identifies the set, H/T/G/B/S the piece.
+            # Full Thai equipment names remain in the live footer after a tap.
             slot.text = "%s%s%s" % [set_code, piece_code, "✓" if worn else ""]
             slot.add_theme_font_size_override("font_size", 12)
         else:
