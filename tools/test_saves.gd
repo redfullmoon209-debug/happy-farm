@@ -86,6 +86,29 @@ func _initialize() -> void:
     purchased_male["clothing_equipped"] = {"bottom": "male_survivor_bottom"}
     check(str(SAVES.normalize(purchased_male).get("clothing_equipped", {}).get("bottom", "")) == "male_survivor_bottom",
         "male modular trousers survive a saved game")
+    # GM placements persist per local save; reject unknown or out-of-map files.
+    var gm_world: Dictionary = farm.duplicate(true)
+    gm_world["gm_placed_props"] = [{
+        "name":"CommonTree_1", "x":-8.5, "z":11.0,
+        "rotation":45.0, "scale":1.2
+    }, {
+        "name":"RockPath_Square_Wide", "x":3.0, "z":7.0,
+        "rotation":90.0, "scale":0.7
+    }]
+    var saved_gm: Dictionary = SAVES.normalize(gm_world)
+    check(saved_gm.get("gm_placed_props", []).size() == 2,
+        "GM imported FBX world placements saved in the farm")
+    var wrong_gm: Dictionary = gm_world.duplicate(true)
+    wrong_gm["gm_placed_props"][0]["name"] = "../unknown"
+    check(SAVES.normalize(wrong_gm).is_empty(),
+        "reject unknown GM asset file references")
+    var out_of_map: Dictionary = gm_world.duplicate(true)
+    out_of_map["gm_placed_props"][0]["x"] = 9999.0
+    check(SAVES.normalize(out_of_map).is_empty(),
+        "reject GM objects placed outside the farm")
+    var gm_roundtrip: Dictionary = SAVES.normalize(JSON.parse_string(JSON.stringify(SAVES.package(gm_world))))
+    check(gm_roundtrip.get("gm_placed_props", []).size() == 2,
+        "GM placements preserved in exported save backup")
     var package_data: Dictionary = SAVES.package(farm)
     var export_import: Dictionary = SAVES.normalize(JSON.parse_string(JSON.stringify(package_data)))
     check(export_import.size() > 0, "export and import new format")
