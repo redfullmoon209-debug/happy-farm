@@ -17,6 +17,7 @@ const UI_HUD: Texture2D = preload("res://assets/ui/happy/hud_bar.png")
 const UI_TOP: Texture2D = preload("res://assets/ui/happy/hud_top.png")
 const UI_ZOOM: Texture2D = preload("res://assets/ui/happy/button_zoom.png")
 const INV_TEXT = preload("res://scripts/InventoryI18n.gd")
+const ICON_GLOVE_SINGLE: Texture2D = preload("res://assets/ui/metal/glove_single.svg")
 const THAI = preload("res://assets/Sarabun-Regular.ttf")
 const THAI_BOLD = preload("res://assets/Sarabun-SemiBold.ttf")
 const SAVE = "user://happy_farm_clean.json"
@@ -2924,6 +2925,11 @@ func refresh_character_panel() -> void:
         var worn: String = " ✓" if not item_id.is_empty() else " +"
         var button: Button = character_equipment_buttons[slot]
         button.text = slot_label + worn
+        if slot == "gloves":
+            button.icon = ICON_GLOVE_SINGLE
+            button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+            button.expand_icon = true
+            button.add_theme_constant_override("icon_max_width", 29)
         button.tooltip_text = str(CLOTHING_CATALOG.get(item_id, {}).get("name", INV_TEXT.label("empty_equipment", inventory_language)))
         button.modulate = Color("#d6f2de") if not item_id.is_empty() else Color.WHITE
     gender_item_button.text = "%s ×%d (%s %d)" % [INV_TEXT.label("gender_ticket", inventory_language), gender_change_tickets, INV_TEXT.label("buy_shop", inventory_language), GENDER_CHANGE_CARD_PRICE]
