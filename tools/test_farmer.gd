@@ -345,6 +345,16 @@ func _check() -> void:
     if farm.avatar_gender != previous_gender:
         problems.append("gender changed without consuming a purchased card")
     if previous_gender == "female" and farm.farmer_visual != null:
+        # Purchased wardrobe: gameplay must not grant a wearable item for free.
+        if int(farm.clothing_owned.get("female_survivor_shoes", 0)) != 0:
+            problems.append("shoe item was free before purchase")
+        farm.coins = maxi(farm.coins, 300)
+        var coins_before_wardrobe: int = farm.coins
+        farm.buy_clothing("female_survivor_shoes")
+        if int(farm.clothing_owned.get("female_survivor_shoes", 0)) != 1:
+            problems.append("shoe shop purchase did not add item to backpack")
+        if farm.coins != coins_before_wardrobe - 160:
+            problems.append("shoe shop did not deduct earned coins")
         # Rendering uses real meshes; never show a generic fake image.
         var shoe_thumbnail: Texture2D = farm._real_equipment_thumbnail("female_survivor_shoes")
         if shoe_thumbnail == null:
