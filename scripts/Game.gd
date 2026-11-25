@@ -141,6 +141,11 @@ const CLOTHING_SLOT_NAMES: Dictionary = {
     "bottom": "กางเกง/กระโปรง", "shoes": "รองเท้า"
 }
 var CLOTHING_CATALOG: Dictionary = WARDROBE.all_items()
+# Verified directly against 04_FarmFlex_Game_Ready/character_manifest.json.
+# Current character GLBs contain only these two independent apparel variants.
+const REAL_CLOTHING_MESH_IDS: Array[String] = [
+    "female_martial_shoes", "female_survivor_shoes"
+]
 var gender_change_tickets: int = 0
 var clothing_owned: Dictionary = WARDROBE.starter_inventory()
 var clothing_equipped: Dictionary = {}
@@ -2828,15 +2833,14 @@ func refresh_labels() -> void:
 # No fake gear: unprovided models remain empty equipment slots on the left.
 func _inventory_contents() -> Array[Dictionary]:
     var out: Array[Dictionary] = []
-    # All three complete sets belong in the bag; show the current gender's
-    # fifteen pieces so the grid stays usable on landscape mobile screens.
-    for set_id in ["villager", "martial", "survivor"]:
-        for slot_id in CLOTHING_SLOTS:
-            var id: String = WARDROBE.item_id(avatar_gender, set_id, slot_id)
-            if int(clothing_owned.get(id, 0)) > 0:
-                var item: Dictionary = CLOTHING_CATALOG[id]
-                out.append({"kind": "clothing", "item_id": id,
-                    "name": str(item["name"]), "count": int(clothing_owned[id])})
+    # Only display garment items backed by a real skinned mesh in the shipped
+    # source GLB. Keep other planned set IDs in save data for later asset import,
+    # but never present invented items as real equipment to the player.
+    for id in REAL_CLOTHING_MESH_IDS:
+        var item: Dictionary = CLOTHING_CATALOG[id]
+        if str(item.get("gender", "")) == avatar_gender and int(clothing_owned.get(id, 0)) > 0:
+            out.append({"kind": "clothing", "item_id": id,
+                "name": str(item["name"]), "count": int(clothing_owned[id])})
     for i in range(CROPS.size()):
         if int(seeds[i]) > 0:
             out.append({"kind": "seed", "index": i, "name": str(CROPS[i]["name"]), "count": int(seeds[i])})
@@ -2906,8 +2910,12 @@ func refresh_bag_cards() -> void:
     if bag_summary == null:
         return
     inventory_entries = _inventory_contents()
-    bag_summary.text = "ชุด 3 แบบ • ชาวบ้าน / จอมยุทธ์ / ผู้รอดชีวิต | %d/%d" % [inventory_entries.size(), INVENTORY_CAPACITY]
-    bag_footer.text = "แตะไอเทมชุดใน 15 ช่องแรกเพื่อสวมหรือถอดทีละชิ้น"
+    var actual_outfits: int = 0
+    for item_entry in inventory_entries:
+        if str(item_entry.get("kind", "")) == "clothing":
+            actual_outfits += 1
+    bag_summary.text = "ชุดที่มีโมเดลจริง %d ชิ้น | %d/%d" % [actual_outfits, inventory_entries.size(), INVENTORY_CAPACITY]
+    bag_footer.text = "โมเดลชายยังไม่มีชิ้นส่วนชุดแยก" if avatar_gender == "male" else "รองเท้าจอมยุทธ์ / ผู้รอดชีวิต (โมเดลจริง)"
     if inventory_selected_index >= 0 and inventory_selected_index < inventory_entries.size():
         var selected_entry: Dictionary = inventory_entries[inventory_selected_index]
         if str(selected_entry.get("kind", "")) == "clothing":
@@ -3106,12 +3114,12 @@ func on_equipment_slot_pressed(slot_name: String) -> void:
         var set_id: String = ["villager", "martial", "survivor"][idx]
         var item_id: String = WARDROBE.item_id(avatar_gender, set_id, slot_name)
         var choice: Button = equipment_picker_buttons[idx]
-        var owned: bool = int(clothing_owned.get(item_id, 0)) > 0
+        var owned: bool = int(clothing_owned.get(item_id, 0)) > 0 and REAL_CLOTHING_MESH_IDS.has(item_id)
         var selected: bool = str(clothing_equipped.get(slot_name, "")) == item_id
         var info: Dictionary = CLOTHING_CATALOG.get(item_id, {})
         choice.text = str(info.get("name", set_id)) + ("  ✓" if selected else "")
         choice.disabled = not owned or selected
-        choice.tooltip_text = str(info.get("name", set_id))
+        choice.tooltip_text = str(info.get("name", set_id)) if owned else "ยังไม่มี Mesh ชิ้นนี้ในไฟล์ตัวละครจริง"
     var remove_button: Button = equipment_picker_buttons[3]
     remove_button.text = "ถอด%s" % slot_label if inventory_language == "th" else "Unequip " + slot_label
     remove_button.disabled = not clothing_equipped.has(slot_name)
@@ -3256,6 +3264,10 @@ func refresh_character_panel() -> void:
 
 func equip_clothing(item_id: String) -> void:
     if not CLOTHING_CATALOG.has(item_id) or int(clothing_owned.get(item_id, 0)) < 1:
+        return
+    if not REAL_CLOTHING_MESH_IDS.has(item_id):
+        message = "ชิ้นนี้ยังไม่มีโมเดล 3D จริง จึงยังสวมไม่ได้"
+        refresh_labels()
         return
     var data: Dictionary = CLOTHING_CATALOG[item_id]
     if str(data["gender"]) != avatar_gender:
