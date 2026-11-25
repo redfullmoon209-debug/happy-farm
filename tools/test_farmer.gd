@@ -282,6 +282,15 @@ func _check() -> void:
     if farm.character_equipment_buttons.size() != 5:
         problems.append("missing horizontal 5-slot equipment bar")
     else:
+        var glove_button: Button = farm.character_equipment_buttons["gloves"]
+        if glove_button.icon == null or not glove_button.text.contains("ถุงมือ"):
+            problems.append("glove slot missing one-hand icon or runtime caption")
+        farm.toggle_inventory_language()
+        if not glove_button.text.contains("Glove") or not farm.bag_heading.text.contains("Inventory"):
+            problems.append("inventory language change requires text labels, not PNG artwork")
+        farm.toggle_inventory_language()
+        if not glove_button.text.contains("ถุงมือ"):
+            problems.append("Thai equipment label did not restore")
         for i in range(farm.CLOTHING_SLOTS.size()-1):
             var left_btn: Button = farm.character_equipment_buttons[farm.CLOTHING_SLOTS[i]]
             var right_btn: Button = farm.character_equipment_buttons[farm.CLOTHING_SLOTS[i+1]]
