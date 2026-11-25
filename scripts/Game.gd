@@ -2208,7 +2208,7 @@ func build_ui() -> void:
     for category_id in ["clothing", "seed", "tree", "decor", "other"]:
         var category_name: String = {
             "clothing": "ชุด", "seed": "เมล็ดพันธุ์", "tree": "ต้นไม้",
-            "decor": "ตกแต่ง", "other": "อื่น ๆ"
+            "decor": "ตกแต่ง", "other": "ไอเทม"
         }[category_id]
         var category_button: Button = btn(category_name, _set_shop_category.bind(category_id))
         category_button.name = "ShopCategory_" + category_id
@@ -3337,7 +3337,13 @@ func _refresh_shop_category() -> void:
             continue
         var cat: String = str(shop_item_categories.get(child.name, ""))
         var part: String = str(shop_item_slots.get(child.name, ""))
-        child.visible = cat == shop_category and (cat != "clothing" or shop_clothing_slot == "all" or part == shop_clothing_slot)
+        var matches_category: bool = cat == shop_category
+        var matches_part: bool = cat != "clothing" or shop_clothing_slot == "all" or part == shop_clothing_slot
+        var matches_gender: bool = true
+        if child.name.begins_with("BuyWardrobe_"):
+            var item_id: String = str(child.name).trim_prefix("BuyWardrobe_")
+            matches_gender = str(CLOTHING_CATALOG.get(item_id, {}).get("gender", "")) == avatar_gender
+        child.visible = matches_category and matches_part and matches_gender
     if shop_buy_information != null:
         shop_buy_information.text = "แตะไอเทมเพื่อดูรายละเอียด แล้วกดยืนยันซื้อ"
 
