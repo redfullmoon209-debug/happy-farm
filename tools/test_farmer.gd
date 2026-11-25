@@ -259,14 +259,19 @@ func _check() -> void:
                     problems.append("male Idle pose still T-pose")
         male_avatar.queue_free()
 
-    # Inventory gate: clicking character button is free, changing gender is NOT.
+    # 200-slot MMO backpack: left 3D player, right item grid at equal width.
     var previous_gender: String = farm.avatar_gender
     farm.bag_button.pressed.emit()
-    if not farm.bag_panel.visible or farm.character_panel.visible:
-        problems.append("backpack does not open on farm-items tab")
-    farm.character_button.pressed.emit()
-    if not farm.bag_panel.visible or not farm.character_panel.visible:
-        problems.append("equipment tab does not open inside backpack")
+    if not farm.bag_panel.visible or not farm.character_panel.visible or not farm.bag_scroll.visible:
+        problems.append("single split backpack must show model and inventory together")
+    if farm.inventory_slots.size() != 200:
+        problems.append("MMORPG backpack does not have exactly 200 slots")
+    if absf(farm.character_panel.size.x - (farm.bag_panel.size.x-30.0)*0.5) > 2.0:
+        problems.append("left model panel does not occupy 50 percent")
+    if absf(farm.bag_scroll.size.x - farm.character_panel.size.x) > 14.0:
+        problems.append("right item pane does not occupy 50 percent")
+    if farm.character_preview_viewport == null or farm.character_preview_avatar == null:
+        problems.append("left panel missing real 3D character preview")
     if farm.gender_item_button.disabled == false:
         problems.append("gender card usable with zero inventory")
     farm.consume_gender_change_ticket()
@@ -301,9 +306,6 @@ func _check() -> void:
             problems.append("consumed gender choice not persisted in farm snapshot")
         if after_change.get("clothing_owned", {}).size() < 2:
             problems.append("changing gender deleted owned clothing")
-    farm.bag_items_tab.pressed.emit()
-    if farm.character_panel.visible or not farm.bag_scroll.visible:
-        problems.append("farm items tab did not restore seed inventory")
     farm.bag_button.pressed.emit()
     if farm.bag_panel.visible:
         problems.append("backpack close did not hide inventory")
