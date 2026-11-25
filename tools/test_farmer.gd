@@ -16,6 +16,32 @@ func _check() -> void:
         problems.append("run/jump buttons missing")
     if farm.zoom_in_button == null or farm.zoom_out_button == null:
         problems.append("camera plus/minus buttons missing")
+    # Shop categories change the actual left-hand products, not just a label.
+    if farm.shop_category_buttons.size() != 5 or farm.shop_slot_buttons.size() != 6:
+        problems.append("missing separate clothing, seeds, trees, decor, item pages or five gear categories")
+    else:
+        if farm.shop_header_art.visible:
+            problems.append("shop still renders unwanted decorative header frame")
+        farm._set_shop_category("seed")
+        for child in farm.shop_grid.get_children():
+            if child is Button and child.visible and farm.shop_item_categories.get(child.name, "") != "seed":
+                problems.append("seed page displays non-seed shop product")
+        farm._set_shop_category("tree")
+        for child in farm.shop_grid.get_children():
+            if child is Button and child.visible and farm.shop_item_categories.get(child.name, "") != "tree":
+                problems.append("tree page displays non-tree shop product")
+        farm._set_shop_category("clothing")
+        farm._set_shop_clothing_slot("shoes")
+        for child in farm.shop_grid.get_children():
+            if child is Button and child.visible and (
+                farm.shop_item_categories.get(child.name, "") != "clothing"
+                or farm.shop_item_slots.get(child.name, "") != "shoes"
+            ):
+                problems.append("shoe subcategory displays other equipment")
+        farm._set_shop_clothing_slot("all")
+        var square_cell: StyleBoxFlat = farm.shop_sell_cards[0].get_theme_stylebox("normal") as StyleBoxFlat
+        if square_cell == null or square_cell.corner_radius_top_left != 0 or square_cell.corner_radius_top_right != 0:
+            problems.append("shop inventory cells are not flat right-angled squares")
     # 50/50 trade window: shop stock on the left, player's produce on the right.
     if farm.shop_scroll == null or farm.shop_sell_scroll == null:
         problems.append("two halves of shop window not created")
