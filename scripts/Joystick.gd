@@ -1,7 +1,10 @@
 extends Control
-# Two separate transparent PNG layers: stationary base + moving thumb.
-const BASE_TEXTURE: Texture2D = preload("res://assets/ui/happy/joystick_base.png")
-const THUMB_TEXTURE: Texture2D = preload("res://assets/ui/happy/joystick_thumb.png")
+# FarmFlex ivory joystick artwork is independently authored in four layers.
+# SVG masters are used until transparent PNG render workflow publishes the PNGs.
+const BASE_TEXTURE: Texture2D = preload("res://assets/ui/farmflex_joystick/joystick_base.svg")
+const ARROWS_TEXTURE: Texture2D = preload("res://assets/ui/farmflex_joystick/joystick_arrows.svg")
+const THUMB_TEXTURE: Texture2D = preload("res://assets/ui/farmflex_joystick/joystick_thumb.svg")
+const EFFECT_TEXTURE: Texture2D = preload("res://assets/ui/farmflex_joystick/joystick_effect.svg")
 # Thumb joystick that tracks a single finger and never steals other touches.
 var direction: Vector2 = Vector2.ZERO
 var finger_id: int = -1
@@ -68,8 +71,12 @@ func _draw() -> void:
     var diameter: float = minf(size.x, size.y) * 0.94
     var base_rect: Rect2 = Rect2(center - Vector2.ONE*diameter*0.5, Vector2.ONE*diameter)
     draw_texture_rect(BASE_TEXTURE, base_rect, false)
-    # Only the foreground PNG travels with the finger; never crop the art.
-    var knob_diameter: float = diameter * 0.50
+    draw_texture_rect(ARROWS_TEXTURE, base_rect, false)
+    # Glow is an independent artwork layer, only visible while steering.
+    if direction.length_squared() > 0.012:
+        draw_texture_rect(EFFECT_TEXTURE, base_rect, false, Color(1.0, 1.0, 1.0, 0.40))
+    # Only the center knob with the new silver/red logo moves with a finger.
+    var knob_diameter: float = diameter * 0.43
     var thumb_center: Vector2 = center + direction * diameter * 0.29
     var thumb_rect: Rect2 = Rect2(thumb_center - Vector2.ONE*knob_diameter*0.5, Vector2.ONE*knob_diameter)
     draw_texture_rect(THUMB_TEXTURE, thumb_rect, false)
