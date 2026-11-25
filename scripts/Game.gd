@@ -2795,7 +2795,7 @@ func update_sizes() -> void:
     set_box(sell_button, shop_right_x+2.0, shop_h-81.0, shop_half-4.0, 31.0)
     set_box(shop_sell_one_button, shop_right_x+2.0, shop_h-45.0, shop_half-4.0, 33.0)
     var trade_w: float = minf(390.0, shop_w-24.0)
-    var trade_h: float = minf(250.0, shop_h-24.0)
+    var trade_h: float = minf(290.0, shop_h-24.0)
     set_box(shop_trade_panel, (shop_w-trade_w)*0.5, (shop_h-trade_h)*0.5, trade_w, trade_h)
     set_box(shop_trade_title, 14, 12, trade_w-28.0, 30)
     set_box(shop_trade_icon, 15, 53, 76, 76)
