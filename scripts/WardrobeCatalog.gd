@@ -35,13 +35,20 @@ static func all_items() -> Dictionary:
                 }
     return items
 
-# Same names as the source character creation/test page, not invented outfits.
-# The currently shipped character GLBs contain only these individual garments.
-# Never charge players for the missing top/glove/pants/hat meshes.
-const SHOP_ITEMS: Dictionary = {
-    "female_martial_shoes": 120,
-    "female_survivor_shoes": 160
-}
+# Three recognizable collection styles, now backed by modular 3D garment
+# geometry generated in FarmFlexGarments.gd for both character rigs.
+# They are new test garments, not missing GLB meshes from the selection page.
+const SET_BASE_PRICES: Dictionary = {"villager": 60, "martial": 125, "survivor": 155}
+const PART_PRICES: Dictionary = {"headwear": 20, "top": 45, "gloves": 20, "bottom": 35, "shoes": 30}
+
+static func available_item_ids() -> Array[String]:
+    var out: Array[String] = []
+    for gender in ["female", "male"]:
+        for set_id in ["villager", "martial", "survivor"]:
+            for slot in SLOTS:
+                out.append(item_id(gender, set_id, slot))
+    return out
+
 static func starter_inventory() -> Dictionary:
     var result: Dictionary = {}
     for id in all_items().keys():
@@ -56,4 +63,9 @@ static func migrate_inventory(old: Dictionary) -> Dictionary:
     return result
 
 static func shop_price(item_id: String) -> int:
-    return int(SHOP_ITEMS.get(item_id, -1))
+    var parts: PackedStringArray = item_id.split("_")
+    if parts.size() != 3 or parts[0] not in ["female", "male"]:
+        return -1
+    if not SET_BASE_PRICES.has(parts[1]) or not PART_PRICES.has(parts[2]):
+        return -1
+    return int(SET_BASE_PRICES[parts[1]]) + int(PART_PRICES[parts[2]])
