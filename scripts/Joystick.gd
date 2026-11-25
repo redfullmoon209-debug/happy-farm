@@ -1,10 +1,10 @@
 extends Control
 # FarmFlex ivory joystick artwork is independently authored in four layers.
-# SVG masters are used until transparent PNG render workflow publishes the PNGs.
-const BASE_TEXTURE: Texture2D = preload("res://assets/ui/farmflex_joystick/joystick_base.svg")
-const ARROWS_TEXTURE: Texture2D = preload("res://assets/ui/farmflex_joystick/joystick_arrows.svg")
-const THUMB_TEXTURE: Texture2D = preload("res://assets/ui/farmflex_joystick/joystick_thumb.svg")
-const EFFECT_TEXTURE: Texture2D = preload("res://assets/ui/farmflex_joystick/joystick_effect.svg")
+# Each rendered transparent PNG is loaded independently; SVG masters remain editable.
+const BASE_TEXTURE: Texture2D = preload("res://assets/ui/farmflex_joystick/joystick_base.png")
+const ARROWS_TEXTURE: Texture2D = preload("res://assets/ui/farmflex_joystick/joystick_arrows.png")
+const THUMB_TEXTURE: Texture2D = preload("res://assets/ui/farmflex_joystick/joystick_thumb.png")
+const EFFECT_TEXTURE: Texture2D = preload("res://assets/ui/farmflex_joystick/joystick_effect.png")
 # Thumb joystick that tracks a single finger and never steals other touches.
 var direction: Vector2 = Vector2.ZERO
 var finger_id: int = -1
