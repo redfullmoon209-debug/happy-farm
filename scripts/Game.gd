@@ -18,30 +18,32 @@ const UI_TOP: Texture2D = preload("res://assets/ui/happy/hud_top.png")
 const UI_ZOOM: Texture2D = preload("res://assets/ui/happy/button_zoom.png")
 const INV_TEXT = preload("res://scripts/InventoryI18n.gd")
 # New separated metallic-blue inventory art. Text is always rendered by Godot.
-const INV_FRAME: Texture2D = preload("res://assets/ui/metal/inventory_window.svg")
-const INV_CHARACTER: Texture2D = preload("res://assets/ui/metal/character_display.svg")
-const INV_RIGHT: Texture2D = preload("res://assets/ui/metal/right_items_panel.svg")
-const INV_SLOT: Texture2D = preload("res://assets/ui/metal/slot_empty.svg")
-const INV_SLOT_SELECTED: Texture2D = preload("res://assets/ui/metal/slot_selected.svg")
-const INV_EQUIPMENT: Texture2D = preload("res://assets/ui/metal/equipment_slot.svg")
-const INV_BUTTON: Texture2D = preload("res://assets/ui/metal/blue_button.svg")
-const INV_CLOSE: Texture2D = preload("res://assets/ui/metal/close_button.svg")
-const INV_TITLE: Texture2D = preload("res://assets/ui/metal/title_bar.svg")
+# Standalone ORIGINAL ivory/gold vector layers, not screenshots or cropped graphics.
+# Text remains dynamic Godot labels for both Thai and English.
+const INV_FRAME: Texture2D = preload("res://assets/ui/pearl/background.svg")
+const INV_CHARACTER: Texture2D = preload("res://assets/ui/pearl/background.svg")
+const INV_RIGHT: Texture2D = preload("res://assets/ui/pearl/right_surface.svg")
+const INV_SLOT: Texture2D = preload("res://assets/ui/pearl/slot_empty.svg")
+const INV_SLOT_SELECTED: Texture2D = preload("res://assets/ui/pearl/slot_selected.svg")
+const INV_EQUIPMENT: Texture2D = preload("res://assets/ui/pearl/equipment_slot.svg")
+const INV_BUTTON: Texture2D = preload("res://assets/ui/pearl/button.svg")
+const INV_CLOSE: Texture2D = preload("res://assets/ui/pearl/close.svg")
+const INV_TITLE: Texture2D = preload("res://assets/ui/pearl/title.svg")
 # Pixel-derived independent images cut from the user's exact supplied sheet.
-const USER_INV_BORDER: Texture2D = preload("res://assets/ui/metal/raster/inventory_outer_border_overlay.webp")
-const USER_INV_TITLE: Texture2D = preload("res://assets/ui/metal/raster/inventory_header_blank.webp")
-const USER_INV_PREVIEW: Texture2D = preload("res://assets/ui/metal/raster/character_showcase_background.webp")
-const USER_INV_STATS: Texture2D = preload("res://assets/ui/metal/raster/character_stats_background.webp")
-const USER_INV_SLOT: Texture2D = preload("res://assets/ui/metal/raster/item_slot_empty.webp")
-const USER_INV_SELECTED: Texture2D = preload("res://assets/ui/metal/raster/item_slot_selected.webp")
-const USER_INV_BUTTON: Texture2D = preload("res://assets/ui/metal/raster/control_button_blank.webp")
-const USER_INV_CLOSE: Texture2D = preload("res://assets/ui/metal/raster/close_button.webp")
-const USER_EQUIP_HAT: Texture2D = preload("res://assets/ui/metal/raster/equipment_hat.webp")
-const USER_EQUIP_TOP: Texture2D = preload("res://assets/ui/metal/raster/equipment_top.webp")
-const USER_EQUIP_GLOVE: Texture2D = preload("res://assets/ui/metal/raster/equipment_glove_single.webp")
-const USER_EQUIP_PANTS: Texture2D = preload("res://assets/ui/metal/raster/equipment_pants.webp")
-const USER_EQUIP_SHOES: Texture2D = preload("res://assets/ui/metal/raster/equipment_shoes.webp")
-const ICON_GLOVE_SINGLE: Texture2D = preload("res://assets/ui/metal/glove_single.svg")
+const USER_INV_BORDER: Texture2D = preload("res://assets/ui/pearl/background.svg")
+const USER_INV_TITLE: Texture2D = preload("res://assets/ui/pearl/title.svg")
+const USER_INV_PREVIEW: Texture2D = preload("res://assets/ui/pearl/character_backdrop.svg")
+const USER_INV_STATS: Texture2D = preload("res://assets/ui/pearl/stats.svg")
+const USER_INV_SLOT: Texture2D = preload("res://assets/ui/pearl/slot_empty.svg")
+const USER_INV_SELECTED: Texture2D = preload("res://assets/ui/pearl/slot_selected.svg")
+const USER_INV_BUTTON: Texture2D = preload("res://assets/ui/pearl/button.svg")
+const USER_INV_CLOSE: Texture2D = preload("res://assets/ui/pearl/close.svg")
+const USER_EQUIP_HAT: Texture2D = preload("res://assets/ui/pearl/icon_hat.svg")
+const USER_EQUIP_TOP: Texture2D = preload("res://assets/ui/pearl/icon_top.svg")
+const USER_EQUIP_GLOVE: Texture2D = preload("res://assets/ui/pearl/glove_single.svg")
+const USER_EQUIP_PANTS: Texture2D = preload("res://assets/ui/pearl/icon_pants.svg")
+const USER_EQUIP_SHOES: Texture2D = preload("res://assets/ui/pearl/icon_shoes.svg")
+const ICON_GLOVE_SINGLE: Texture2D = preload("res://assets/ui/pearl/glove_single.svg")
 const THAI = preload("res://assets/Sarabun-Regular.ttf")
 const THAI_BOLD = preload("res://assets/Sarabun-SemiBold.ttf")
 const SAVE = "user://happy_farm_clean.json"
@@ -306,6 +308,7 @@ var bag_cards: Array[Button] = []
 var bag_counts: Array[Label] = []
 var inventory_slots: Array[Button] = []
 var inventory_entries: Array[Dictionary] = []
+var inventory_selected_index: int = -1
 var character_preview_frame: SubViewportContainer
 var character_preview_viewport: SubViewport
 var character_preview_avatar: Node3D
@@ -1854,18 +1857,23 @@ func _metal_button_skin(b: Button, art: Texture2D = INV_EQUIPMENT) -> void:
     normal.texture_margin_bottom = 9.0
     b.add_theme_stylebox_override("normal", normal)
     b.add_theme_stylebox_override("disabled", normal)
-    var hover: StyleBoxTexture = normal.duplicate()
-    hover.texture = INV_SLOT_SELECTED
-    b.add_theme_stylebox_override("hover", hover)
-    b.add_theme_stylebox_override("pressed", hover)
+    # Hover is matte; ONLY the clicked/selected item is highlighted.
+    b.add_theme_stylebox_override("hover", normal)
+    var pressed: StyleBoxTexture = normal.duplicate()
+    pressed.texture = INV_SLOT_SELECTED
+    b.add_theme_stylebox_override("pressed", pressed)
     b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-    b.add_theme_color_override("font_color", Color("#d9f4ff"))
-    b.add_theme_color_override("font_disabled_color", Color("#7da5b7"))
+    b.add_theme_color_override("font_color", Color("#624d3d"))
+    b.add_theme_color_override("font_hover_color", Color("#624d3d"))
+    b.add_theme_color_override("font_pressed_color", Color("#59432e"))
+    b.add_theme_color_override("font_disabled_color", Color("#a79c96"))
+    b.add_theme_color_override("font_outline_color", Color.TRANSPARENT)
+    b.add_theme_constant_override("outline_size", 0)
 
 func _metal_right_overlay() -> void:
     if bag_right_decoration != null:
         return
-    bag_right_decoration = panel(Color("#051322"))
+    bag_right_decoration = panel(Color("#f6eeeacc"))
     _metal_panel_skin(bag_right_decoration, INV_RIGHT, 10.0)
     bag_right_decoration.mouse_filter = Control.MOUSE_FILTER_IGNORE
     bag_panel.add_child(bag_right_decoration)
@@ -2204,14 +2212,15 @@ func build_ui() -> void:
 
     # Dedicated seed inventory in the left-side area shown in the reference.
     # The panel is a fixed-size Panel, not a PanelContainer; it cannot grow.
-    bag_panel = panel(Color("#ecf1e6fb"))
-    _metal_panel_skin(bag_panel, INV_FRAME, 17.0)
+    bag_panel = panel(Color("#f5e9e3f3"))
+    _metal_panel_skin(bag_panel, INV_FRAME, 8.0)
     ui.add_child(bag_panel)
     _metal_right_overlay()
     bag_panel.visible = false
     bag_metal_edge_overlay = TextureRect.new()
-    bag_metal_edge_overlay.name = "ExactUserArtworkBorder"
+    bag_metal_edge_overlay.name = "StandalonePearlWindowLayer"
     bag_metal_edge_overlay.texture = USER_INV_BORDER
+    bag_metal_edge_overlay.visible = false # the background already contains its own minimal outline
     bag_metal_edge_overlay.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
     bag_metal_edge_overlay.stretch_mode = TextureRect.STRETCH_SCALE
     bag_metal_edge_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2230,7 +2239,7 @@ func build_ui() -> void:
     bag_header.color = Color.TRANSPARENT
     bag_header.mouse_filter = Control.MOUSE_FILTER_IGNORE
     bag_panel.add_child(bag_header)
-    bag_heading = text_label(INV_TEXT.label("bag_title", inventory_language), 23, Color("#ffffff"))
+    bag_heading = text_label(INV_TEXT.label("bag_title", inventory_language), 23, Color("#624b39"))
     bag_heading.add_theme_font_override("font", THAI_BOLD)
     bag_panel.add_child(bag_heading)
     bag_close = btn("✕", show_bag, Color("#cf4765"))
@@ -2242,7 +2251,7 @@ func build_ui() -> void:
     bag_panel.add_child(bag_language_button)
     # No extra wardrobe tab: MMO split screen always shows the player on
     # the left and all 200 item slots on the right.
-    bag_summary = text_label("", 17, Color("#ffffff"))
+    bag_summary = text_label("", 17, Color("#624b39"))
     bag_panel.add_child(bag_summary)
     bag_scroll = ScrollContainer.new()
     bag_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -2264,9 +2273,9 @@ func build_ui() -> void:
         _metal_button_skin(slot, USER_INV_SLOT)
         bag_grid.add_child(slot)
         inventory_slots.append(slot)
-    bag_footer = text_label("แตะซองเมล็ดเพื่อเลือกไปปลูก", 16, Color("#ffffff"))
+    bag_footer = text_label("แตะซองเมล็ดเพื่อเลือกไปปลูก", 16, Color("#624b39"))
     bag_panel.add_child(bag_footer)
-    bag_save_status = text_label("เซฟเก็บอยู่ในเบราว์เซอร์เครื่องนี้", 16, Color("#ffe4a6"))
+    bag_save_status = text_label("เซฟเก็บอยู่ในเบราว์เซอร์เครื่องนี้", 16, Color("#765a46"))
     bag_panel.add_child(bag_save_status)
     bag_export_button = btn("ดาวน์โหลดเซฟ", export_save_backup, Color("#397e62"))
     bag_panel.add_child(bag_export_button)
@@ -2341,27 +2350,27 @@ func build_ui() -> void:
     gm_panel.add_child(gm_female)
 
     # Above the HUD, shop and bag. All equipment is changed inside this window.
-    character_panel = panel(Color("#e9f1e6fb"))
-    _metal_panel_skin(character_panel, INV_CHARACTER, 9.0)
+    character_panel = panel(Color("#f5ebe1cc"))
+    _metal_panel_skin(character_panel, INV_RIGHT, 0.0)
     bag_panel.add_child(character_panel)
     character_panel.name = "CharacterWardrobe"
     character_panel.mouse_filter = Control.MOUSE_FILTER_STOP
     character_panel.visible = false
     bag_character_backdrop = TextureRect.new()
-    bag_character_backdrop.name = "ExactUserArtworkCharacterBackdrop"
+    bag_character_backdrop.name = "StandalonePearlCharacterBackdrop"
     bag_character_backdrop.texture = USER_INV_PREVIEW
     bag_character_backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
     bag_character_backdrop.stretch_mode = TextureRect.STRETCH_SCALE
     bag_character_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
     character_panel.add_child(bag_character_backdrop)
     bag_stats_backdrop = TextureRect.new()
-    bag_stats_backdrop.name = "ExactUserArtworkStatsBackdrop"
+    bag_stats_backdrop.name = "StandalonePearlStatsBackdrop"
     bag_stats_backdrop.texture = USER_INV_STATS
     bag_stats_backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
     bag_stats_backdrop.stretch_mode = TextureRect.STRETCH_SCALE
     bag_stats_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
     character_panel.add_child(bag_stats_backdrop)
-    character_title = text_label(INV_TEXT.label("character_info", inventory_language), 18, Color.WHITE)
+    character_title = text_label(INV_TEXT.label("character_info", inventory_language), 18, Color("#654f40"))
     character_title.add_theme_font_override("font", THAI_BOLD)
     character_panel.add_child(character_title)
     # The original male/female Codex GLB is previewed inside the backpack.
@@ -2389,7 +2398,7 @@ func build_ui() -> void:
     preview_light.rotation_degrees = Vector3(-38.0, -25.0, 0.0)
     preview_light.light_energy = 1.8
     character_preview_viewport.add_child(preview_light)
-    character_gender_label = text_label("", 17, Color("#ffefc6"))
+    character_gender_label = text_label("", 17, Color("#654f40"))
     character_panel.add_child(character_gender_label)
     # Five modular item slots, left to right: head / top / gloves / legs / shoes.
     # Tapping an occupied slot removes it; tapping an empty slot prompts the
@@ -2402,7 +2411,7 @@ func build_ui() -> void:
         _metal_button_skin(slot_button, USER_INV_SLOT)
         character_panel.add_child(slot_button)
         character_equipment_buttons[slot_name] = slot_button
-    character_info_label = text_label("", 15, Color("#e3f1ff"))
+    character_info_label = text_label("", 15, Color("#655143"))
     character_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     character_panel.add_child(character_info_label)
     gender_item_button = btn("", request_gender_change, Color("#487f72"))
@@ -2824,6 +2833,8 @@ func _inventory_contents() -> Array[Dictionary]:
 func inventory_slot_pressed(index: int) -> void:
     if index < 0 or index >= inventory_entries.size():
         return
+    inventory_selected_index = index
+    refresh_bag_cards()
     var item: Dictionary = inventory_entries[index]
     match str(item.get("kind", "")):
         "seed":
@@ -2848,11 +2859,19 @@ func refresh_bag_cards() -> void:
     bag_footer.text = INV_TEXT.label("click_hint", inventory_language)
     for i in range(inventory_slots.size()):
         var slot: Button = inventory_slots[i]
+        var selected: bool = i == inventory_selected_index and i < inventory_entries.size()
+        var state_skin: StyleBoxTexture = slot.get_theme_stylebox("normal") as StyleBoxTexture
+        if state_skin != null:
+            var displayed_skin: StyleBoxTexture = state_skin.duplicate()
+            displayed_skin.texture = USER_INV_SELECTED if selected else USER_INV_SLOT
+            slot.add_theme_stylebox_override("normal", displayed_skin)
+            slot.add_theme_stylebox_override("hover", displayed_skin)
+            slot.add_theme_stylebox_override("disabled", displayed_skin)
         if i >= inventory_entries.size():
             slot.text = ""
             slot.tooltip_text = "ช่องว่าง %d" % (i+1)
             slot.disabled = true
-            slot.modulate = Color("#8b9b8d")
+            slot.modulate = Color.WHITE
             continue
         var entry: Dictionary = inventory_entries[i]
         slot.text = "%s\n×%d" % [str(entry["name"]), int(entry["count"])]
@@ -3059,7 +3078,13 @@ func refresh_character_panel() -> void:
         button.expand_icon = true
         button.add_theme_constant_override("icon_max_width", 26)
         button.tooltip_text = str(CLOTHING_CATALOG.get(item_id, {}).get("name", INV_TEXT.label("empty_equipment", inventory_language)))
-        button.modulate = Color("#d6f2de") if not item_id.is_empty() else Color.WHITE
+        button.modulate = Color.WHITE
+        var equipped_skin: StyleBoxTexture = button.get_theme_stylebox("normal") as StyleBoxTexture
+        if equipped_skin != null:
+            var new_equipped_skin: StyleBoxTexture = equipped_skin.duplicate()
+            new_equipped_skin.texture = USER_INV_SELECTED if not item_id.is_empty() else USER_INV_SLOT
+            button.add_theme_stylebox_override("normal", new_equipped_skin)
+            button.add_theme_stylebox_override("hover", new_equipped_skin)
     gender_item_button.text = "%s ×%d (%s %d)" % [INV_TEXT.label("gender_ticket", inventory_language), gender_change_tickets, INV_TEXT.label("buy_shop", inventory_language), GENDER_CHANGE_CARD_PRICE]
     gender_item_button.disabled = gender_change_tickets < 1 or work_plot >= 0
     for previous in character_slot_list.get_children():
