@@ -72,7 +72,14 @@ func initialize(gender: String, appearance: Dictionary = {}) -> bool:
     for m in meshes:
         if not m.visible:
             continue
-        var bounds: AABB = (inverse_root * m.global_transform) * m.get_aabb()
+        var bind_transform := m.global_transform
+        if skeleton != null and m.skin != null and m.skin.get_bind_count() > 0:
+            var id := skeleton.find_bone(m.skin.get_bind_name(0))
+            if id < 0:
+                id = m.skin.get_bind_bone(0)
+            if id >= 0:
+                bind_transform = skeleton.global_transform * skeleton.get_bone_global_rest(id) * m.skin.get_bind_pose(0)
+        var bounds: AABB = (inverse_root * bind_transform) * m.mesh.get_aabb()
         low = low.min(bounds.position)
         high = high.max(bounds.end)
         mesh_count += 1
@@ -102,7 +109,7 @@ func initialize(gender: String, appearance: Dictionary = {}) -> bool:
         else:
             motion_controller.queue_free()
             motion_controller = null
-    return has_visible_avatar()
+    return has_visible_avatar() and anim_player != null
 
 func _tint_hair(mesh_node: MeshInstance3D, hex_color: String) -> void:
     if not Color.html_is_valid(hex_color):
@@ -221,7 +228,7 @@ func _create_hand_tools() -> void:
     hoe_prop.visible = false
 
 func set_state(state: String) -> void:
-    if state not in ["Idle", "Walk", "Run", "Jump", "Water", "Dig"]:
+    if state not in ["Idle", "Walk", "Run", "Talk", "Jump", "Water", "Dig"]:
         state = "Idle"
     current_state = state
     if can_prop != null:

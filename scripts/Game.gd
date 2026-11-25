@@ -4,7 +4,6 @@ const JOYSTICK = preload("res://scripts/Joystick.gd")
 const ICON = preload("res://scripts/BadgeIcon.gd")
 const SEED_ICON = preload("res://scripts/SeedIcon.gd")
 const SAVE_DATA = preload("res://scripts/SaveData.gd")
-const FARMER_VISUAL = preload("res://scripts/FarmerVisual.gd")
 const MODULAR_VISUAL = preload("res://scripts/ModularVisual.gd")
 const FARM_AUDIO = preload("res://scripts/FarmAudio.gd")
 const GARDEN_DECOR = preload("res://scripts/GardenDecor.gd")
@@ -1096,21 +1095,7 @@ func build_farmer() -> void:
         return
     chosen_model.queue_free()
 
-    # Swap the placeholder for the player's real skinned Mixamo farmer.
-    # The old model remains a safe fallback until the FBX bundle is imported.
-    var mixamo: Node3D = FARMER_VISUAL.new()
-    mixamo.name = "MixamoFemale"
-    farmer.add_child(mixamo)
-    if avatar_gender == "female" and mixamo.initialize() and mixamo.has_visible_avatar():
-        farmer_visual = mixamo
-        for part in farmer.get_children():
-            if part != farmer_visual:
-                part.visible = false
-    else:
-        # Do not hide the backup actor unless a real, correctly sized
-        # skinned mesh can actually be displayed.
-        mixamo.queue_free()
-        farmer_visual = null
+    farmer_visual = null
 
 func required_farm_level(index: int) -> int:
     var place: int = PLOT_UNLOCK_ORDER.find(index)
@@ -1388,6 +1373,8 @@ func _process(delta: float) -> void:
             pose_name = "Jump"
         elif displacement.length() > 0.001:
             pose_name = "Run" if (running and work_plot < 0) else "Walk"
+        if pose_name == "Idle" and farm_audio.voice.playing:
+            pose_name = "Talk"
         farmer_visual.set_state(pose_name)
 
 func move_actor(direction: Vector3, speed: float, delta: float) -> void:

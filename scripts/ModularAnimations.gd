@@ -4,7 +4,7 @@ extends Node
 # than copied by bone name: the target GLBs have a different skeleton basis.
 const ACTIONS: Array[String] = ["Idle", "Walk", "Run", "Talk", "Jump", "Water", "Dig"]
 const PROVIDED: Array[String] = ["Idle", "Walk", "Run", "Talk"]
-const SAMPLE_FPS: float = 18.0
+const SAMPLE_FPS: float = 60.0
 static var libraries_by_gender: Dictionary = {}
 static var paths_by_gender: Dictionary = {}
 
@@ -32,27 +32,20 @@ func initialize(target_host: Node3D, target_skeleton: Skeleton3D, selected_gende
         source_files = (paths_by_gender.get(gender, {}) as Dictionary).duplicate()
     else:
         library = AnimationLibrary.new()
-        for state in ACTIONS:
-            var imported: bool = false
-            if state in PROVIDED:
-                var path: String = "res://assets/animations/%s/%s.fbx" % [gender, state]
-                if ResourceLoader.exists(path):
-                    imported = _retarget_original(library, state, path)
-                    if imported:
-                        source_files[state] = path
-                        print("ORIGINAL MIXAMO PLAYBACK: ", gender, " ", state, " <- ", path)
-                if not imported:
-                    push_error("FarmFlex missing user-supplied %s %s Mixamo animation" % [gender, state])
-                    return false
-            else:
-                # There were NO Jump, Water, Dig clips in the user's upload.
-                # Keep the game state functional, but do not invent substitute
-                # gestures and do not pass off procedural motion as the source.
-                var hold: Animation = Animation.new()
-                hold.length = 0.5
-                hold.loop_mode = Animation.LOOP_NONE if state == "Jump" else Animation.LOOP_LINEAR
-                if library.add_animation(state, hold) != OK:
-                    return false
+        var probes := _sole_probes()
+        if probes.is_empty():
+            return false
+        for state in PROVIDED:
+            var path := "res://assets/animations/%s/%s.fbx" % [gender, state]
+            if not ResourceLoader.exists(path) or not _retarget_original(library, state, path, probes):
+                push_error("FarmFlex could not bind " + path)
+                return false
+            source_files[state] = path
+            print("ORIGINAL MIXAMO PLAYBACK: ", gender, " ", state, " <- ", path)
+        # These gameplay actions have no source clip. Keep the planted idle
+        # pose while the existing controller moves the actor and hand tools.
+        for state in ["Jump", "Water", "Dig"]:
+            library.add_animation(state, library.get_animation("Idle").duplicate())
         libraries_by_gender[gender] = library
         paths_by_gender[gender] = source_files.duplicate()
     if player.add_animation_library("Farm", library) != OK:
@@ -60,6 +53,7 @@ func initialize(target_host: Node3D, target_skeleton: Skeleton3D, selected_gende
     for state in ACTIONS:
         available[state] = player.has_animation("Farm/" + state)
     change_state("Idle")
+    player.advance(0.0)
     return true
 
 func _find_node_by_class(n: Node, expected_class: String) -> Node:
@@ -91,7 +85,7 @@ func _landmark_frame(rig: Skeleton3D) -> Basis:
         return Basis.IDENTITY
     var up: Vector3 = rig.to_global(rig.get_bone_global_rest(head).origin) - rig.to_global(rig.get_bone_global_rest(hip).origin)
     var side: Vector3 = rig.to_global(rig.get_bone_global_rest(right).origin) - rig.to_global(rig.get_bone_global_rest(left).origin)
-    if up.length() < 0.01 or side.length() < 0.01:
+    if up.length_squared() < 1e-12 or side.length_squared() < 1e-12:
         return Basis.IDENTITY
     up = up.normalized()
     side = (side - up * side.dot(up)).normalized()
@@ -111,7 +105,54 @@ func _chosen_clip(src_player: AnimationPlayer) -> String:
             best_name = str(name)
     return best_name if max_tracks > 5 else ""
 
-func _retarget_original(library: AnimationLibrary, state: String, filename: String) -> bool:
+# Select the extremes of each sole from the actual skinned body. Using
+# heel and toe vertices also supports tilted feet during push-off.
+func _sole_probes() -> Dictionary:
+    var probes := {}
+    var lowest := {}
+    var directions: Array[Vector3] = [Vector3.UP]
+    for tilt in [0.5, 1.1, 1.48]:
+        for direction in 8:
+            var angle := TAU * direction / 8.0
+            directions.append(Vector3(sin(tilt)*cos(angle), cos(tilt), sin(tilt)*sin(angle)))
+    for node in host.find_children("*BaseBody*", "MeshInstance3D", true, false):
+        var mesh := node as MeshInstance3D
+        var skin := mesh.skin
+        var arrays := mesh.mesh.surface_get_arrays(0)
+        var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+        var bones: PackedInt32Array = arrays[Mesh.ARRAY_BONES]
+        var weights: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS]
+        var stride := bones.size() / vertices.size()
+        for i in vertices.size():
+            var strongest := i * stride
+            for k in range(1,stride):
+                if weights[i*stride+k] > weights[strongest]:
+                    strongest = i*stride+k
+            var bind := bones[strongest]
+            var id := skeleton.find_bone(skin.get_bind_name(bind))
+            if id < 0:
+                id = skin.get_bind_bone(bind)
+            var name_lower := str(skeleton.get_bone_name(id)).to_lower()
+            if not ("foot" in name_lower or "toe" in name_lower):
+                continue
+            var local_point := skin.get_bind_pose(bind) * vertices[i]
+            var rest := host.to_local(skeleton.to_global(skeleton.get_bone_global_rest(id) * local_point))
+            if not probes.has(id):
+                var samples := PackedVector3Array()
+                samples.resize(directions.size())
+                probes[id] = samples
+                var distances := PackedFloat32Array()
+                distances.resize(directions.size())
+                distances.fill(INF)
+                lowest[id] = distances
+            for j in directions.size():
+                var height := rest.dot(directions[j])
+                if height < lowest[id][j]:
+                    lowest[id][j] = height
+                    probes[id][j] = local_point
+    return probes
+
+func _retarget_original(library: AnimationLibrary, state: String, filename: String, supports: Dictionary) -> bool:
     var resource: Resource = ResourceLoader.load(filename)
     if not (resource is PackedScene):
         return false
@@ -147,6 +188,7 @@ func _retarget_original(library: AnimationLibrary, state: String, filename: Stri
         push_error("FarmFlex retarget: too few matching skeleton bones: " + str(target_map.size()))
         instance.queue_free()
         return false
+    skeleton.reset_bone_poses()
     donor_player.play(clip_name)
     donor_player.seek(0.0, true)
     var donor_basis: Basis = donor.global_basis.orthonormalized()
@@ -158,15 +200,9 @@ func _retarget_original(library: AnimationLibrary, state: String, filename: Stri
     animation.loop_mode = Animation.LOOP_LINEAR
     var tracks: Dictionary = {}
     var conversion: Dictionary = {}
-    # Original FBX movement only: drive appendages, never the imported Codex
-    # GLB's Hips/Spine/Neck/Head or root. FBX global skeleton rotations
-    # produce 90-degree offsets on this model, even with a name match.
     for target_idx in target_map.keys():
         var idx: int = int(target_idx)
         var bone_name: String = String(skeleton.get_bone_name(idx))
-        var canonical: String = _normalized_bone_name(bone_name)
-        if not (canonical.begins_with("left") or canonical.begins_with("right")):
-            continue
         var src_idx: int = int(target_map[idx])
         var tr: int = animation.add_track(Animation.TYPE_ROTATION_3D)
         animation.track_set_path(tr, NodePath(String(host.get_path_to(skeleton)) + ":" + bone_name))
@@ -177,6 +213,14 @@ func _retarget_original(library: AnimationLibrary, state: String, filename: Stri
         var tgt_rest_world: Basis = target_basis * skeleton.get_bone_global_rest(idx).basis.orthonormalized()
         var change_of_basis: Basis = tgt_rest_world.inverse() * alignment * src_rest_world
         conversion[idx] = change_of_basis.orthonormalized().get_rotation_quaternion()
+    var hips := _bone_with_suffix(skeleton, "hips")
+    var position_track := animation.add_track(Animation.TYPE_POSITION_3D)
+    animation.track_set_path(position_track, NodePath(String(host.get_path_to(skeleton)) + ":" + str(skeleton.get_bone_name(hips))))
+    var hip_rest := skeleton.get_bone_rest(hips)
+    var hip_parent := skeleton.get_bone_parent(hips)
+    var parent_axes := skeleton.global_basis
+    if hip_parent >= 0:
+        parent_axes *= skeleton.get_bone_global_rest(hip_parent).basis
     var count: int = maxi(2, ceili(duration * SAMPLE_FPS) + 1)
     for frame in range(count):
         var t: float = minf(duration, float(frame) * duration / float(count - 1))
@@ -186,8 +230,19 @@ func _retarget_original(library: AnimationLibrary, state: String, filename: Stri
             var src_idx: int = int(target_map[idx])
             var source_pose: Quaternion = donor.get_bone_pose_rotation(src_idx)
             var mapping: Quaternion = conversion[idx]
-            var target_rotation: Quaternion = (mapping * source_pose * mapping.inverse()).normalized()
+            var src_rest := donor.get_bone_rest(src_idx).basis.get_rotation_quaternion()
+            var tgt_rest := skeleton.get_bone_rest(idx).basis.get_rotation_quaternion()
+            var target_rotation := (tgt_rest * mapping * src_rest.inverse() * source_pose * mapping.inverse()).normalized()
+            skeleton.set_bone_pose_rotation(idx, target_rotation)
             animation.rotation_track_insert_key(int(tracks[idx]), t, target_rotation)
+        var lowest := INF
+        for id: int in supports:
+            var posed := host.global_transform.affine_inverse() * skeleton.global_transform * skeleton.get_bone_global_pose(id)
+            for point: Vector3 in supports[id]:
+                lowest = minf(lowest, (posed * point).y)
+        var lift := parent_axes.inverse() * (host.global_basis * Vector3.DOWN * lowest)
+        animation.position_track_insert_key(position_track, t, hip_rest.origin + lift)
+    skeleton.reset_bone_poses()
     instance.queue_free()
     if animation.get_track_count() < 10:
         return false
