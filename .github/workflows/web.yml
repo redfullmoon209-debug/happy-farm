@@ -2,6 +2,10 @@ name: Happy Farm Clean - Godot Web
 on:
   push:
     branches: [main]
+    # Audio is committed by this very workflow; don't recursively cancel a deploy.
+    paths-ignore:
+      - "assets/audio/**"
+      - "farmflex-build.txt"
   workflow_dispatch:
 permissions:
   contents: write
@@ -9,7 +13,7 @@ permissions:
   id-token: write
 concurrency:
   group: happy-farm-pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   build:
     runs-on: ubuntu-latest
