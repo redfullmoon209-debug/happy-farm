@@ -324,6 +324,35 @@ func _check() -> void:
             previous.append(bounds)
         if farm.character_info_label == null or not farm.character_info_label.text.contains("EXP"):
             problems.append("character stats missing beneath equipment slots")
+    # Each existing gear slot must open its own three-set picker.
+    farm.on_equipment_slot_pressed("top")
+    if farm.equipment_picker == null or not farm.equipment_picker.visible:
+        problems.append("tap on shirt slot did not open a clothing picker")
+    if farm.equipment_picker_slot != "top" or farm.equipment_picker_buttons.size() != 4:
+        problems.append("shirt picker missing three sets and unequip choice")
+    if not farm.equipment_picker_buttons[0].text.contains("ชาวบ้าน"):
+        problems.append("shirt picker has no first outfit option")
+    farm._on_equipment_picker_choice(1)
+    if str(farm.clothing_equipped.get("top", "")) != "female_martial_top":
+        if farm.avatar_gender == "female":
+            problems.append("shirt choice did not equip female martial top")
+        elif str(farm.clothing_equipped.get("top", "")) != "male_martial_top":
+            problems.append("shirt choice did not equip male martial top")
+    if farm.equipment_picker.visible:
+        problems.append("shirt picker stayed open after selecting an item")
+    farm.on_equipment_slot_pressed("gloves")
+    farm._on_equipment_picker_choice(0)
+    if str(farm.clothing_equipped.get("gloves", "")) != farm.avatar_gender + "_villager_gloves":
+        problems.append("glove choice did not equip villager gloves")
+    if str(farm.clothing_equipped.get("top", "")) != farm.avatar_gender + "_martial_top":
+        problems.append("equipping gloves unexpectedly changed shirt")
+    farm.on_equipment_slot_pressed("gloves")
+    farm._on_equipment_picker_choice(3)
+    if farm.clothing_equipped.has("gloves"):
+        problems.append("unequip picker did not clear gloves")
+    if str(farm.clothing_equipped.get("top", "")) != farm.avatar_gender + "_martial_top":
+        problems.append("unequipping gloves unexpectedly changed shirt")
+    farm.unequip_clothing("top")
     if farm.gender_item_button.disabled == false:
         problems.append("gender card usable with zero inventory")
     farm.consume_gender_change_ticket()
