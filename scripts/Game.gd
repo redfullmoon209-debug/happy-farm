@@ -16,6 +16,7 @@ const UI_SLOT: Texture2D = preload("res://assets/ui/happy/inventory_slot.png")
 const UI_HUD: Texture2D = preload("res://assets/ui/happy/hud_bar.png")
 const UI_TOP: Texture2D = preload("res://assets/ui/happy/hud_top.png")
 const UI_ZOOM: Texture2D = preload("res://assets/ui/happy/button_zoom.png")
+const INV_TEXT = preload("res://scripts/InventoryI18n.gd")
 const THAI = preload("res://assets/Sarabun-Regular.ttf")
 const THAI_BOLD = preload("res://assets/Sarabun-SemiBold.ttf")
 const SAVE = "user://happy_farm_clean.json"
@@ -237,6 +238,8 @@ var bag_panel: Panel
 var bag_header: ColorRect
 var bag_heading: Label
 var bag_close: Button
+var bag_language_button: Button
+var inventory_language: String = "th"
 var bag_summary: Label
 var bag_scroll: ScrollContainer
 var bag_grid: GridContainer
@@ -2127,11 +2130,14 @@ func build_ui() -> void:
     bag_header.color = Color.TRANSPARENT
     bag_header.mouse_filter = Control.MOUSE_FILTER_IGNORE
     bag_panel.add_child(bag_header)
-    bag_heading = text_label("กระเป๋าไอเทม", 23, Color("#ffffff"))
+    bag_heading = text_label(INV_TEXT.label("bag_title", inventory_language), 23, Color("#ffffff"))
     bag_heading.add_theme_font_override("font", THAI_BOLD)
     bag_panel.add_child(bag_heading)
     bag_close = btn("ปิด", show_bag, Color("#d4a16b"))
     bag_panel.add_child(bag_close)
+    bag_language_button = btn("TH / EN", toggle_inventory_language, Color("#426e92"))
+    bag_language_button.name = "InventoryLanguageToggle"
+    bag_panel.add_child(bag_language_button)
     # No extra wardrobe tab: MMO split screen always shows the player on
     # the left and all 200 item slots on the right.
     bag_summary = text_label("", 17, Color("#ffffff"))
@@ -2238,7 +2244,7 @@ func build_ui() -> void:
     character_panel.name = "CharacterWardrobe"
     character_panel.mouse_filter = Control.MOUSE_FILTER_STOP
     character_panel.visible = false
-    character_title = text_label("ตัวละคร / อุปกรณ์", 18, Color.WHITE)
+    character_title = text_label(INV_TEXT.label("character_info", inventory_language), 18, Color.WHITE)
     character_title.add_theme_font_override("font", THAI_BOLD)
     character_panel.add_child(character_title)
     # The original male/female Codex GLB is previewed inside the backpack.
@@ -2484,6 +2490,7 @@ func update_sizes() -> void:
     set_box(bag_header, 0, 0, bag_width, 53)
     set_box(bag_heading, 16, 7, bag_width-104.0, 33)
     set_box(bag_close, bag_width-75.0, 7, 64, 36)
+    set_box(bag_language_button, bag_width-164.0, 7, 83, 36)
     # LEFT: 3D character and 5 independently equipped gear slots
     set_box(character_panel, 10.0, 52.0, side_w, bag_height-65.0)
     set_box(character_title, 12.0, 8.0, side_w-24.0, 28.0)
@@ -2712,8 +2719,8 @@ func refresh_bag_cards() -> void:
     if bag_summary == null:
         return
     inventory_entries = _inventory_contents()
-    bag_summary.text = "ช่องเก็บไอเทม  %d/%d" % [inventory_entries.size(), INVENTORY_CAPACITY]
-    bag_footer.text = "แตะไอเทมเพื่อใช้ / สวมใส่ • เลื่อนดูได้ 200 ช่อง"
+    bag_summary.text = "%s  %d/%d" % [INV_TEXT.label("bag_full", inventory_language), inventory_entries.size(), INVENTORY_CAPACITY]
+    bag_footer.text = INV_TEXT.label("click_hint", inventory_language)
     for i in range(inventory_slots.size()):
         var slot: Button = inventory_slots[i]
         if i >= inventory_entries.size():
@@ -2862,7 +2869,7 @@ func on_equipment_slot_pressed(slot_name: String) -> void:
     if clothing_equipped.has(slot_name):
         unequip_clothing(slot_name)
     else:
-        message = "เลือก%sจากช่องเก็บไอเทมด้านขวาเพื่อสวมใส่" % str(CLOTHING_SLOT_NAMES[slot_name])
+        message = INV_TEXT.label("equipment_prompt", inventory_language) % INV_TEXT.label(slot_name, inventory_language)
         refresh_labels()
 
 func refresh_character_preview() -> void:
@@ -2891,28 +2898,40 @@ func refresh_character_preview() -> void:
     else:
         preview_model.queue_free()
 
+# Language-neutral artwork: all captions are runtime controls.
+# Can be extended with additional locale dictionaries without changing PNGs.
+func toggle_inventory_language() -> void:
+    inventory_language = "en" if inventory_language == "th" else "th"
+    bag_heading.text = INV_TEXT.label("bag_title", inventory_language)
+    character_title.text = INV_TEXT.label("character_info", inventory_language)
+    refresh_bag_cards()
+    refresh_character_panel()
+
 func refresh_character_panel() -> void:
     if character_panel == null or character_slot_list == null:
         return
-    character_gender_label.text = "เพศปัจจุบัน: %s" % ("ผู้ชาย" if avatar_gender == "male" else "ผู้หญิง")
-    character_info_label.text = "เพศ: %s   •   ฟาร์ม Lv.%d   •   EXP %d/%d\nเหรียญ: %d   •   เสื้อผ้า: %d/5 ช่อง" % [
-        "ชาย" if avatar_gender == "male" else "หญิง", farm_level, farm_xp, xp_to_next_level(),
-        coins, clothing_equipped.size()
+    var sex_name: String = INV_TEXT.label("gender_male" if avatar_gender == "male" else "gender_female", inventory_language)
+    character_gender_label.text = "%s: %s" % [INV_TEXT.label("gender", inventory_language), sex_name]
+    character_info_label.text = "%s: %s   •   %s%d   •   EXP %d/%d\n%s: %d   •   %s: %d/5" % [
+        INV_TEXT.label("gender", inventory_language), sex_name,
+        INV_TEXT.label("farm_level", inventory_language), farm_level, farm_xp, xp_to_next_level(),
+        INV_TEXT.label("coins", inventory_language), coins,
+        INV_TEXT.label("worn", inventory_language), clothing_equipped.size()
     ]
     for slot in CLOTHING_SLOTS:
         var item_id: String = str(clothing_equipped.get(slot, ""))
-        var slot_label: String = str(CLOTHING_SLOT_NAMES[slot])
+        var slot_label: String = INV_TEXT.label(slot, inventory_language)
         var worn: String = " ✓" if not item_id.is_empty() else " +"
         var button: Button = character_equipment_buttons[slot]
         button.text = slot_label + worn
-        button.tooltip_text = str(CLOTHING_CATALOG.get(item_id, {}).get("name", "ช่องว่าง — เลือกจากไอเทมด้านขวา"))
+        button.tooltip_text = str(CLOTHING_CATALOG.get(item_id, {}).get("name", INV_TEXT.label("empty_equipment", inventory_language)))
         button.modulate = Color("#d6f2de") if not item_id.is_empty() else Color.WHITE
-    gender_item_button.text = "ใช้บัตรเปลี่ยนเพศ  ×%d  (ซื้อในร้านค้า %d เหรียญ)" % [gender_change_tickets, GENDER_CHANGE_CARD_PRICE]
+    gender_item_button.text = "%s ×%d (%s %d)" % [INV_TEXT.label("gender_ticket", inventory_language), gender_change_tickets, INV_TEXT.label("buy_shop", inventory_language), GENDER_CHANGE_CARD_PRICE]
     gender_item_button.disabled = gender_change_tickets < 1 or work_plot >= 0
     for previous in character_slot_list.get_children():
         character_slot_list.remove_child(previous)
         previous.queue_free()
-    var heading: Label = text_label("ช่องสวมใส่ — แตะไอเทมเพื่อใส่ทีละชิ้น", 18, Color("#264b37"))
+    var heading: Label = text_label(INV_TEXT.label("worn", inventory_language), 18, Color("#264b37"))
     heading.add_theme_font_override("font", THAI_BOLD)
     character_slot_list.add_child(heading)
     for slot in CLOTHING_SLOTS:
@@ -2921,7 +2940,7 @@ func refresh_character_panel() -> void:
         character_slot_list.add_child(row)
         var equipped_id: String = str(clothing_equipped.get(slot, ""))
         var worn_name: String = str(CLOTHING_CATALOG.get(equipped_id, {}).get("name", "ว่าง"))
-        var slot_text: Label = text_label("%s: %s" % [CLOTHING_SLOT_NAMES[slot], worn_name], 17, Color("#2b523e"))
+        var slot_text: Label = text_label("%s: %s" % [INV_TEXT.label(slot, inventory_language), worn_name], 17, Color("#2b523e"))
         slot_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         row.add_child(slot_text)
         if not equipped_id.is_empty():
