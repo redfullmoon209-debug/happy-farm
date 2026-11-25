@@ -312,22 +312,23 @@ static func normalize(raw: Variant) -> Dictionary:
     var safe_tokens: int = int(token_input)
     if safe_tokens < 0 or safe_tokens > 999:
         return {}
-    # Test wardrobe: three sets, five separate slots, both model genders.
-    # Existing save files automatically receive each test piece once.
+    # All previous wardrobe items were granted as free test inventory.
+    # Do not carry those unpurchased items into the new earned-coin economy.
+    # Once the new market version is saved, preserve legitimate purchases.
     var catalog: Dictionary = WARDROBE.all_items()
+    var market_save: bool = data.get("wardrobe_market_v1", false) == true
     var inventory_input: Variant = data.get("clothing_owned", {})
     if not (inventory_input is Dictionary):
         return {}
     var safe_clothing: Dictionary = {}
     for item_id in catalog.keys():
-        var qty: Variant = (inventory_input as Dictionary).get(item_id, 1)
+        var qty: Variant = (inventory_input as Dictionary).get(item_id, 0)
         if not (qty is int or qty is float) or not is_finite(float(qty)) or float(qty) != float(int(qty)):
             return {}
         var amount: int = int(qty)
         if amount < 0 or amount > 99:
             return {}
-        # Ensure all test pieces exist even in older two-shoe save files.
-        safe_clothing[item_id] = maxi(1, amount)
+        safe_clothing[item_id] = amount if market_save else 0
     var equipment_input: Variant = data.get("clothing_equipped", {})
     if not (equipment_input is Dictionary):
         return {}
@@ -348,6 +349,7 @@ static func normalize(raw: Variant) -> Dictionary:
         "avatar_gender": gender,
         "character_profile": safe_profile,
         "gender_change_tickets": safe_tokens,
+        "wardrobe_market_v1": true,
         "clothing_owned": safe_clothing,
         "clothing_equipped": safe_equipment,
         "feed": stock,
