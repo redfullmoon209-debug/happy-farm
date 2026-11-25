@@ -283,6 +283,9 @@ func _ready() -> void:
     add_child(farm_audio)
     farm_audio.subtitle.connect(_show_voice_caption)
     build_ui()
+    if OS.has_feature("web") and str(JavaScriptBridge.eval("(new URLSearchParams(window.location.search)).get('wardrobe')", true)) == "1":
+        character_panel.visible = true
+        refresh_character_panel()
     _focus_game_canvas()
     refresh_plants()
     refresh_labels()
@@ -312,15 +315,8 @@ func _read_locked_character_from_browser() -> void:
         return
     avatar_gender = chosen_gender
     character_profile = decoded.duplicate(true)
-    # Preview the other sex using a test URL without changing the locked
-    # player identity or farm save. No GM privileges are granted.
-    var requested_preview: Variant = JavaScriptBridge.eval("(new URLSearchParams(window.location.search)).get('test_gender')", true)
-    if typeof(requested_preview) == TYPE_STRING and str(requested_preview).to_lower() in ["female", "male"]:
-        test_avatar_gender = str(requested_preview).to_lower()
-        original_locked_profile = decoded.duplicate(true)
-        avatar_gender = test_avatar_gender
-        character_profile["sex"] = test_avatar_gender
-        print("FARMFLEX CHARACTER TEST: temporary ", test_avatar_gender, " avatar; locked profile preserved")
+    # Changing a locked gender is no longer possible through a URL test flag.
+    # Only consuming the in-game gender-change card may persist the change.
 
 func make_material(color: Color) -> StandardMaterial3D:
     var key: String = color.to_html()
