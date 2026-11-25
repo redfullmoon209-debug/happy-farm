@@ -6,6 +6,7 @@ const SEED_ICON = preload("res://scripts/SeedIcon.gd")
 const SAVE_DATA = preload("res://scripts/SaveData.gd")
 const WARDROBE = preload("res://scripts/WardrobeCatalog.gd")
 const MODULAR_VISUAL = preload("res://scripts/ModularVisual.gd")
+const EQUIPMENT_THUMBNAIL = preload("res://scripts/EquipmentThumbnail.gd")
 const FARM_AUDIO = preload("res://scripts/FarmAudio.gd")
 const GARDEN_DECOR = preload("res://scripts/GardenDecor.gd")
 # Each visual element is imported from a standalone transparent PNG.
@@ -305,6 +306,7 @@ var bag_cards: Array[Button] = []
 var bag_counts: Array[Label] = []
 var inventory_slots: Array[Button] = []
 var inventory_entries: Array[Dictionary] = []
+var equipment_thumbnail_cache: Dictionary = {}
 var inventory_selected_index: int = -1
 var character_preview_frame: SubViewportContainer
 var character_preview_viewport: SubViewport
@@ -1909,6 +1911,9 @@ func _set_icon(button: Button, name: String) -> void:
 func _fit_button_caption(button: Button) -> void:
     if button == null or button.text.is_empty():
         return
+    if button.name.begins_with("InventorySlot_"):
+        # Inventory artwork must stay independent from button text and width fitting.
+        return
     if button.name.begins_with("EquipmentSlot_"):
         # Real extracted PNG artwork is separate from the live button caption.
         # Never hide a one-hand glove or any equipment icon when resizing.
@@ -2878,6 +2883,25 @@ func inventory_slot_pressed(index: int) -> void:
             message = str(item.get("name", "ไอเทม"))
             refresh_labels()
 
+# Render a thumbnail once per item from its imported 3D garment Mesh.
+# The supplied GLBs only have two confirmed real shoe variants.
+func _real_equipment_thumbnail(item_id: String) -> Texture2D:
+    if equipment_thumbnail_cache.has(item_id):
+        return equipment_thumbnail_cache[item_id] as Texture2D
+    if item_id not in ["female_martial_shoes", "female_survivor_shoes"]:
+        return null
+    if bag_panel == null:
+        return null
+    var image_viewport: SubViewport = EQUIPMENT_THUMBNAIL.new()
+    image_viewport.name = "RealGearThumb_" + item_id
+    bag_panel.add_child(image_viewport)
+    if not image_viewport.set_equipment_item(item_id):
+        image_viewport.queue_free()
+        return null
+    var texture: Texture2D = image_viewport.get_texture()
+    equipment_thumbnail_cache[item_id] = texture
+    return texture
+
 func refresh_bag_cards() -> void:
     if bag_summary == null:
         return
@@ -2909,7 +2933,21 @@ func refresh_bag_cards() -> void:
         # Render clothing type + collection as live text, not baked into art.
         slot.icon = null
         if str(entry.get("kind", "")) == "clothing":
-            var outfit: Dictionary = CLOTHING_CATALOG.get(str(entry["item_id"]), {})
+            var item_id: String = str(entry["item_id"])
+            var rendered_item: Texture2D = _real_equipment_thumbnail(item_id)
+            if rendered_item != null:
+                # Actual garment preview, kept separate from the slot background and label.
+                slot.icon = rendered_item
+                slot.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+                slot.expand_icon = true
+                slot.add_theme_constant_override("icon_max_width", 31)
+                var equipped_slot: String = str(CLOTHING_CATALOG[item_id].get("slot", ""))
+                slot.text = "✓" if str(clothing_equipped.get(equipped_slot, "")) == item_id else ""
+                slot.tooltip_text = str(entry["name"])
+                slot.disabled = false
+                slot.modulate = Color.WHITE
+                continue
+            var outfit: Dictionary = CLOTHING_CATALOG.get(item_id, {})
             var slot_id: String = str(outfit.get("slot", ""))
             var piece_code: String = {"headwear":"H", "top":"T", "gloves":"G", "bottom":"B", "shoes":"S"}.get(slot_id, "?")
             var set_code: String = {"villager":"V", "martial":"M", "survivor":"R"}.get(str(outfit.get("set", "")), "?")
