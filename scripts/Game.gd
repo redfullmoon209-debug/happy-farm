@@ -104,6 +104,7 @@ var avatar_gender: String = "female"
 var character_profile: Dictionary = {}
 # Gender change is a consumed item, never a free UI toggle.
 const GENDER_CHANGE_CARD_PRICE: int = 200
+const INVENTORY_CAPACITY: int = 200
 const CLOTHING_SLOTS: Array[String] = ["headwear", "top", "gloves", "bottom", "shoes"]
 const CLOTHING_SLOT_NAMES: Dictionary = {
     "headwear": "หมวก", "top": "เสื้อ", "gloves": "ถุงมือ",
@@ -270,6 +271,13 @@ var pending_restore: Dictionary = {}
 var browser_import_callback: JavaScriptObject
 var bag_cards: Array[Button] = []
 var bag_counts: Array[Label] = []
+var inventory_slots: Array[Button] = []
+var inventory_entries: Array[Dictionary] = []
+var character_preview_frame: SubViewportContainer
+var character_preview_viewport: SubViewport
+var character_preview_avatar: Node3D
+var character_preview_gender: String = ""
+var character_preview_shoes: String = ""
 var message: String = "เลือกเครื่องมือ แล้วแตะแปลงผัก"
 
 func _ready() -> void:
@@ -285,7 +293,7 @@ func _ready() -> void:
     farm_audio.subtitle.connect(_show_voice_caption)
     build_ui()
     if OS.has_feature("web") and str(JavaScriptBridge.eval("(new URLSearchParams(window.location.search)).get('wardrobe')", true)) == "1":
-        open_wardrobe_tab()
+        open_backpack_view()
     _focus_game_canvas()
     refresh_plants()
     refresh_labels()
@@ -2120,12 +2128,8 @@ func build_ui() -> void:
     bag_panel.add_child(bag_heading)
     bag_close = btn("ปิด", show_bag, Color("#d4a16b"))
     bag_panel.add_child(bag_close)
-    bag_items_tab = btn("ไอเทมฟาร์ม", show_bag_items_tab, Color("#497958"))
-    bag_items_tab.name = "BagFarmItemsTab"
-    bag_panel.add_child(bag_items_tab)
-    character_button = btn("อุปกรณ์สวมใส่", open_wardrobe_tab, Color("#547f78"))
-    character_button.name = "BagWardrobeTab"
-    bag_panel.add_child(character_button)
+    # No extra wardrobe tab: MMO split screen always shows the player on
+    # the left and all 200 item slots on the right.
     bag_summary = text_label("", 17, Color("#ffffff"))
     bag_panel.add_child(bag_summary)
     bag_scroll = ScrollContainer.new()
@@ -2133,40 +2137,20 @@ func build_ui() -> void:
     bag_scroll.clip_contents = true
     bag_panel.add_child(bag_scroll)
     bag_grid = GridContainer.new()
-    bag_grid.columns = 3
+    bag_grid.columns = 6
     bag_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    bag_grid.add_theme_constant_override("h_separation", 8)
-    bag_grid.add_theme_constant_override("v_separation", 10)
+    bag_grid.add_theme_constant_override("h_separation", 4)
+    bag_grid.add_theme_constant_override("v_separation", 4)
     bag_scroll.add_child(bag_grid)
-    for i in range(CROPS.size()):
-        var card: Button = btn("", select_seed.bind(i), Color("#fff9ec"))
-        card.custom_minimum_size = Vector2(96, 122)
-        card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        bag_grid.add_child(card)
-        bag_cards.append(card)
-        var contents: VBoxContainer = VBoxContainer.new()
-        contents.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        contents.add_theme_constant_override("separation", 0)
-        card.add_child(contents)
-        contents.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-        contents.offset_left = 3
-        contents.offset_right = -3
-        contents.offset_top = 5
-        contents.offset_bottom = -3
-        var crop_image: Control = SEED_ICON.new()
-        crop_image.crop_id = i
-        crop_image.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-        contents.add_child(crop_image)
-        var crop_name: Label = text_label(str(CROPS[i]["name"]), 16, Color("#314b3a"))
-        crop_name.add_theme_font_override("font", THAI_BOLD)
-        crop_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        crop_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        contents.add_child(crop_name)
-        var count: Label = text_label("", 14, Color("#608066"))
-        count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        count.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        contents.add_child(count)
-        bag_counts.append(count)
+    for slot_index in range(INVENTORY_CAPACITY):
+        var slot: Button = btn("", inventory_slot_pressed.bind(slot_index), Color("#34463c"))
+        slot.name = "InventorySlot_%03d" % slot_index
+        slot.custom_minimum_size = Vector2(52, 54)
+        slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        slot.add_theme_font_size_override("font_size", 11)
+        slot.clip_text = true
+        bag_grid.add_child(slot)
+        inventory_slots.append(slot)
     bag_footer = text_label("แตะซองเมล็ดเพื่อเลือกไปปลูก", 16, Color("#ffffff"))
     bag_panel.add_child(bag_footer)
     bag_save_status = text_label("เซฟเก็บอยู่ในเบราว์เซอร์เครื่องนี้", 16, Color("#ffe4a6"))
@@ -2250,11 +2234,33 @@ func build_ui() -> void:
     character_panel.name = "CharacterWardrobe"
     character_panel.mouse_filter = Control.MOUSE_FILTER_STOP
     character_panel.visible = false
-    character_title = text_label("ตัวละคร • เสื้อผ้า", 19, Color.WHITE)
+    character_title = text_label("ตัวละคร / อุปกรณ์", 18, Color.WHITE)
     character_title.add_theme_font_override("font", THAI_BOLD)
     character_panel.add_child(character_title)
-    character_close = btn("ไอเทมฟาร์ม", show_bag_items_tab, Color("#bd9160"))
-    character_panel.add_child(character_close)
+    # The original male/female Codex GLB is previewed inside the backpack.
+    character_preview_frame = SubViewportContainer.new()
+    character_preview_frame.name = "CharacterModelPreview"
+    character_preview_frame.stretch = true
+    character_preview_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    character_preview_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    character_panel.add_child(character_preview_frame)
+    character_preview_viewport = SubViewport.new()
+    character_preview_viewport.name = "CharacterViewport3D"
+    character_preview_viewport.size = Vector2i(280, 340)
+    character_preview_viewport.transparent_bg = true
+    character_preview_viewport.own_world_3d = true
+    character_preview_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+    character_preview_frame.add_child(character_preview_viewport)
+    var preview_camera: Camera3D = Camera3D.new()
+    preview_camera.position = Vector3(0.0, 0.62, 2.15)
+    preview_camera.look_at(Vector3(0.0, 0.46, 0.0))
+    preview_camera.fov = 34.0
+    character_preview_viewport.add_child(preview_camera)
+    preview_camera.current = true
+    var preview_light: DirectionalLight3D = DirectionalLight3D.new()
+    preview_light.rotation_degrees = Vector3(-38.0, -25.0, 0.0)
+    preview_light.light_energy = 1.8
+    character_preview_viewport.add_child(preview_light)
     character_gender_label = text_label("", 17, Color("#ffefc6"))
     character_panel.add_child(character_gender_label)
     gender_item_button = btn("", request_gender_change, Color("#487f72"))
@@ -2448,39 +2454,40 @@ func update_sizes() -> void:
     set_box(voice_caption, (w-caption_width)*0.5, caption_y, caption_width, 53.0)
     set_box(voice_caption_label, 9, 7, caption_width-18.0, 37.0)
 
-    # Inventory lives on the left. Never stretch it to the full game screen.
-    # One backpack window with farm-items and equipment tabs.
-    var bag_top: float = 104.0 if narrow else 69.0
-    var bag_width: float = minf(560.0, w-20.0)
-    var bag_height: float = maxf(200.0, minf(570.0, h-bag_top-10.0))
+    # 50% model/equipment LEFT | 50% exactly 200 item slots RIGHT.
+    # Full pop-up area is scrollable on phone landscape, not clipped behind HUD.
+    var bag_width: float = minf(w-18.0, 1040.0)
+    var bag_height: float = minf(h-20.0, 690.0)
     var bag_x: float = (w-bag_width)*0.5
-    set_box(bag_panel, bag_x, bag_top, bag_width, bag_height)
-    set_box(bag_header_art, 7, 2, bag_width-14.0, 59)
-    set_box(bag_header, 0, 0, bag_width, 60)
-    set_box(bag_heading, 15, 9, bag_width-95.0, 34)
-    set_box(bag_close, bag_width-75.0, 9, 63, 36)
-    var tab_width: float = (bag_width-31.0)*0.5
-    set_box(bag_items_tab, 10, 55, tab_width, 40)
-    set_box(character_button, 21+tab_width, 55, tab_width, 40)
-    set_box(bag_summary, 15, 102, bag_width-30, 27)
-    set_box(bag_scroll, 12, 135, bag_width-24, maxf(40.0, bag_height-251.0))
-    set_box(bag_footer, 14, bag_height-111.0, bag_width-28, 23)
-    set_box(bag_save_status, 14, bag_height-85.0, bag_width-28, 24)
-    var backup_button_width: float = (bag_width-36.0)*0.5
-    set_box(bag_export_button, 12, bag_height-54.0, backup_button_width, 41)
-    set_box(bag_import_button, 24.0+backup_button_width, bag_height-54.0, backup_button_width, 41)
-    bag_grid.columns = 3 if bag_width >= 345.0 else 2
-    if character_panel != null:
-        var character_w: float = bag_width-20.0
-        var character_h: float = maxf(80.0, bag_height-109.0)
-        set_box(character_panel, 10.0, 101.0, character_w, character_h)
-        set_box(character_title, 10, 8, character_w-126, 28)
-        set_box(character_close, character_w-126, 7, 116, 32)
-        set_box(character_gender_label, 12, 41, character_w-24, 25)
-        set_box(gender_item_button, 12, 68, character_w-24, 41)
-        set_box(character_scroll, 12, 115, character_w-24, maxf(35.0, character_h-123.0))
-    for card in bag_cards:
-        card.custom_minimum_size = Vector2(95.0, 119.0)
+    var bag_y: float = (h-bag_height)*0.5
+    var side_w: float = (bag_width-30.0)*0.5
+    set_box(bag_panel, bag_x, bag_y, bag_width, bag_height)
+    set_box(bag_header_art, 6.0, 2.0, bag_width-12.0, 51.0)
+    set_box(bag_header, 0, 0, bag_width, 53)
+    set_box(bag_heading, 16, 7, bag_width-104.0, 33)
+    set_box(bag_close, bag_width-75.0, 7, 64, 36)
+    # LEFT: 3D character and 5 independently equipped gear slots
+    set_box(character_panel, 10.0, 52.0, side_w, bag_height-65.0)
+    set_box(character_title, 12.0, 8.0, side_w-24.0, 28.0)
+    var left_inner_h: float = bag_height-65.0
+    var preview_h: float = maxf(88.0, minf(270.0, left_inner_h*0.47))
+    set_box(character_preview_frame, 12.0, 38.0, side_w-24.0, preview_h)
+    set_box(character_gender_label, 12.0, 42.0+preview_h, side_w-24.0, 25.0)
+    set_box(gender_item_button, 12.0, 70.0+preview_h, side_w-24.0, 37.0)
+    set_box(character_scroll, 12.0, 113.0+preview_h, side_w-24.0,
+        maxf(30.0, left_inner_h-122.0-preview_h))
+    character_preview_viewport.size = Vector2i(maxi(80, int(side_w-24.0)), maxi(80, int(preview_h)))
+    # RIGHT: exactly 200 slots in a responsive grid, always visible with scrollbar.
+    var inventory_x: float = 20.0+side_w
+    var inventory_w: float = side_w
+    set_box(bag_summary, inventory_x+5.0, 58.0, inventory_w-10.0, 25.0)
+    set_box(bag_scroll, inventory_x+4.0, 88.0, inventory_w-8.0, maxf(60.0, bag_height-174.0))
+    set_box(bag_footer, inventory_x+5.0, bag_height-79.0, inventory_w-10.0, 18.0)
+    set_box(bag_save_status, inventory_x+5.0, bag_height-57.0, inventory_w-10.0, 20.0)
+    var backup_button_width: float = maxf(60.0, (inventory_w-18.0)*0.5)
+    set_box(bag_export_button, inventory_x+4.0, bag_height-34.0, backup_button_width, 29.0)
+    set_box(bag_import_button, inventory_x+13.0+backup_button_width, bag_height-34.0, backup_button_width, 29.0)
+    bag_grid.columns = 6 if inventory_w >= 390.0 else (5 if inventory_w >= 315.0 else (4 if inventory_w >= 260.0 else 3))
     _fit_all_ui_text()
     update_camera()
 func point_on_ui(pos: Vector2) -> bool:
@@ -2623,41 +2630,74 @@ func refresh_labels() -> void:
         action_buttons[key].modulate = Color.WHITE if key == tool_mode else Color("#d7e0d2")
     _fit_all_ui_text()
 
+# Stable 200 slots. Only actual owned items get entries, the rest are empty.
+# No fake gear: unprovided models remain empty equipment slots on the left.
+func _inventory_contents() -> Array[Dictionary]:
+    var out: Array[Dictionary] = []
+    for i in range(CROPS.size()):
+        if int(seeds[i]) > 0:
+            out.append({"kind": "seed", "index": i, "name": str(CROPS[i]["name"]), "count": int(seeds[i])})
+    for i in range(CROPS.size()):
+        if int(produce[i]) > 0:
+            out.append({"kind": "produce", "index": i, "name": str(CROPS[i]["name"])+" ผลผลิต", "count": int(produce[i])})
+    if gender_change_tickets > 0:
+        out.append({"kind": "gender", "name": "บัตรเปลี่ยนเพศ", "count": gender_change_tickets})
+    for id in CLOTHING_CATALOG:
+        if int(clothing_owned.get(id, 0)) > 0:
+            var item: Dictionary = CLOTHING_CATALOG[id]
+            out.append({"kind": "clothing", "item_id": id, "name": str(item["name"]), "count": int(clothing_owned[id])})
+    if plot_kits > 0:
+        out.append({"kind": "plot", "name": "ชุดแปลง", "count": plot_kits})
+    for i in range(tree_kits.size()):
+        if int(tree_kits[i]) > 0:
+            out.append({"kind": "tree", "name": "ต้น"+str(TREE_NAMES[i]), "count": int(tree_kits[i])})
+    for i in range(decor_kits.size()):
+        if int(decor_kits[i]) > 0:
+            out.append({"kind": "decor", "name": str(DECOR_NAMES[i]), "count": int(decor_kits[i])})
+    if wood > 0:
+        out.append({"kind": "wood", "name": "ไม้", "count": wood})
+    if feed > 0:
+        out.append({"kind": "feed", "name": "อาหารหมู", "count": feed})
+    return out.slice(0, INVENTORY_CAPACITY)
+
+func inventory_slot_pressed(index: int) -> void:
+    if index < 0 or index >= inventory_entries.size():
+        return
+    var item: Dictionary = inventory_entries[index]
+    match str(item.get("kind", "")):
+        "seed":
+            select_seed(int(item["index"]))
+        "clothing":
+            var id: String = str(item["item_id"])
+            if str(clothing_equipped.get("shoes", "")) == id:
+                unequip_clothing("shoes")
+            else:
+                equip_clothing(id)
+        "gender":
+            request_gender_change()
+        _:
+            message = str(item.get("name", "ไอเทม"))
+            refresh_labels()
+
 func refresh_bag_cards() -> void:
     if bag_summary == null:
         return
-    var total: int = 0
-    for i in range(seeds.size()):
-        total += int(seeds[i])
-    var harvest_total: int = 0
-    for quantity in produce:
-        harvest_total += int(quantity)
-    bag_summary.text = "เมล็ด %d ซอง | ผลผลิต %d ชิ้น" % [total, harvest_total]
-    var tree_total: int = 0
-    for stock in tree_kits:
-        tree_total += int(stock)
-    var decor_total: int = 0
-    for stock in decor_kits:
-        decor_total += int(stock)
-    bag_footer.text = "แปลง %d | ต้น %d | ของแต่ง %d | ไม้ %d" % [plot_kits, tree_total, decor_total, wood]
-    for i in range(bag_cards.size()):
-        var count: int = int(seeds[i])
-        var selected: bool = selected_seed == i
-        bag_counts[i].text = "มี %d ซอง" % count if count > 0 else "หมดแล้ว"
-        bag_counts[i].add_theme_color_override("font_color", Color("#28774e") if count > 0 else Color("#a98c7a"))
-        var style: StyleBoxFlat = StyleBoxFlat.new()
-        style.bg_color = Color("#e0f0d8") if selected else (Color("#fffdf4") if count > 0 else Color("#edece4"))
-        style.border_color = Color("#399465") if selected else Color("#d8ddcf")
-        style.set_border_width_all(3 if selected else 1)
-        style.set_corner_radius_all(13)
-        style.set_content_margin_all(3)
-        bag_cards[i].add_theme_stylebox_override("normal", style)
-        var hover: StyleBoxFlat = style.duplicate()
-        hover.bg_color = style.bg_color.lightened(0.07)
-        bag_cards[i].add_theme_stylebox_override("hover", hover)
-        bag_cards[i].add_theme_stylebox_override("pressed", style)
-        bag_cards[i].modulate = Color.WHITE if count > 0 or selected else Color("#dddddd")
-
+    inventory_entries = _inventory_contents()
+    bag_summary.text = "ช่องเก็บไอเทม  %d/%d" % [inventory_entries.size(), INVENTORY_CAPACITY]
+    bag_footer.text = "แตะไอเทมเพื่อใช้ / สวมใส่ • เลื่อนดูได้ 200 ช่อง"
+    for i in range(inventory_slots.size()):
+        var slot: Button = inventory_slots[i]
+        if i >= inventory_entries.size():
+            slot.text = ""
+            slot.tooltip_text = "ช่องว่าง %d" % (i+1)
+            slot.disabled = true
+            slot.modulate = Color("#8b9b8d")
+            continue
+        var entry: Dictionary = inventory_entries[i]
+        slot.text = "%s\n×%d" % [str(entry["name"]), int(entry["count"])]
+        slot.tooltip_text = "%s (%d) • ช่อง %d" % [str(entry["name"]), int(entry["count"]), i+1]
+        slot.disabled = false
+        slot.modulate = Color.WHITE
 func toggle_landscaping() -> void:
     if work_plot >= 0 or work_time > 0.0:
         message = "รอทำแปลงปัจจุบันให้เสร็จก่อน"
@@ -2721,57 +2761,69 @@ func toggle_run() -> void:
     run_button.modulate = Color.WHITE if run_toggle else Color("#aeb9a8")
 
 func show_bag() -> void:
-    if shop_panel.visible:
+    if shop_panel != null:
         shop_panel.visible = false
-    var opening: bool = not bag_panel.visible
-    bag_panel.visible = opening
-    if opening:
-        show_bag_items_tab()
+    bag_panel.visible = not bag_panel.visible
+    if bag_panel.visible:
+        open_backpack_view()
 
-func show_bag_items_tab() -> void:
-    if bag_panel == null:
+func open_backpack_view() -> void:
+    if bag_panel == null or character_panel == null:
         return
     bag_panel.visible = true
-    character_panel.visible = false
+    character_panel.visible = true
     bag_summary.visible = true
     bag_scroll.visible = true
     bag_footer.visible = true
     bag_save_status.visible = true
     bag_export_button.visible = true
     bag_import_button.visible = true
-    bag_items_tab.modulate = Color.WHITE
-    character_button.modulate = Color("#bdccbe")
-    refresh_bag_cards()
-
-func open_wardrobe_tab() -> void:
-    if bag_panel == null or character_panel == null:
-        return
-    bag_panel.visible = true
     if shop_panel != null:
         shop_panel.visible = false
     if gm_panel != null:
         gm_panel.visible = false
-    character_panel.visible = true
-    bag_summary.visible = false
-    bag_scroll.visible = false
-    bag_footer.visible = false
-    bag_save_status.visible = false
-    bag_export_button.visible = false
-    bag_import_button.visible = false
-    bag_items_tab.modulate = Color("#bdccbe")
-    character_button.modulate = Color.WHITE
     refresh_character_panel()
+    refresh_bag_cards()
+
+# Compatibility for existing saved UI links: both now open one split backpack.
+func show_bag_items_tab() -> void:
+    open_backpack_view()
+
+func open_wardrobe_tab() -> void:
+    open_backpack_view()
+
+func toggle_character_panel() -> void:
+    if bag_panel != null and bag_panel.visible:
+        bag_panel.visible = false
+    else:
+        open_backpack_view()
 
 func show_shop() -> void:
     if bag_panel != null:
         bag_panel.visible = false
     shop_panel.visible = not shop_panel.visible
 
-func toggle_character_panel() -> void:
-    if bag_panel != null and bag_panel.visible and character_panel.visible:
-        show_bag_items_tab()
+func refresh_character_preview() -> void:
+    if character_preview_viewport == null or not character_panel.visible:
+        return
+    var selected_shoes: String = str(clothing_equipped.get("shoes", ""))
+    if character_preview_avatar != null and is_instance_valid(character_preview_avatar):
+        if character_preview_gender == avatar_gender and character_preview_shoes == selected_shoes:
+            return
+        character_preview_viewport.remove_child(character_preview_avatar)
+        character_preview_avatar.queue_free()
+        character_preview_avatar = null
+    var preview_model: Node3D = MODULAR_VISUAL.new()
+    preview_model.name = "WardrobePlayerPreview"
+    character_preview_viewport.add_child(preview_model)
+    if preview_model.initialize(avatar_gender, character_profile):
+        preview_model.apply_equipment(clothing_equipped)
+        preview_model.set_state("Idle")
+        character_preview_avatar = preview_model
+        character_preview_gender = avatar_gender
+        character_preview_shoes = selected_shoes
     else:
-        open_wardrobe_tab()
+        preview_model.queue_free()
 
 func refresh_character_panel() -> void:
     if character_panel == null or character_slot_list == null:
@@ -2820,6 +2872,7 @@ func refresh_character_panel() -> void:
     var note: Label = text_label("ชุดเริ่มต้นฝังใน BaseBody • ไอเทมแยกที่มีจริงตอนนี้คือรองเท้าผู้หญิง 2 คู่", 15, Color("#445849"))
     note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     character_slot_list.add_child(note)
+    refresh_character_preview()
 
 func equip_clothing(item_id: String) -> void:
     if not CLOTHING_CATALOG.has(item_id) or int(clothing_owned.get(item_id, 0)) < 1:
@@ -2833,6 +2886,7 @@ func equip_clothing(item_id: String) -> void:
     clothing_equipped[slot] = item_id
     if farmer_visual != null and farmer_visual.has_method("apply_equipment"):
         farmer_visual.apply_equipment(clothing_equipped)
+    character_preview_gender = ""
     message = "สวม%sแล้ว" % str(data["name"])
     save_game()
     refresh_labels()
@@ -2843,6 +2897,7 @@ func unequip_clothing(slot: String) -> void:
     clothing_equipped.erase(slot)
     if farmer_visual != null and farmer_visual.has_method("apply_equipment"):
         farmer_visual.apply_equipment(clothing_equipped)
+    character_preview_gender = ""
     message = "ถอด%sแล้ว" % str(CLOTHING_SLOT_NAMES[slot])
     save_game()
     refresh_labels()
