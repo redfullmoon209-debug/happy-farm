@@ -1936,9 +1936,9 @@ func _fit_button_caption(button: Button) -> void:
             "EquipmentSlot_shoes": USER_EQUIP_SHOES
         }
         button.icon = visual_icons.get(button.name, USER_EQUIP_GLOVE) as Texture2D
-        button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+        button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
         button.expand_icon = true
-        button.add_theme_constant_override("icon_max_width", 24)
+        button.add_theme_constant_override("icon_max_width", 46)
         button.add_theme_font_size_override("font_size", 12)
         return
     var width: float = maxf(button.size.x, button.custom_minimum_size.x)
@@ -3088,7 +3088,6 @@ func refresh_character_panel() -> void:
     for slot in CLOTHING_SLOTS:
         var item_id: String = str(clothing_equipped.get(slot, ""))
         var slot_label: String = INV_TEXT.label(slot, inventory_language)
-        var worn: String = " ✓" if not item_id.is_empty() else " +"
         var button: Button = character_equipment_buttons[slot]
         button.text = "" # Standalone icon only; full name and status live in tooltip.
         var equipment_images: Dictionary = {
@@ -3097,9 +3096,9 @@ func refresh_character_panel() -> void:
             "shoes": USER_EQUIP_SHOES
         }
         button.icon = equipment_images[slot] as Texture2D
-        button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+        button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
         button.expand_icon = true
-        button.add_theme_constant_override("icon_max_width", 26)
+        button.add_theme_constant_override("icon_max_width", 46)
         button.tooltip_text = "%s: %s" % [slot_label, str(CLOTHING_CATALOG.get(item_id, {}).get("name", INV_TEXT.label("empty_equipment", inventory_language)))]
         button.modulate = Color.WHITE
         var equipped_skin: StyleBoxTexture = button.get_theme_stylebox("normal") as StyleBoxTexture
