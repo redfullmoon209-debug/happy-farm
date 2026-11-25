@@ -278,6 +278,10 @@ var character_preview_viewport: SubViewport
 var character_preview_avatar: Node3D
 var character_preview_gender: String = ""
 var character_preview_shoes: String = ""
+var character_preview_rotation_y: float = PI
+var character_preview_dragging: bool = false
+var character_equipment_buttons: Dictionary = {}
+var character_info_label: Label
 var message: String = "เลือกเครื่องมือ แล้วแตะแปลงผัก"
 
 func _ready() -> void:
@@ -2241,8 +2245,9 @@ func build_ui() -> void:
     character_preview_frame = SubViewportContainer.new()
     character_preview_frame.name = "CharacterModelPreview"
     character_preview_frame.stretch = true
-    character_preview_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    character_preview_frame.mouse_filter = Control.MOUSE_FILTER_STOP
     character_preview_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    character_preview_frame.gui_input.connect(_on_character_preview_input)
     character_panel.add_child(character_preview_frame)
     character_preview_viewport = SubViewport.new()
     character_preview_viewport.name = "CharacterViewport3D"
@@ -2263,6 +2268,19 @@ func build_ui() -> void:
     character_preview_viewport.add_child(preview_light)
     character_gender_label = text_label("", 17, Color("#ffefc6"))
     character_panel.add_child(character_gender_label)
+    # Five modular item slots, left to right: head / top / gloves / legs / shoes.
+    # Tapping an occupied slot removes it; tapping an empty slot prompts the
+    # player to choose the matching item in the 200-slot bag on the right.
+    for slot_name in CLOTHING_SLOTS:
+        var slot_button: Button = btn("", on_equipment_slot_pressed.bind(slot_name), Color("#638779"))
+        slot_button.name = "EquipmentSlot_" + slot_name
+        slot_button.clip_text = true
+        slot_button.add_theme_font_size_override("font_size", 11)
+        character_panel.add_child(slot_button)
+        character_equipment_buttons[slot_name] = slot_button
+    character_info_label = text_label("", 15, Color("#324d39"))
+    character_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    character_panel.add_child(character_info_label)
     gender_item_button = btn("", request_gender_change, Color("#487f72"))
     character_panel.add_child(gender_item_button)
     character_scroll = ScrollContainer.new()
@@ -2470,12 +2488,23 @@ func update_sizes() -> void:
     set_box(character_panel, 10.0, 52.0, side_w, bag_height-65.0)
     set_box(character_title, 12.0, 8.0, side_w-24.0, 28.0)
     var left_inner_h: float = bag_height-65.0
-    var preview_h: float = maxf(88.0, minf(270.0, left_inner_h*0.47))
-    set_box(character_preview_frame, 12.0, 38.0, side_w-24.0, preview_h)
-    set_box(character_gender_label, 12.0, 42.0+preview_h, side_w-24.0, 25.0)
-    set_box(gender_item_button, 12.0, 70.0+preview_h, side_w-24.0, 37.0)
-    set_box(character_scroll, 12.0, 113.0+preview_h, side_w-24.0,
-        maxf(30.0, left_inner_h-122.0-preview_h))
+    # Reserve the lower part for gear row, character data and gender-card action.
+    var preview_h: float = maxf(67.0, minf(310.0, left_inner_h-164.0))
+    set_box(character_preview_frame, 12.0, 36.0, side_w-24.0, preview_h)
+    var row_y: float = 40.0+preview_h
+    var gear_gap: float = 3.0
+    var gear_w: float = (side_w-24.0-4.0*gear_gap)/5.0
+    var gear_h: float = 48.0 if left_inner_h >= 320.0 else 37.0
+    for slot_idx in range(CLOTHING_SLOTS.size()):
+        var equipment_slot: String = CLOTHING_SLOTS[slot_idx]
+        set_box(character_equipment_buttons[equipment_slot], 12.0+float(slot_idx)*(gear_w+gear_gap),
+            row_y, gear_w, gear_h)
+    var info_y: float = row_y+gear_h+6.0
+    set_box(character_info_label, 12.0, info_y, side_w-24.0, 43.0)
+    set_box(gender_item_button, 12.0, info_y+47.0, side_w-24.0, 34.0)
+    # The previous vertical wardrobe is superseded by the five horizontal slots.
+    character_scroll.visible = false
+    character_gender_label.visible = false
     # SubViewportContainer.stretch adjusts the viewport automatically.
     # RIGHT: exactly 200 slots in a responsive grid, always visible with scrollbar.
     var inventory_x: float = 20.0+side_w
@@ -2803,6 +2832,39 @@ func show_shop() -> void:
         bag_panel.visible = false
     shop_panel.visible = not shop_panel.visible
 
+# Rotating the preview never rotates the farmer in the actual game.
+# Mouse drag works on PC; ScreenDrag works on Android / iOS landscape.
+func _on_character_preview_input(event: InputEvent) -> void:
+    if character_preview_frame == null or not bag_panel.visible:
+        return
+    if event is InputEventMouseButton:
+        if event.button_index == MOUSE_BUTTON_LEFT:
+            character_preview_dragging = event.pressed
+            character_preview_frame.accept_event()
+    elif event is InputEventMouseMotion:
+        if character_preview_dragging:
+            rotate_character_preview(event.relative.x)
+            character_preview_frame.accept_event()
+    elif event is InputEventScreenDrag:
+        rotate_character_preview(event.relative.x)
+        character_preview_frame.accept_event()
+    elif event is InputEventScreenTouch:
+        character_preview_frame.accept_event()
+
+func rotate_character_preview(delta_x: float) -> void:
+    character_preview_rotation_y = wrapf(character_preview_rotation_y + delta_x*0.012, 0.0, TAU)
+    if character_preview_avatar != null and is_instance_valid(character_preview_avatar):
+        character_preview_avatar.rotation.y = character_preview_rotation_y
+
+func on_equipment_slot_pressed(slot_name: String) -> void:
+    if not CLOTHING_SLOTS.has(slot_name):
+        return
+    if clothing_equipped.has(slot_name):
+        unequip_clothing(slot_name)
+    else:
+        message = "เลือก%sจากช่องเก็บไอเทมด้านขวาเพื่อสวมใส่" % str(CLOTHING_SLOT_NAMES[slot_name])
+        refresh_labels()
+
 func refresh_character_preview() -> void:
     if character_preview_viewport == null or not character_panel.visible:
         return
@@ -2819,6 +2881,10 @@ func refresh_character_preview() -> void:
     if preview_model.initialize(avatar_gender, character_profile):
         preview_model.apply_equipment(clothing_equipped)
         preview_model.set_state("Idle")
+        # The imported base GLB faces away from the preview camera by default.
+        # Start from a front-facing half-turn; keep the current angle while
+        # swapping clothing and sex.
+        preview_model.rotation.y = character_preview_rotation_y
         character_preview_avatar = preview_model
         character_preview_gender = avatar_gender
         character_preview_shoes = selected_shoes
@@ -2828,7 +2894,19 @@ func refresh_character_preview() -> void:
 func refresh_character_panel() -> void:
     if character_panel == null or character_slot_list == null:
         return
-    character_gender_label.text = "เพศปัจจุบัน: %s  |  ช่องเสื้อผ้าแยกชิ้น" % ("ผู้ชาย" if avatar_gender == "male" else "ผู้หญิง")
+    character_gender_label.text = "เพศปัจจุบัน: %s" % ("ผู้ชาย" if avatar_gender == "male" else "ผู้หญิง")
+    character_info_label.text = "เพศ: %s   •   ฟาร์ม Lv.%d   •   EXP %d/%d\nเหรียญ: %d   •   เสื้อผ้า: %d/5 ช่อง" % [
+        "ชาย" if avatar_gender == "male" else "หญิง", farm_level, farm_xp, xp_to_next_level(),
+        coins, clothing_equipped.size()
+    ]
+    for slot in CLOTHING_SLOTS:
+        var item_id: String = str(clothing_equipped.get(slot, ""))
+        var slot_label: String = str(CLOTHING_SLOT_NAMES[slot])
+        var worn: String = " ✓" if not item_id.is_empty() else " +"
+        var button: Button = character_equipment_buttons[slot]
+        button.text = slot_label + worn
+        button.tooltip_text = str(CLOTHING_CATALOG.get(item_id, {}).get("name", "ช่องว่าง — เลือกจากไอเทมด้านขวา"))
+        button.modulate = Color("#d6f2de") if not item_id.is_empty() else Color.WHITE
     gender_item_button.text = "ใช้บัตรเปลี่ยนเพศ  ×%d  (ซื้อในร้านค้า %d เหรียญ)" % [gender_change_tickets, GENDER_CHANGE_CARD_PRICE]
     gender_item_button.disabled = gender_change_tickets < 1 or work_plot >= 0
     for previous in character_slot_list.get_children():
