@@ -2544,9 +2544,10 @@ func build_ui() -> void:
             model_btn.tooltip_text = asset_name + ".fbx"
             gm_build_grid.add_child(model_btn)
             gm_build_item_buttons[asset_name] = model_btn
-    for mode in ["place", "move", "rotate", "delete"]:
+    for mode in ["place", "move", "rotate", "delete", "stop"]:
         var label_text: String = {
-            "place": "วาง", "move": "ย้าย", "rotate": "หมุน +15°", "delete": "ลบ"
+            "place": "วาง", "move": "ย้าย", "rotate": "หมุน +15°",
+            "delete": "ลบ", "stop": "หยุดแก้ไข"
         }[mode]
         var action_btn: Button = btn(label_text, _gm_set_build_mode.bind(mode))
         action_btn.name = "GMBuild_" + mode
@@ -2935,8 +2936,8 @@ func update_sizes() -> void:
         set_box(gm_build_category_buttons[cat_order[tab_i]], 11.0+float(tab_i)*cat_width, 53.0, cat_width-4.0, 34.0)
     set_box(gm_build_scroll, 10.0, 94.0, construct_w-20.0, maxf(55.0, construct_h-221.0))
     gm_build_grid.columns = 5 if construct_w > 540.0 else 3
-    var action_width: float = (construct_w-24.0)/4.0
-    var mode_order: Array[String] = ["place", "move", "rotate", "delete"]
+    var action_width: float = (construct_w-24.0)/5.0
+    var mode_order: Array[String] = ["place", "move", "rotate", "delete", "stop"]
     for action_i in range(mode_order.size()):
         set_box(gm_build_mode_buttons[mode_order[action_i]], 11.0+float(action_i)*action_width, construct_h-118.0, action_width-4.0, 38)
     set_box(gm_build_scale, 11.0, construct_h-72.0, 110.0, 32.0)
@@ -4270,7 +4271,14 @@ func _gm_rotation_changed(value: float) -> void:
     gm_rotation_deg = value
 
 func _gm_set_build_mode(mode: String) -> void:
-    if not GM_TEST_MODE or mode not in ["place", "move", "rotate", "delete"]:
+    if not GM_TEST_MODE or mode not in ["place", "move", "rotate", "delete", "stop"]:
+        return
+    if mode == "stop":
+        gm_build_mode = ""
+        gm_target_index = -1
+        gm_build_panel.visible = false
+        message = "GM: หยุดแก้ไขแมพแล้ว"
+        refresh_labels()
         return
     if mode == "place" and (gm_selected_asset.is_empty() or not GM_PROPS.exists(gm_selected_asset)):
         message = "เลือกไฟล์โมเดลที่นำเข้าแล้วก่อน"
