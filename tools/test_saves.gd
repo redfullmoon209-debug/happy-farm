@@ -30,20 +30,28 @@ func _initialize() -> void:
     check(updated.has("pens") and int(updated["pens"]) == 1, "create initial pen for old saves")
     check(int(updated.get("coins", -1)) == 192, "keep legacy money")
     check(updated.get("seeds", []).size() == 6, "keep old seed inventory")
+    check(int(updated.get("gender_change_tickets", -1)) == 0, "old saves begin without gender change tickets")
+    check(int(updated.get("clothing_owned", {}).get("female_survivor_shoes", -1)) == 1, "old saves receive real starter shoes")
 
     # New saves explicitly carry plot and pen counts.
     var farm: Dictionary = updated.duplicate(true)
     farm["coins"] = 430
     farm["pens"] = 3
     farm["pigs"] = 9
+    farm["gender_change_tickets"] = 2
+    farm["clothing_equipped"] = {"shoes": "female_survivor_shoes"}
     var normalized: Dictionary = SAVES.normalize(farm)
     check(not normalized.is_empty(), "new 50-plot save with 3 pens and 9 pigs")
     check(int(normalized.get("pens", -1)) == 3, "persist purchased pens")
     check(int(normalized.get("pigs", -1)) == 9, "persist purchased pigs")
+    check(int(normalized.get("gender_change_tickets", -1)) == 2, "persist purchased gender cards")
+    check(str(normalized.get("clothing_equipped", {}).get("shoes", "")) == "female_survivor_shoes", "persist individual clothing slot")
     var package_data: Dictionary = SAVES.package(farm)
     var export_import: Dictionary = SAVES.normalize(JSON.parse_string(JSON.stringify(package_data)))
     check(export_import.size() > 0, "export and import new format")
     check(int(export_import.get("pens", -1)) == 3, "backup preserves pen count")
+    check(int(export_import.get("gender_change_tickets", -1)) == 2, "backup preserves gender cards")
+    check(export_import.get("clothing_equipped", {}).get("shoes", "") == "female_survivor_shoes", "backup preserves equipped shoes")
 
     var maximum: Dictionary = farm.duplicate(true)
     maximum["pens"] = 4
@@ -63,6 +71,12 @@ func _initialize() -> void:
     invalid_crop["plots"][2]["crop"] = 999
     check(SAVES.normalize(invalid_crop).is_empty(), "reject invalid crop")
     check(SAVES.normalize({"unrelated": true}).is_empty(), "reject unrelated data")
+    var negative_cards: Dictionary = farm.duplicate(true)
+    negative_cards["gender_change_tickets"] = -1
+    check(SAVES.normalize(negative_cards).is_empty(), "reject negative gender card counts")
+    var invalid_outfit: Dictionary = farm.duplicate(true)
+    invalid_outfit["clothing_equipped"] = {"top": "missing_skin"}
+    check(SAVES.normalize(invalid_outfit).is_empty(), "reject items without real compatible model")
 
     # Exercise both flat autosaves and versioned downloaded backups.
     var path: String = "user://happy_farm_expansion_test.json"
