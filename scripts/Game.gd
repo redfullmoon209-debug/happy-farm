@@ -27,6 +27,20 @@ const INV_EQUIPMENT: Texture2D = preload("res://assets/ui/metal/equipment_slot.s
 const INV_BUTTON: Texture2D = preload("res://assets/ui/metal/blue_button.svg")
 const INV_CLOSE: Texture2D = preload("res://assets/ui/metal/close_button.svg")
 const INV_TITLE: Texture2D = preload("res://assets/ui/metal/title_bar.svg")
+# Pixel-derived independent images cut from the user's exact supplied sheet.
+const USER_INV_BORDER: Texture2D = preload("res://assets/ui/metal/raster/inventory_outer_border_overlay.webp")
+const USER_INV_TITLE: Texture2D = preload("res://assets/ui/metal/raster/inventory_header_blank.webp")
+const USER_INV_PREVIEW: Texture2D = preload("res://assets/ui/metal/raster/character_showcase_background.webp")
+const USER_INV_STATS: Texture2D = preload("res://assets/ui/metal/raster/character_stats_background.webp")
+const USER_INV_SLOT: Texture2D = preload("res://assets/ui/metal/raster/item_slot_empty.webp")
+const USER_INV_SELECTED: Texture2D = preload("res://assets/ui/metal/raster/item_slot_selected.webp")
+const USER_INV_BUTTON: Texture2D = preload("res://assets/ui/metal/raster/control_button_blank.webp")
+const USER_INV_CLOSE: Texture2D = preload("res://assets/ui/metal/raster/close_button.webp")
+const USER_EQUIP_HAT: Texture2D = preload("res://assets/ui/metal/raster/equipment_hat.webp")
+const USER_EQUIP_TOP: Texture2D = preload("res://assets/ui/metal/raster/equipment_top.webp")
+const USER_EQUIP_GLOVE: Texture2D = preload("res://assets/ui/metal/raster/equipment_glove_single.webp")
+const USER_EQUIP_PANTS: Texture2D = preload("res://assets/ui/metal/raster/equipment_pants.webp")
+const USER_EQUIP_SHOES: Texture2D = preload("res://assets/ui/metal/raster/equipment_shoes.webp")
 const ICON_GLOVE_SINGLE: Texture2D = preload("res://assets/ui/metal/glove_single.svg")
 const THAI = preload("res://assets/Sarabun-Regular.ttf")
 const THAI_BOLD = preload("res://assets/Sarabun-SemiBold.ttf")
@@ -248,6 +262,9 @@ var active_seed_label: Label
 var bag_panel: Panel
 var bag_right_decoration: Panel
 var bag_title_decoration: TextureRect
+var bag_metal_edge_overlay: TextureRect
+var bag_character_backdrop: TextureRect
+var bag_stats_backdrop: TextureRect
 var bag_header: ColorRect
 var bag_heading: Label
 var bag_close: Button
@@ -1900,10 +1917,17 @@ func _set_icon(button: Button, name: String) -> void:
 func _fit_button_caption(button: Button) -> void:
     if button == null or button.text.is_empty():
         return
-    if button.name == "EquipmentSlot_gloves":
-        # Keep a SINGLE glove icon visible even in narrow phone landscape.
-        # The caption is still a real Button text field for localization.
-        button.icon = ICON_GLOVE_SINGLE
+    if button.name.begins_with("EquipmentSlot_"):
+        # Real extracted PNG artwork is separate from the live button caption.
+        # Never hide a one-hand glove or any equipment icon when resizing.
+        var visual_icons: Dictionary = {
+            "EquipmentSlot_headwear": USER_EQUIP_HAT,
+            "EquipmentSlot_top": USER_EQUIP_TOP,
+            "EquipmentSlot_gloves": USER_EQUIP_GLOVE,
+            "EquipmentSlot_bottom": USER_EQUIP_PANTS,
+            "EquipmentSlot_shoes": USER_EQUIP_SHOES
+        }
+        button.icon = visual_icons.get(button.name, USER_EQUIP_GLOVE) as Texture2D
         button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
         button.expand_icon = true
         button.add_theme_constant_override("icon_max_width", 24)
@@ -2185,11 +2209,19 @@ func build_ui() -> void:
     ui.add_child(bag_panel)
     _metal_right_overlay()
     bag_panel.visible = false
+    bag_metal_edge_overlay = TextureRect.new()
+    bag_metal_edge_overlay.name = "ExactUserArtworkBorder"
+    bag_metal_edge_overlay.texture = USER_INV_BORDER
+    bag_metal_edge_overlay.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    bag_metal_edge_overlay.stretch_mode = TextureRect.STRETCH_SCALE
+    bag_metal_edge_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    bag_panel.add_child(bag_metal_edge_overlay)
+    bag_panel.move_child(bag_metal_edge_overlay, 1)
     # Old farm-wood header must not cover the metallic frame.
     bag_header_art = _header_layer(bag_panel)
     bag_header_art.visible = false
     bag_title_decoration = TextureRect.new()
-    bag_title_decoration.texture = INV_TITLE
+    bag_title_decoration.texture = USER_INV_TITLE
     bag_title_decoration.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
     bag_title_decoration.stretch_mode = TextureRect.STRETCH_SCALE
     bag_title_decoration.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2202,11 +2234,11 @@ func build_ui() -> void:
     bag_heading.add_theme_font_override("font", THAI_BOLD)
     bag_panel.add_child(bag_heading)
     bag_close = btn("✕", show_bag, Color("#cf4765"))
-    _metal_button_skin(bag_close, INV_CLOSE)
+    _metal_button_skin(bag_close, USER_INV_CLOSE)
     bag_panel.add_child(bag_close)
     bag_language_button = btn("TH / EN", toggle_inventory_language, Color("#426e92"))
     bag_language_button.name = "InventoryLanguageToggle"
-    _metal_button_skin(bag_language_button, INV_BUTTON)
+    _metal_button_skin(bag_language_button, USER_INV_BUTTON)
     bag_panel.add_child(bag_language_button)
     # No extra wardrobe tab: MMO split screen always shows the player on
     # the left and all 200 item slots on the right.
@@ -2229,7 +2261,7 @@ func build_ui() -> void:
         slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         slot.add_theme_font_size_override("font_size", 11)
         slot.clip_text = true
-        _metal_button_skin(slot, INV_SLOT)
+        _metal_button_skin(slot, USER_INV_SLOT)
         bag_grid.add_child(slot)
         inventory_slots.append(slot)
     bag_footer = text_label("แตะซองเมล็ดเพื่อเลือกไปปลูก", 16, Color("#ffffff"))
@@ -2315,6 +2347,20 @@ func build_ui() -> void:
     character_panel.name = "CharacterWardrobe"
     character_panel.mouse_filter = Control.MOUSE_FILTER_STOP
     character_panel.visible = false
+    bag_character_backdrop = TextureRect.new()
+    bag_character_backdrop.name = "ExactUserArtworkCharacterBackdrop"
+    bag_character_backdrop.texture = USER_INV_PREVIEW
+    bag_character_backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    bag_character_backdrop.stretch_mode = TextureRect.STRETCH_SCALE
+    bag_character_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    character_panel.add_child(bag_character_backdrop)
+    bag_stats_backdrop = TextureRect.new()
+    bag_stats_backdrop.name = "ExactUserArtworkStatsBackdrop"
+    bag_stats_backdrop.texture = USER_INV_STATS
+    bag_stats_backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    bag_stats_backdrop.stretch_mode = TextureRect.STRETCH_SCALE
+    bag_stats_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    character_panel.add_child(bag_stats_backdrop)
     character_title = text_label(INV_TEXT.label("character_info", inventory_language), 18, Color.WHITE)
     character_title.add_theme_font_override("font", THAI_BOLD)
     character_panel.add_child(character_title)
@@ -2353,14 +2399,14 @@ func build_ui() -> void:
         slot_button.name = "EquipmentSlot_" + slot_name
         slot_button.clip_text = true
         slot_button.add_theme_font_size_override("font_size", 11)
-        _metal_button_skin(slot_button, INV_EQUIPMENT)
+        _metal_button_skin(slot_button, USER_INV_SLOT)
         character_panel.add_child(slot_button)
         character_equipment_buttons[slot_name] = slot_button
     character_info_label = text_label("", 15, Color("#e3f1ff"))
     character_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     character_panel.add_child(character_info_label)
     gender_item_button = btn("", request_gender_change, Color("#487f72"))
-    _metal_button_skin(gender_item_button, INV_BUTTON)
+    _metal_button_skin(gender_item_button, USER_INV_BUTTON)
     character_panel.add_child(gender_item_button)
     character_scroll = ScrollContainer.new()
     character_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -2559,6 +2605,7 @@ func update_sizes() -> void:
     var bag_y: float = (h-bag_height)*0.5
     var side_w: float = (bag_width-30.0)*0.5
     set_box(bag_panel, bag_x, bag_y, bag_width, bag_height)
+    set_box(bag_metal_edge_overlay, 0.0, 0.0, bag_width, bag_height)
     set_box(bag_header_art, 6.0, 2.0, bag_width-12.0, 51.0)
     set_box(bag_title_decoration, (bag_width-300.0)*0.5, 0.0, 300.0, 51.0)
     set_box(bag_header, 0, 0, bag_width, 53)
@@ -2574,6 +2621,7 @@ func update_sizes() -> void:
     # Reserve the lower part for gear row, character data and gender-card action.
     var preview_h: float = maxf(67.0, minf(310.0, left_inner_h-215.0))
     set_box(character_preview_frame, 12.0, 36.0, side_w-24.0, preview_h)
+    set_box(bag_character_backdrop, 12.0, 36.0, side_w-24.0, preview_h)
     var row_y: float = 40.0+preview_h
     var gear_gap: float = 3.0
     var gear_w: float = (side_w-24.0-4.0*gear_gap)/5.0
@@ -2583,6 +2631,7 @@ func update_sizes() -> void:
         set_box(character_equipment_buttons[equipment_slot], 12.0+float(slot_idx)*(gear_w+gear_gap),
             row_y, gear_w, gear_h)
     var info_y: float = row_y+gear_h+6.0
+    set_box(bag_stats_backdrop, 6.0, info_y-7.0, side_w-12.0, 61.0)
     set_box(character_info_label, 12.0, info_y, side_w-24.0, 43.0)
     set_box(gender_item_button, 12.0, info_y+47.0, side_w-24.0, 34.0)
     # The previous vertical wardrobe is superseded by the five horizontal slots.
@@ -3000,11 +3049,15 @@ func refresh_character_panel() -> void:
         var worn: String = " ✓" if not item_id.is_empty() else " +"
         var button: Button = character_equipment_buttons[slot]
         button.text = slot_label + worn
-        if slot == "gloves":
-            button.icon = ICON_GLOVE_SINGLE
-            button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
-            button.expand_icon = true
-            button.add_theme_constant_override("icon_max_width", 29)
+        var equipment_images: Dictionary = {
+            "headwear": USER_EQUIP_HAT, "top": USER_EQUIP_TOP,
+            "gloves": USER_EQUIP_GLOVE, "bottom": USER_EQUIP_PANTS,
+            "shoes": USER_EQUIP_SHOES
+        }
+        button.icon = equipment_images[slot] as Texture2D
+        button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+        button.expand_icon = true
+        button.add_theme_constant_override("icon_max_width", 26)
         button.tooltip_text = str(CLOTHING_CATALOG.get(item_id, {}).get("name", INV_TEXT.label("empty_equipment", inventory_language)))
         button.modulate = Color("#d6f2de") if not item_id.is_empty() else Color.WHITE
     gender_item_button.text = "%s ×%d (%s %d)" % [INV_TEXT.label("gender_ticket", inventory_language), gender_change_tickets, INV_TEXT.label("buy_shop", inventory_language), GENDER_CHANGE_CARD_PRICE]
