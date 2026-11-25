@@ -324,19 +324,54 @@ func _check() -> void:
             previous.append(bounds)
         if farm.character_info_label == null or not farm.character_info_label.text.contains("EXP"):
             problems.append("character stats missing beneath equipment slots")
-    # Left equipment slots must never open a choice list or equip anything.
+    # The MMORPG inventory must not equip from a left-side slot.
     farm.on_equipment_slot_pressed("top")
     if farm.inventory_detail_panel.visible:
-        problems.append("empty left equipment slot unexpectedly opens the item details")
+        problems.append("left equipment slot incorrectly opened item choice")
     farm.equip_clothing(farm.avatar_gender + "_martial_top")
     if farm.clothing_equipped.has("top"):
-        problems.append("missing shirt model was marked equipped as if real")
-    if farm.avatar_gender == "male":
-        for item_entry in farm._inventory_contents():
-            if str(item_entry.get("kind", "")) == "clothing":
-                problems.append("male backpack displays clothing without any male outfit mesh")
+        problems.append("unowned shirt equipped without a purchase")
     if farm.inventory_detail_panel == null or farm.inventory_equip_button == null:
-        problems.append("MMORPG backpack item details and explicit equip action are missing")
+        problems.append("missing separate item details and equip confirmation")
+    # Both rigs have new 3D bone-attached wardrobe parts. Purchasing a shirt
+    # and gloves never modifies the other equipped slot.
+    farm.coins = maxi(farm.coins, 600)
+    var bought_shirt: String = farm.avatar_gender + "_villager_top"
+    var bought_gloves: String = farm.avatar_gender + "_martial_gloves"
+    var cost_before: int = farm.coins
+    farm.buy_clothing(bought_shirt)
+    if int(farm.clothing_owned.get(bought_shirt, 0)) != 1 or farm.coins != cost_before - farm.WARDROBE.shop_price(bought_shirt):
+        problems.append("farm coins did not purchase a modular shirt")
+    farm.buy_clothing(bought_gloves)
+    farm.refresh_bag_cards()
+    var shirt_index: int = -1
+    for i in range(farm.inventory_entries.size()):
+        if str(farm.inventory_entries[i].get("item_id", "")) == bought_shirt:
+            shirt_index = i
+            break
+    if shirt_index < 0:
+        problems.append("purchased shirt missing from right inventory grid")
+    else:
+        farm.inventory_slot_pressed(shirt_index)
+        if farm.clothing_equipped.has("top"):
+            problems.append("item tap changed clothes before confirmation")
+        if farm.inventory_equip_button.text != "สวมใส่":
+            problems.append("item details missing separate equip action")
+        farm._equip_selected_inventory_item()
+        if str(farm.clothing_equipped.get("top", "")) != bought_shirt:
+            problems.append("confirm equip did not wear modular shirt")
+        var glove_index: int = -1
+        for i in range(farm.inventory_entries.size()):
+            if str(farm.inventory_entries[i].get("item_id", "")) == bought_gloves:
+                glove_index = i
+                break
+        if glove_index >= 0:
+            farm.inventory_slot_pressed(glove_index)
+            farm._equip_selected_inventory_item()
+            if str(farm.clothing_equipped.get("top", "")) != bought_shirt or str(farm.clothing_equipped.get("gloves", "")) != bought_gloves:
+                problems.append("different modular slots do not mix independently")
+        farm.unequip_clothing("gloves")
+        farm.unequip_clothing("top")
     if farm.gender_item_button.disabled == false:
         problems.append("gender card usable with zero inventory")
     farm.consume_gender_change_ticket()
@@ -380,8 +415,8 @@ func _check() -> void:
         var shoe_thumbnail: Texture2D = farm._real_equipment_thumbnail("female_survivor_shoes")
         if shoe_thumbnail == null:
             problems.append("real survivor shoe mesh thumbnail did not load")
-        if farm._real_equipment_thumbnail("female_villager_top") != null:
-            problems.append("missing shirt model unexpectedly shows a fake thumbnail")
+        if farm._real_equipment_thumbnail("female_villager_top") == null:
+            problems.append("modular shirt thumbnail does not use real gear geometry")
         farm.equip_clothing("female_survivor_shoes")
         farm.refresh_character_preview()
         if farm.character_preview_avatar == null or not is_instance_valid(farm.character_preview_avatar):
@@ -389,14 +424,14 @@ func _check() -> void:
         if str(farm.clothing_equipped.get("shoes", "")) != "female_survivor_shoes":
             problems.append("shoe item failed to equip into independent slot")
         else:
-            var real_shoes: Array[MeshInstance3D] = []
-            farm.farmer_visual._find_meshes(farm.farmer_visual.imported_character, real_shoes)
-            var visible_shoes: int = 0
-            for piece in real_shoes:
-                if str(piece.name).contains("Female_Outfit_Apocalypse_Survivor_Shoes") and piece.visible:
-                    visible_shoes += 1
-            if visible_shoes != 2:
-                problems.append("wearing shoes did not reveal both real GLB shoe meshes")
+            var visual_skeleton: Skeleton3D = farm.farmer_visual.skeleton
+            var worn_pieces: int = 0
+            if visual_skeleton != null:
+                for child in visual_skeleton.get_children():
+                    if child.name.begins_with("FarmFlexWardrobe_female_survivor_shoes"):
+                        worn_pieces += 1
+            if worn_pieces != 2:
+                problems.append("wearing shoes did not attach both modular 3D shoe meshes")
         farm.unequip_clothing("shoes")
         if farm.clothing_equipped.has("shoes"):
             problems.append("unequip did not empty shoe slot")
