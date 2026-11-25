@@ -299,11 +299,53 @@ static func normalize(raw: Variant) -> Dictionary:
     var gender: String = str(data.get("avatar_gender", "female"))
     if gender not in ["male", "female"]:
         return {}
+    # Backward-compatible character/inventory data: never wipe existing farms
+    # simply because they were saved before the wardrobe was added.
+    var profile_input: Variant = data.get("character_profile", {})
+    var safe_profile: Dictionary = profile_input.duplicate(true) if profile_input is Dictionary else {}
+    if not safe_profile.is_empty():
+        safe_profile["sex"] = gender
+    var token_input: Variant = data.get("gender_change_tickets", 0)
+    if not (token_input is int or token_input is float) or not is_finite(float(token_input)) or float(token_input) != float(int(token_input)):
+        return {}
+    var safe_tokens: int = int(token_input)
+    if safe_tokens < 0 or safe_tokens > 999:
+        return {}
+    var wardrobe_ids: Array[String] = ["female_survivor_shoes", "female_martial_shoes"]
+    var inventory_input: Variant = data.get("clothing_owned", {
+        "female_survivor_shoes": 1, "female_martial_shoes": 1
+    })
+    if not (inventory_input is Dictionary):
+        return {}
+    var safe_clothing: Dictionary = {}
+    for item_id in wardrobe_ids:
+        var qty: Variant = inventory_input.get(item_id, 0)
+        if not (qty is int or qty is float) or not is_finite(float(qty)) or float(qty) != float(int(qty)):
+            return {}
+        var amount: int = int(qty)
+        if amount < 0 or amount > 99:
+            return {}
+        safe_clothing[item_id] = amount
+    var equipment_input: Variant = data.get("clothing_equipped", {})
+    if not (equipment_input is Dictionary):
+        return {}
+    var safe_equipment: Dictionary = {}
+    for slot in ["headwear", "top", "gloves", "bottom", "shoes"]:
+        var item_name: String = str(equipment_input.get(slot, ""))
+        if item_name.is_empty():
+            continue
+        if slot != "shoes" or not wardrobe_ids.has(item_name) or int(safe_clothing.get(item_name, 0)) == 0 or gender != "female":
+            return {}
+        safe_equipment[slot] = item_name
     return {
         "coins": balance,
         "land_grid": 2,
         "produce": safe_produce,
         "avatar_gender": gender,
+        "character_profile": safe_profile,
+        "gender_change_tickets": safe_tokens,
+        "clothing_owned": safe_clothing,
+        "clothing_equipped": safe_equipment,
         "feed": stock,
         "pigs": animal_count,
         "pens": pen_count,
