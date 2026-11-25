@@ -324,13 +324,10 @@ func _check() -> void:
             previous.append(bounds)
         if farm.character_info_label == null or not farm.character_info_label.text.contains("EXP"):
             problems.append("character stats missing beneath equipment slots")
-    # The 3D source pack has no shirts, hats, gloves or bottoms. Don't
-    # present fabricated outfit entries as wearable mesh assets.
+    # Left equipment slots must never open a choice list or equip anything.
     farm.on_equipment_slot_pressed("top")
-    if farm.equipment_picker == null or not farm.equipment_picker.visible:
-        problems.append("tap on shirt slot did not open a picker")
-    elif not farm.equipment_picker_buttons[0].disabled:
-        problems.append("missing villager shirt mesh is incorrectly equipable")
+    if farm.inventory_detail_panel.visible:
+        problems.append("empty left equipment slot unexpectedly opens the item details")
     farm.equip_clothing(farm.avatar_gender + "_martial_top")
     if farm.clothing_equipped.has("top"):
         problems.append("missing shirt model was marked equipped as if real")
@@ -338,7 +335,8 @@ func _check() -> void:
         for item_entry in farm._inventory_contents():
             if str(item_entry.get("kind", "")) == "clothing":
                 problems.append("male backpack displays clothing without any male outfit mesh")
-    farm._close_equipment_picker()
+    if farm.inventory_detail_panel == null or farm.inventory_equip_button == null:
+        problems.append("MMORPG backpack item details and explicit equip action are missing")
     if farm.gender_item_button.disabled == false:
         problems.append("gender card usable with zero inventory")
     farm.consume_gender_change_ticket()
@@ -355,6 +353,29 @@ func _check() -> void:
             problems.append("shoe shop purchase did not add item to backpack")
         if farm.coins != coins_before_wardrobe - 160:
             problems.append("shoe shop did not deduct earned coins")
+        # Tap to inspect the item; only the separate action button can equip it.
+        farm.refresh_bag_cards()
+        var shoe_index: int = -1
+        for i in range(farm.inventory_entries.size()):
+            if str(farm.inventory_entries[i].get("item_id", "")) == "female_survivor_shoes":
+                shoe_index = i
+                break
+        if shoe_index < 0:
+            problems.append("purchased shoe item missing from right-hand backpack")
+        else:
+            farm.inventory_slot_pressed(shoe_index)
+            if not farm.inventory_detail_panel.visible or farm.inventory_equip_button.text != "สวมใส่":
+                problems.append("shoe tap did not show details and separate equip button")
+            if farm.clothing_equipped.has("shoes"):
+                problems.append("shoe tap equipped item without pressing equip")
+            farm._equip_selected_inventory_item()
+            if str(farm.clothing_equipped.get("shoes", "")) != "female_survivor_shoes":
+                problems.append("explicit equip action failed to dress avatar")
+            if farm.inventory_equip_button.text != "ถอด":
+                problems.append("details did not update to unequip after dressing")
+            farm._equip_selected_inventory_item()
+            if farm.clothing_equipped.has("shoes"):
+                problems.append("explicit unequip action failed to undress avatar")
         # Rendering uses real meshes; never show a generic fake image.
         var shoe_thumbnail: Texture2D = farm._real_equipment_thumbnail("female_survivor_shoes")
         if shoe_thumbnail == null:
