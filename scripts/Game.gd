@@ -3440,21 +3440,6 @@ func _select_shop_sale_slot(index: int) -> void:
 func _sell_selected_shop_item() -> void:
     _request_sell_selected()
 
-func _sell_selected_shop_item_legacy() -> void:
-    if shop_sell_selected < 0 or shop_sell_selected >= shop_sell_entries.size():
-        return
-    var crop_index: int = int(shop_sell_entries[shop_sell_selected]["crop"])
-    var sale_price: int = int(CROPS[crop_index]["reward"])
-    if int(produce[crop_index]) < 1 or coins > 1000000000 - sale_price:
-        return
-    produce[crop_index] = int(produce[crop_index]) - 1
-    coins += sale_price
-    message = "ขาย%s +%d เหรียญ" % [str(CROPS[crop_index]["name"]), sale_price]
-    if int(produce[crop_index]) == 0:
-        shop_sell_selected = -1
-    save_game()
-    refresh_labels()
-
 # Rotating the preview never rotates the farmer in the actual game.
 # Mouse drag works on PC; ScreenDrag works on Android / iOS landscape.
 func _on_character_preview_input(event: InputEvent) -> void:
