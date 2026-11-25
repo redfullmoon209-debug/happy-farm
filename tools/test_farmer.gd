@@ -10,6 +10,27 @@ func _check() -> void:
     var problems: Array[String] = []
     if farm.farmer == null:
         problems.append("no player actor")
+    # GM-only catalog must match all original user-supplied FBX files exactly.
+    if farm.GM_PROPS.all_names().size() != 68:
+        problems.append("FBX.zip catalog does not include all 68 models")
+    if farm.GM_TEST_MODE:
+        if farm.gm_build_open_button == null or farm.gm_build_panel == null:
+            problems.append("GM construction menu missing")
+        elif farm.gm_build_item_buttons.size() != 68 or farm.gm_build_category_buttons.size() != 5:
+            problems.append("GM construction does not categorize all 68 original models")
+        else:
+            farm._gm_select_category("paths")
+            var visible_paths: int = 0
+            for button in farm.gm_build_item_buttons.values():
+                if button.visible:
+                    visible_paths += 1
+            if visible_paths != farm.GM_PROPS.GROUPS["paths"].size():
+                problems.append("GM stone path category filter is incorrect")
+            farm._gm_set_build_mode("delete")
+            if farm.gm_build_mode != "delete":
+                problems.append("GM remove mode not available")
+            farm.gm_build_mode = ""
+            farm._gm_select_category("trees")
     if farm.stick == null:
         problems.append("no joystick")
     if farm.jump_button == null or farm.run_button == null:
