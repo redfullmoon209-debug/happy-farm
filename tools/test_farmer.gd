@@ -359,7 +359,16 @@ func _check() -> void:
     if farm.avatar_gender != previous_gender:
         problems.append("gender changed without consuming a purchased card")
     if previous_gender == "female" and farm.farmer_visual != null:
+        # Rendering uses real meshes; never show a generic fake image.
+        var shoe_thumbnail: Texture2D = farm._real_equipment_thumbnail("female_survivor_shoes")
+        if shoe_thumbnail == null:
+            problems.append("real survivor shoe mesh thumbnail did not load")
+        if farm._real_equipment_thumbnail("female_villager_top") != null:
+            problems.append("missing shirt model unexpectedly shows a fake thumbnail")
         farm.equip_clothing("female_survivor_shoes")
+        farm.refresh_character_preview()
+        if farm.character_preview_avatar == null or not is_instance_valid(farm.character_preview_avatar):
+            problems.append("preview avatar missing after equipment change")
         if str(farm.clothing_equipped.get("shoes", "")) != "female_survivor_shoes":
             problems.append("shoe item failed to equip into independent slot")
         else:
