@@ -258,6 +258,7 @@ var shop_close: Button
 var shop_feed: Button
 var shop_scroll: ScrollContainer
 var shop_grid: GridContainer
+var shop_wardrobe_buttons: Dictionary = {}
 var shop_livestock_label: Label
 var shop_pen_button: Button
 var shop_pig_button: Button
@@ -2200,6 +2201,7 @@ func build_ui() -> void:
         var price: int = WARDROBE.shop_price(item_id)
         var wardrobe_buy: Button = btn("%s\n%d เหรียญ" % [str(gear_data["name"]), price], buy_clothing.bind(item_id))
         wardrobe_buy.name = "BuyWardrobe_" + item_id
+        shop_wardrobe_buttons[item_id] = wardrobe_buy
         wardrobe_buy.custom_minimum_size = Vector2(145, 55)
         wardrobe_buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         wardrobe_buy.tooltip_text = "ซื้อด้วยเงินจากการทำฟาร์ม • สวมทีละชิ้นในกระเป๋า"
@@ -2794,6 +2796,12 @@ func refresh_labels() -> void:
     if sell_button != null:
         sell_button.text = tr("ขายผลผลิตทั้งหมด (%d เหรียญ)") % produce_value()
         sell_button.disabled = produce_value() == 0
+    for garment_id in shop_wardrobe_buttons.keys():
+        var buy_button: Button = shop_wardrobe_buttons[garment_id]
+        var gender_ok: bool = str(CLOTHING_CATALOG[garment_id].get("gender", "")) == avatar_gender
+        var already_owned: bool = int(clothing_owned.get(garment_id, 0)) > 0
+        buy_button.disabled = not gender_ok or already_owned
+        buy_button.tooltip_text = "ซื้อแล้ว อยู่ในกระเป๋า" if already_owned else ("สำหรับตัวละครหญิง" if not gender_ok else "ปลูกผักขายเพื่อหาเหรียญซื้อชุด")
     if get_viewport().get_visible_rect().size.x < 960.0:
         money_label.text = "เงิน %d | คอก %d | หมู %d/%d" % [coins, pens, pigs, pens*PEN_CAPACITY]
     else:
