@@ -2489,7 +2489,7 @@ func update_sizes() -> void:
     set_box(character_title, 12.0, 8.0, side_w-24.0, 28.0)
     var left_inner_h: float = bag_height-65.0
     # Reserve the lower part for gear row, character data and gender-card action.
-    var preview_h: float = maxf(67.0, minf(310.0, left_inner_h-164.0))
+    var preview_h: float = maxf(67.0, minf(310.0, left_inner_h-215.0))
     set_box(character_preview_frame, 12.0, 36.0, side_w-24.0, preview_h)
     var row_y: float = 40.0+preview_h
     var gear_gap: float = 3.0
