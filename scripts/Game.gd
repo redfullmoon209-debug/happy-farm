@@ -314,6 +314,10 @@ var character_preview_shoes: String = ""
 var character_preview_rotation_y: float = PI
 var character_preview_dragging: bool = false
 var character_equipment_buttons: Dictionary = {}
+var equipment_picker: Panel
+var equipment_picker_title: Label
+var equipment_picker_buttons: Array[Button] = []
+var equipment_picker_slot: String = ""
 var character_info_label: Label
 var message: String = "เลือกเครื่องมือ แล้วแตะแปลงผัก"
 
@@ -2379,9 +2383,7 @@ func build_ui() -> void:
     character_preview_viewport.add_child(preview_light)
     character_gender_label = text_label("", 17, Color("#654f40"))
     character_panel.add_child(character_gender_label)
-    # Five modular item slots, left to right: head / top / gloves / legs / shoes.
-    # Tapping an occupied slot removes it; tapping an empty slot prompts the
-    # player to choose the matching item in the 200-slot bag on the right.
+    # Each of five equipment slots opens a cream picker for one independent piece.
     for slot_name in CLOTHING_SLOTS:
         var slot_button: Button = btn("", on_equipment_slot_pressed.bind(slot_name), Color("#638779"))
         slot_button.name = "EquipmentSlot_" + slot_name
@@ -2408,6 +2410,20 @@ func build_ui() -> void:
     gender_change_confirmation.dialog_text = "ใช้บัตรเปลี่ยนเพศ 1 ใบหรือไม่?"
     gender_change_confirmation.confirmed.connect(consume_gender_change_ticket)
     ui.add_child(gender_change_confirmation)
+    equipment_picker = panel(Color("#f6efe3f5"))
+    equipment_picker.name = "EquipmentPiecePicker"
+    equipment_picker.z_index = 30
+    equipment_picker.mouse_filter = Control.MOUSE_FILTER_STOP
+    equipment_picker.visible = false
+    bag_panel.add_child(equipment_picker)
+    equipment_picker_title = text_label("", 17, Color("#604934"))
+    equipment_picker_title.add_theme_font_override("font", THAI_BOLD)
+    equipment_picker.add_child(equipment_picker_title)
+    for choice_index in range(4):
+        var choice_button: Button = btn("", _on_equipment_picker_choice.bind(choice_index))
+        choice_button.name = "EquipmentChoice_%d" % choice_index
+        equipment_picker.add_child(choice_button)
+        equipment_picker_buttons.append(choice_button)
 
     # PNG glyphs stay separate from PNG button bases and live labels.
     for entry in [
@@ -2648,6 +2664,13 @@ func update_sizes() -> void:
     set_box(bag_summary, inventory_x+5.0, 58.0, inventory_w-10.0, 25.0)
     set_box(bag_scroll, inventory_x+4.0, 88.0, inventory_w-8.0, maxf(60.0, bag_height-174.0))
     set_box(bag_footer, inventory_x+5.0, bag_height-79.0, inventory_w-10.0, 18.0)
+    if equipment_picker != null:
+        var picker_width: float = minf(310.0, inventory_w-22.0)
+        set_box(equipment_picker, inventory_x+8.0, 89.0, picker_width, 234.0)
+        set_box(equipment_picker_title, 10.0, 7.0, picker_width-20.0, 27.0)
+        for idx in range(equipment_picker_buttons.size()):
+            set_box(equipment_picker_buttons[idx], 9.0, 40.0+float(idx)*47.0,
+                picker_width-18.0, 41.0)
     set_box(bag_save_status, inventory_x+5.0, bag_height-57.0, inventory_w-10.0, 20.0)
     var backup_button_width: float = maxf(60.0, (inventory_w-18.0)*0.5)
     set_box(bag_export_button, inventory_x+4.0, bag_height-34.0, backup_button_width, 29.0)
@@ -2967,11 +2990,14 @@ func show_bag() -> void:
     bag_panel.visible = not bag_panel.visible
     if bag_panel.visible:
         open_backpack_view()
+    else:
+        _close_equipment_picker()
 
 func open_backpack_view() -> void:
     if bag_panel == null or character_panel == null:
         return
     bag_panel.visible = true
+    _close_equipment_picker()
     character_panel.visible = true
     bag_summary.visible = true
     bag_scroll.visible = true
@@ -3029,13 +3055,43 @@ func rotate_character_preview(delta_x: float) -> void:
         character_preview_avatar.rotation.y = character_preview_rotation_y
 
 func on_equipment_slot_pressed(slot_name: String) -> void:
+    if not CLOTHING_SLOTS.has(slot_name) or equipment_picker == null:
+        return
+    if equipment_picker.visible and equipment_picker_slot == slot_name:
+        _close_equipment_picker()
+        return
+    equipment_picker_slot = slot_name
+    var slot_label: String = INV_TEXT.label(slot_name, inventory_language)
+    equipment_picker_title.text = "เลือก%s" % slot_label if inventory_language == "th" else "Choose " + slot_label
+    for idx in range(3):
+        var set_id: String = ["villager", "martial", "survivor"][idx]
+        var item_id: String = WARDROBE.item_id(avatar_gender, set_id, slot_name)
+        var choice: Button = equipment_picker_buttons[idx]
+        var owned: bool = int(clothing_owned.get(item_id, 0)) > 0
+        var selected: bool = str(clothing_equipped.get(slot_name, "")) == item_id
+        var info: Dictionary = CLOTHING_CATALOG.get(item_id, {})
+        choice.text = str(info.get("name", set_id)) + ("  ✓" if selected else "")
+        choice.disabled = not owned or selected
+        choice.tooltip_text = str(info.get("name", set_id))
+    var remove_button: Button = equipment_picker_buttons[3]
+    remove_button.text = "ถอด%s" % slot_label if inventory_language == "th" else "Unequip " + slot_label
+    remove_button.disabled = not clothing_equipped.has(slot_name)
+    equipment_picker.visible = true
+
+func _close_equipment_picker() -> void:
+    if equipment_picker != null:
+        equipment_picker.visible = false
+    equipment_picker_slot = ""
+
+func _on_equipment_picker_choice(choice_index: int) -> void:
+    var slot_name: String = equipment_picker_slot
     if not CLOTHING_SLOTS.has(slot_name):
         return
-    if clothing_equipped.has(slot_name):
+    if choice_index == 3:
         unequip_clothing(slot_name)
-    else:
-        message = INV_TEXT.label("equipment_prompt", inventory_language) % INV_TEXT.label(slot_name, inventory_language)
-        refresh_labels()
+    elif choice_index >= 0 and choice_index < 3:
+        var set_id: String = ["villager", "martial", "survivor"][choice_index]
+        equip_clothing(WARDROBE.item_id(avatar_gender, set_id, slot_name))
 
 func refresh_character_preview() -> void:
     if character_preview_viewport == null or not character_panel.visible:
@@ -3163,6 +3219,7 @@ func equip_clothing(item_id: String) -> void:
         return
     var slot: String = str(data["slot"])
     clothing_equipped[slot] = item_id
+    _close_equipment_picker()
     if farmer_visual != null and farmer_visual.has_method("apply_equipment"):
         farmer_visual.apply_equipment(clothing_equipped)
     character_preview_gender = ""
@@ -3175,6 +3232,7 @@ func unequip_clothing(slot: String) -> void:
     if not CLOTHING_SLOTS.has(slot) or not clothing_equipped.has(slot):
         return
     clothing_equipped.erase(slot)
+    _close_equipment_picker()
     if farmer_visual != null and farmer_visual.has_method("apply_equipment"):
         farmer_visual.apply_equipment(clothing_equipped)
     character_preview_gender = ""
