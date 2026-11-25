@@ -167,6 +167,23 @@ func _apply_skin_tone(body: MeshInstance3D, hex_color: String, gender: String) -
         material_copy.albedo_texture = ImageTexture.create_from_image(result_image)
         body.set_surface_override_material(idx, material_copy)
 
+# Clothing attaches only to matching, pre-existing skinned GLB meshes.
+# At present the supplied character pack contains TWO female shoe pairs;
+# shirt, pants, gloves, hat and male shoe meshes have not been supplied yet.
+func apply_equipment(equipped: Dictionary) -> void:
+    if imported_character == null:
+        return
+    var shoes_id: String = str(equipped.get("shoes", ""))
+    var parts: Array[MeshInstance3D] = []
+    _find_meshes(imported_character, parts)
+    for part in parts:
+        var piece_name: String = str(part.name)
+        if not piece_name.contains("_Outfit_"):
+            continue
+        var survivor: bool = shoes_id == "female_survivor_shoes" and piece_name.contains("Female_Outfit_Apocalypse_Survivor_Shoes_")
+        var martial: bool = shoes_id == "female_martial_shoes" and piece_name.contains("Female_Outfit_Martial_Artist_Shoes_")
+        part.visible = survivor or martial
+
 func has_visible_avatar() -> bool:
     return imported_character != null and mesh_count > 0 and display_height >= 0.85 and display_height <= 0.95
 
