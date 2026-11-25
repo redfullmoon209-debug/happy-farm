@@ -2895,7 +2895,7 @@ func _real_equipment_thumbnail(item_id: String) -> Texture2D:
     var image_viewport: SubViewport = EQUIPMENT_THUMBNAIL.new()
     image_viewport.name = "RealGearThumb_" + item_id
     bag_panel.add_child(image_viewport)
-    if not image_viewport.set_equipment_item(item_id):
+    if not bool(image_viewport.call("set_equipment_item", item_id)):
         image_viewport.queue_free()
         return null
     var texture: Texture2D = image_viewport.get_texture()
@@ -3140,7 +3140,8 @@ func refresh_character_preview() -> void:
     # shoes-only cache because shirts/gloves/pants/headwear are independent.
     if character_preview_avatar != null and is_instance_valid(character_preview_avatar):
         if character_preview_gender == avatar_gender:
-            character_preview_avatar.apply_equipment(clothing_equipped)
+            if character_preview_avatar.has_method("apply_equipment"):
+                character_preview_avatar.call("apply_equipment", clothing_equipped)
             character_preview_equipment = clothing_equipped.duplicate(true)
             return
         character_preview_viewport.remove_child(character_preview_avatar)
