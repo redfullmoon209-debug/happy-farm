@@ -1,4 +1,5 @@
 extends RefCounted
+const WARDROBE = preload("res://scripts/WardrobeCatalog.gd")
 # Browser-friendly, versioned and validated Happy Farm save data.
 # This module keeps existing flat user:// saves compatible.
 
@@ -311,32 +312,35 @@ static func normalize(raw: Variant) -> Dictionary:
     var safe_tokens: int = int(token_input)
     if safe_tokens < 0 or safe_tokens > 999:
         return {}
-    var wardrobe_ids: Array[String] = ["female_survivor_shoes", "female_martial_shoes"]
-    var inventory_input: Variant = data.get("clothing_owned", {
-        "female_survivor_shoes": 1, "female_martial_shoes": 1
-    })
+    # Test wardrobe: three sets, five separate slots, both model genders.
+    # Existing save files automatically receive each test piece once.
+    var catalog: Dictionary = WARDROBE.all_items()
+    var inventory_input: Variant = data.get("clothing_owned", {})
     if not (inventory_input is Dictionary):
         return {}
     var safe_clothing: Dictionary = {}
-    for item_id in wardrobe_ids:
-        var qty: Variant = inventory_input.get(item_id, 0)
+    for item_id in catalog.keys():
+        var qty: Variant = (inventory_input as Dictionary).get(item_id, 1)
         if not (qty is int or qty is float) or not is_finite(float(qty)) or float(qty) != float(int(qty)):
             return {}
         var amount: int = int(qty)
         if amount < 0 or amount > 99:
             return {}
-        safe_clothing[item_id] = amount
+        # Ensure all test pieces exist even in older two-shoe save files.
+        safe_clothing[item_id] = maxi(1, amount)
     var equipment_input: Variant = data.get("clothing_equipped", {})
     if not (equipment_input is Dictionary):
         return {}
     var safe_equipment: Dictionary = {}
-    for slot in ["headwear", "top", "gloves", "bottom", "shoes"]:
+    for slot in WARDROBE.SLOTS:
         var item_name: String = str(equipment_input.get(slot, ""))
         if item_name.is_empty():
             continue
-        if slot != "shoes" or not wardrobe_ids.has(item_name) or int(safe_clothing.get(item_name, 0)) == 0 or gender != "female":
-            return {}
-        safe_equipment[slot] = item_name
+        if not catalog.has(item_name):
+            continue
+        var item: Dictionary = catalog[item_name]
+        if str(item["slot"]) == slot and str(item["gender"]) == gender and int(safe_clothing.get(item_name, 0)) > 0:
+            safe_equipment[slot] = item_name
     return {
         "coins": balance,
         "land_grid": 2,
