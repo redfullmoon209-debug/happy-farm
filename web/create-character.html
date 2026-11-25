@@ -33,10 +33,10 @@
 <div class="section">8 · เริ่มเล่น</div><div class="note">ยืนยันครั้งเดียว จะล็อกเพศ ใบหน้า และทรงผมในเบราว์เซอร์นี้ • เปลี่ยนชุดในคลังเก็บของภายในเกมเมื่อระบบเสื้อผ้าพร้อม</div><button id="confirmCharacter" disabled style="margin-top:9px;background:#396751;border:1px solid #a1d8aa;min-height:48px;font-weight:700">ยืนยันสร้างตัวละคร และเข้าเกม</button><p id="creationStatus" class="tag" role="status">สำหรับการสร้างตัวละครครั้งแรก</p>
 <div id="avatarTestControls" hidden style="display:none;margin-top:14px">
 <div class="section">โหมดทดสอบตัวละคร (ไม่เปลี่ยนตัวละครที่ล็อกไว้)</div>
-<div class="note">สำหรับลองแอนิเมชันชาย–หญิงเท่านั้น ไม่ใช่ GM และไม่แก้เซฟหรือเปลี่ยนเพศถาวร</div>
+<div class="note">การเปลี่ยนเพศต้องซื้อบัตรเปลี่ยนเพศในร้านค้า แล้วกดใช้ในหน้าตัวละคร</div>
 <div class="grid" style="margin-top:8px">
-<button type="button" data-preview-sex="male">ทดลองเล่นผู้ชาย</button>
-<button type="button" data-preview-sex="female">ทดลองเล่นผู้หญิง</button>
+<button type="button" data-preview-sex="male">ไปหน้าเปลี่ยนตัวละคร</button>
+<button type="button" data-preview-sex="female">เปิดคลังเสื้อผ้า</button>
 </div></div>
 <p class="foot">หมุนดูตัวละคร 3D ได้ • เสื้อผ้าเปลี่ยนในคลังเก็บของของเกมภายหลังเมื่อชิ้นส่วนพร้อม • บัญชีออนไลน์และการล็อกฝั่งเซิร์ฟเวอร์ยังอยู่ระหว่างพัฒนา</p>
 </aside><div id="tip">เลือกตัวละคร → ยืนยันล็อก → เข้าเกม FarmFlex</div>
@@ -139,9 +139,7 @@ if(new URLSearchParams(location.search).get('test')==='1'){
         statusCreation.textContent='ต้องยืนยันตัวละครครั้งแรกก่อน จึงจะทดลองสลับชาย–หญิงได้';
         return;
       }
-      const selected=button.dataset.previewSex;
-      if(!['male','female'].includes(selected))return;
-      window.location.assign('./index.html?test_gender='+selected);
+      window.location.assign('./index.html?wardrobe=1');
     }catch(err){statusCreation.textContent='เปิดโหมดทดสอบไม่ได้: '+err.message}
   }));
 }
