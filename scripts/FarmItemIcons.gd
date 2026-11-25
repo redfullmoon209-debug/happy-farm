@@ -47,6 +47,8 @@ static func _svg_picture(kind: String, idx: int) -> String:
             7: veggie = "<path d='M16 55L36 23L55 50L72 31L85 61L62 81H28Z' fill='"+accent+"'/><path d='M21 61H79' stroke='#f2d38b' stroke-width='6'/>"
         if idx >= 8:
             veggie += "<circle cx='73' cy='75' r='10' fill='#a4bf94' stroke='#618863' stroke-width='3'/>"
+    elif kind == "basket":
+        veggie = "<path d='M20 45H76L69 82H27Z' fill='#be945d' stroke='#8a6948' stroke-width='3'/><path d='M27 45Q27 13 48 13Q69 13 69 45' fill='none' stroke='#966e48' stroke-width='6'/><path d='M37 48L41 78M49 48V79M61 48L57 78' stroke='#e5c59a' stroke-width='4'/><circle cx='35' cy='42' r='10' fill='#e99745'/><circle cx='53' cy='40' r='11' fill='#df6556'/><ellipse cx='65' cy='42' rx='11' ry='9' fill='#8ab968'/>"
     elif kind == "plot":
         veggie = "<path d='M10 62L38 25H87L61 67Z' fill='#8c613f'/><path d='M20 60L45 29M36 64L60 29M52 65L76 31' stroke='#c09061' stroke-width='7'/>"
     elif kind == "feed":
