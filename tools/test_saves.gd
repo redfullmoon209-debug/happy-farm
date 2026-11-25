@@ -36,6 +36,12 @@ func _initialize() -> void:
         "legacy free shoes do not bypass the new farm-coin shop")
     check(int(updated.get("clothing_owned", {}).get("female_villager_gloves", -1)) == 0,
         "no invented free clothing is granted")
+    check(SAVES.WARDROBE.available_item_ids().size() == 30,
+        "three outfit collections and five separate pieces exist for both genders")
+    check(SAVES.WARDROBE.shop_price("male_martial_top") > 0,
+        "male modular shirt requires earned farm coins")
+    check(SAVES.WARDROBE.shop_price("female_survivor_bottom") > 0,
+        "female modular bottom has an item price")
 
     # New saves explicitly carry plot and pen counts.
     var farm: Dictionary = updated.duplicate(true)
@@ -65,6 +71,21 @@ func _initialize() -> void:
     forbidden_mix["clothing_equipped"] = {"gloves": "male_martial_gloves"}
     check(SAVES.normalize(forbidden_mix).get("clothing_equipped", {}).is_empty(),
         "incompatible equipment is not applied")
+    var purchased_mixed: Dictionary = farm.duplicate(true)
+    purchased_mixed["clothing_owned"]["female_villager_top"] = 1
+    purchased_mixed["clothing_owned"]["female_martial_gloves"] = 1
+    purchased_mixed["clothing_equipped"] = {
+        "top": "female_villager_top",
+        "gloves": "female_martial_gloves"
+    }
+    check(SAVES.normalize(purchased_mixed).get("clothing_equipped", {}).size() == 2,
+        "save preserves independently equipped purchased top and gloves")
+    var purchased_male: Dictionary = farm.duplicate(true)
+    purchased_male["avatar_gender"] = "male"
+    purchased_male["clothing_owned"]["male_survivor_bottom"] = 1
+    purchased_male["clothing_equipped"] = {"bottom": "male_survivor_bottom"}
+    check(str(SAVES.normalize(purchased_male).get("clothing_equipped", {}).get("bottom", "")) == "male_survivor_bottom",
+        "male modular trousers survive a saved game")
     var package_data: Dictionary = SAVES.package(farm)
     var export_import: Dictionary = SAVES.normalize(JSON.parse_string(JSON.stringify(package_data)))
     check(export_import.size() > 0, "export and import new format")
