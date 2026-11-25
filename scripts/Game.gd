@@ -2261,6 +2261,16 @@ func build_ui() -> void:
     ticket_for_sale.custom_minimum_size = Vector2(145, 55)
     ticket_for_sale.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     shop_grid.add_child(ticket_for_sale)
+    # The left half uses compact item cards like an MMORPG inventory,
+    # not the previous two-column list of oversized shop buttons.
+    wardrobe_note.custom_minimum_size = Vector2(56, 65)
+    for shop_child in shop_grid.get_children():
+        if shop_child is Button:
+            var shop_item_card: Button = shop_child as Button
+            shop_item_card.custom_minimum_size = Vector2(55, 62)
+            shop_item_card.clip_text = true
+            shop_item_card.add_theme_font_size_override("font_size", 11)
+            _metal_button_skin(shop_item_card, USER_INV_SLOT)
     shop_feed = btn("ซื้ออาหารหมู +5 (35 เหรียญ)", buy_feed, Color("#ad7c53"))
     shop_panel.add_child(shop_feed)
     shop_pen_button = btn("ขยายคอกหมู", buy_pen, Color("#7c985d"))
@@ -2869,6 +2879,8 @@ func refresh_labels() -> void:
     if sell_button != null:
         sell_button.text = tr("ขายผลผลิตทั้งหมด (%d เหรียญ)") % produce_value()
         sell_button.disabled = produce_value() == 0
+    if shop_sell_grid != null:
+        _refresh_shop_sell_grid()
     for garment_id in shop_wardrobe_buttons.keys():
         var buy_button: Button = shop_wardrobe_buttons[garment_id]
         var gender_ok: bool = str(CLOTHING_CATALOG[garment_id].get("gender", "")) == avatar_gender
@@ -3163,9 +3175,70 @@ func show_shop() -> void:
         bag_panel.visible = false
     shop_panel.visible = not shop_panel.visible
     if shop_panel.visible and shop_scroll != null:
-        # Make clothing discoverable instead of hiding it after every seed,
-        # tree and decoration item in the long scroll list.
         shop_scroll.scroll_vertical = 0
+        shop_sell_selected = -1
+        _refresh_shop_sell_grid()
+
+# Right side of the shop lists only harvested produce that can be exchanged
+# at the game's existing crop.reward price. Seeds, clothing, and farm tools
+# cannot be accidentally sold.
+func _refresh_shop_sell_grid() -> void:
+    if shop_sell_grid == null or shop_sell_one_button == null:
+        return
+    shop_sell_entries.clear()
+    for i in range(CROPS.size()):
+        if int(produce[i]) > 0:
+            shop_sell_entries.append({
+                "crop": i,
+                "name": str(CROPS[i]["name"]) + " ผลผลิต",
+                "count": int(produce[i]),
+                "price": int(CROPS[i]["reward"])
+            })
+    if shop_sell_selected >= shop_sell_entries.size():
+        shop_sell_selected = -1
+    for index in range(shop_sell_cards.size()):
+        var card: Button = shop_sell_cards[index]
+        if index >= shop_sell_entries.size():
+            card.text = ""
+            card.tooltip_text = "ช่องว่าง"
+            card.disabled = true
+            card.icon = null
+            card.modulate = Color.WHITE
+        else:
+            var entry: Dictionary = shop_sell_entries[index]
+            card.text = "%s\n×%d" % [str(CROPS[int(entry["crop"])]["name"]), int(entry["count"])]
+            card.tooltip_text = "%s • ขายได้ %d เหรียญ/ชิ้น" % [str(entry["name"]), int(entry["price"])]
+            card.disabled = false
+            card.modulate = Color("#f1dbbb") if index == shop_sell_selected else Color.WHITE
+    shop_sell_one_button.disabled = shop_sell_selected < 0
+    if shop_sell_selected >= 0:
+        var selected_entry: Dictionary = shop_sell_entries[shop_sell_selected]
+        shop_sell_detail.text = "%s ×%d • ขาย 1 ชิ้น +%d เหรียญ" % [
+            str(selected_entry["name"]), int(selected_entry["count"]), int(selected_entry["price"])
+        ]
+    else:
+        shop_sell_detail.text = "เลือกผลผลิตทางขวาเพื่อขายแลกเหรียญ"
+
+func _select_shop_sale_slot(index: int) -> void:
+    if index < 0 or index >= shop_sell_entries.size():
+        return
+    shop_sell_selected = index
+    _refresh_shop_sell_grid()
+
+func _sell_selected_shop_item() -> void:
+    if shop_sell_selected < 0 or shop_sell_selected >= shop_sell_entries.size():
+        return
+    var crop_index: int = int(shop_sell_entries[shop_sell_selected]["crop"])
+    var sale_price: int = int(CROPS[crop_index]["reward"])
+    if int(produce[crop_index]) < 1 or coins > 1000000000 - sale_price:
+        return
+    produce[crop_index] = int(produce[crop_index]) - 1
+    coins += sale_price
+    message = "ขาย%s +%d เหรียญ" % [str(CROPS[crop_index]["name"]), sale_price]
+    if int(produce[crop_index]) == 0:
+        shop_sell_selected = -1
+    save_game()
+    refresh_labels()
 
 # Rotating the preview never rotates the farmer in the actual game.
 # Mouse drag works on PC; ScreenDrag works on Android / iOS landscape.
