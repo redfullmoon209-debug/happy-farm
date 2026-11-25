@@ -386,7 +386,7 @@ func _check() -> void:
         farm.buy_clothing("female_survivor_shoes")
         if int(farm.clothing_owned.get("female_survivor_shoes", 0)) != 1:
             problems.append("shoe shop purchase did not add item to backpack")
-        if farm.coins != coins_before_wardrobe - 160:
+        if farm.coins != coins_before_wardrobe - farm.WARDROBE.shop_price("female_survivor_shoes"):
             problems.append("shoe shop did not deduct earned coins")
         # Tap to inspect the item; only the separate action button can equip it.
         farm.refresh_bag_cards()
