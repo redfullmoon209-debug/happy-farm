@@ -2990,6 +2990,7 @@ func refresh_labels() -> void:
             WARDROBE.shop_price(str(garment_id)),
             " • ซื้อแล้ว" if already_owned else ""
         ]
+    _refresh_shop_category()
     if get_viewport().get_visible_rect().size.x < 960.0:
         money_label.text = "เงิน %d | คอก %d | หมู %d/%d" % [coins, pens, pigs, pens*PEN_CAPACITY]
     else:
@@ -3292,6 +3293,8 @@ func _square_shop_slot(button: Button) -> void:
     button.clip_text = true
 
 func _register_shop_product(button: Button, category: String, clothing_slot: String = "") -> void:
+    if not button.name.begins_with("BuyWardrobe_"):
+        button.name = "ShopProduct_%03d" % shop_item_categories.size()
     shop_item_categories[button.name] = category
     shop_item_slots[button.name] = clothing_slot
 
@@ -3346,6 +3349,7 @@ func show_shop() -> void:
     if shop_panel.visible and shop_scroll != null:
         shop_scroll.scroll_vertical = 0
         shop_sell_selected = -1
+        _refresh_shop_category()
         _refresh_shop_sell_grid()
 
 func _request_shop_buy(kind: String, item: Variant) -> void:
