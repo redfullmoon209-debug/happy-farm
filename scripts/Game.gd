@@ -3064,13 +3064,13 @@ func show_bag() -> void:
     if bag_panel.visible:
         open_backpack_view()
     else:
-        _close_equipment_picker()
+        _close_inventory_item_details()
 
 func open_backpack_view() -> void:
     if bag_panel == null or character_panel == null:
         return
     bag_panel.visible = true
-    _close_equipment_picker()
+    _close_inventory_item_details()
     character_panel.visible = true
     bag_summary.visible = true
     bag_scroll.visible = true
@@ -3322,7 +3322,7 @@ func equip_clothing(item_id: String) -> void:
         return
     var slot: String = str(data["slot"])
     clothing_equipped[slot] = item_id
-    _close_equipment_picker()
+    _close_inventory_item_details()
     if farmer_visual != null and farmer_visual.has_method("apply_equipment"):
         farmer_visual.apply_equipment(clothing_equipped)
     refresh_character_preview()
@@ -3335,7 +3335,7 @@ func unequip_clothing(slot: String) -> void:
     if not CLOTHING_SLOTS.has(slot) or not clothing_equipped.has(slot):
         return
     clothing_equipped.erase(slot)
-    _close_equipment_picker()
+    _close_inventory_item_details()
     if farmer_visual != null and farmer_visual.has_method("apply_equipment"):
         farmer_visual.apply_equipment(clothing_equipped)
     refresh_character_preview()
