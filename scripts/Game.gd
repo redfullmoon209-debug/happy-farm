@@ -3219,8 +3219,12 @@ func consume_gender_change_ticket() -> void:
     # A ticket makes the change permanent, even when the page was in test mode.
     test_avatar_gender = ""
     original_locked_profile.clear()
-    if target_gender != "female":
-        clothing_equipped.erase("shoes")
+    # Unequip every piece from the former gender, not just shoes.
+    # Ownership stays in the bag for a future gender change.
+    for worn_slot in clothing_equipped.keys():
+        var worn_id: String = str(clothing_equipped[worn_slot])
+        if str(CLOTHING_CATALOG.get(worn_id, {}).get("gender", "")) != target_gender:
+            clothing_equipped.erase(worn_slot)
     gender_change_tickets -= 1
     if not save_game():
         avatar_gender = previous_gender
@@ -3371,6 +3375,10 @@ func gm_change_gender(gender: String) -> void:
     if not GM_TEST_MODE or bool(character_profile.get("locked", false)) or gender not in ["male", "female"] or gender == avatar_gender or work_plot >= 0:
         return
     avatar_gender = gender
+    for worn_slot in clothing_equipped.keys():
+        var worn_id: String = str(clothing_equipped[worn_slot])
+        if str(CLOTHING_CATALOG.get(worn_id, {}).get("gender", "")) != gender:
+            clothing_equipped.erase(worn_slot)
     var old_position: Vector3 = farmer.position
     var old_rotation: Vector3 = farmer.rotation
     farmer.queue_free()
