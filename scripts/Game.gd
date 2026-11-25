@@ -3375,6 +3375,79 @@ func show_shop() -> void:
         _refresh_shop_category()
         _refresh_shop_sell_grid()
 
+# Every shop icon is a transparent piece illustration, not an abbreviation.
+# Clothing icons are previews of the same modular 3D geometry used by the avatar.
+func _shop_item_picture(kind: String, item: Variant) -> Texture2D:
+    if kind == "clothing":
+        return _real_equipment_thumbnail(str(item))
+    if kind in ["seed", "produce", "tree", "decor"]:
+        return ITEM_ICONS.texture(kind, int(item))
+    return ITEM_ICONS.texture(kind, 0)
+
+func _shop_card_picture(button: Button, kind: String, item: Variant, description: String) -> void:
+    button.icon = _shop_item_picture(kind, item)
+    button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+    button.expand_icon = true
+    button.add_theme_constant_override("icon_max_width", 47)
+    button.text = ""
+    button.tooltip_text = description
+
+func _shop_buy_capacity(kind: String, item: Variant) -> int:
+    match kind:
+        "clothing": return 1 if int(clothing_owned.get(str(item), 0)) == 0 else 0
+        "seed": return maxi(0, 100000 - int(seeds[int(item)]))
+        "tree": return maxi(0, 100000 - int(tree_kits[int(item)]))
+        "decor": return maxi(0, 100000 - int(decor_kits[int(item)]))
+        "plot": return maxi(0, 100000 - plot_kits)
+        "gender": return maxi(0, 999 - gender_change_tickets)
+        "feed": return maxi(0, int((100000 - feed) / 5))
+        "pen", "pig": return 1
+    return 0
+
+func _show_trade_quantity(default_value: int, maximum: int, allow_edit: bool = true) -> void:
+    if shop_trade_quantity == null:
+        return
+    shop_trade_quantity.set_block_signals(true)
+    shop_trade_quantity.max_value = maxf(1.0, float(maximum))
+    shop_trade_quantity.value = clampi(default_value, 1, maxi(1, maximum))
+    shop_trade_quantity.editable = allow_edit
+    shop_trade_quantity.set_block_signals(false)
+    _update_shop_trade_preview()
+
+func _shop_trade_quantity_changed(_value: float) -> void:
+    _update_shop_trade_preview()
+
+func _update_shop_trade_preview() -> void:
+    if shop_pending_trade.is_empty() or shop_trade_details == null:
+        return
+    var pending: Dictionary = shop_pending_trade
+    var mode: String = str(pending.get("mode", ""))
+    var quantity: int = maxi(1, int(shop_trade_quantity.value))
+    var unit_price: int = int(pending.get("price", 0))
+    var amount: int = unit_price * quantity
+    var valid: bool = false
+    match mode:
+        "buy":
+            var max_count: int = _shop_buy_capacity(str(pending["kind"]), pending["item"])
+            valid = quantity <= max_count and coins >= amount and unit_price > 0
+            shop_trade_details.text = "%s\n%s\nจำนวน %d × %d เหรียญ\nรวมจ่าย %d เหรียญ\nเงินคงเหลือ %d เหรียญ" % [
+                str(pending["name"]), str(pending["description"]), quantity, unit_price, amount, coins - amount
+            ]
+        "sell_one":
+            var crop_index: int = int(pending["crop"])
+            valid = quantity <= int(produce[crop_index]) and coins <= 1000000000 - amount
+            shop_trade_details.text = "%s ผลผลิต\nมีอยู่ %d ชิ้น\nขาย %d × %d เหรียญ\nรับเงิน %d เหรียญ\nเงินหลังขาย %d เหรียญ" % [
+                str(CROPS[crop_index]["name"]), int(produce[crop_index]), quantity, unit_price, amount, coins + amount
+            ]
+        "sell_all":
+            var value: int = produce_value()
+            valid = value > 0 and coins <= 1000000000 - value
+            shop_trade_details.text = "ผลผลิตรวม %d ชนิด\nรวม %d ชิ้น\nรับเงิน %d เหรียญ\nเงินหลังขาย %d เหรียญ" % [
+                _count_shop_sale_types(), quantity, value, coins + value
+            ]
+    shop_trade_confirm.disabled = not valid
+
 func _request_shop_buy(kind: String, item: Variant) -> void:
     var item_name: String = ""
     var item_price: int = -1
