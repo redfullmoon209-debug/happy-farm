@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720"><defs>
+<linearGradient id="base" x2="0" y2="1"><stop stop-color="#061322"/><stop offset=".45" stop-color="#0c2138"/><stop offset="1" stop-color="#050e1a"/></linearGradient>
+<linearGradient id="steel"><stop stop-color="#f1f9ff"/><stop offset=".16" stop-color="#7c95ae"/><stop offset=".42" stop-color="#25394e"/><stop offset=".75" stop-color="#94bedf"/><stop offset="1" stop-color="#e2f4ff"/></linearGradient>
+<linearGradient id="blue" x2=".35" y2="1"><stop stop-color="#123c64"/><stop offset=".48" stop-color="#041221"/><stop offset="1" stop-color="#0b2c4d"/></linearGradient>
+<radialGradient id="glow"><stop stop-color="#20cafa" stop-opacity=".38"/><stop offset=".42" stop-color="#147fdb" stop-opacity=".12"/><stop offset="1" stop-color="#041221" stop-opacity="0"/></radialGradient>
+<filter id="halo" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="5"/></filter>
+</defs>
+<rect x="11" y="17" width="1178" height="688" rx="19" fill="#010812" fill-opacity=".9" stroke="#000a17" stroke-width="13"/>
+<rect x="14" y="14" width="1172" height="689" rx="15" fill="url(#base)" stroke="url(#steel)" stroke-width="6"/>
+<path d="M30 30H444L475 9H750L780 30H1170" fill="none" stroke="#95c6e9" stroke-width="2"/>
+<path d="M30 688H475L491 707H704L722 688H1170" fill="none" stroke="#6d94b2" stroke-width="2"/>
+<path d="M480 15L504 36H697L720 15" fill="url(#blue)" stroke="url(#steel)" stroke-width="4"/>
+<path d="M33 51H1167" stroke="#0e8eff" stroke-opacity=".7" stroke-width="2"/>
+<path d="M34 676H1166" stroke="#0c90e7" stroke-opacity=".6" stroke-width="2"/>
+<path d="M32 30l23-19h28l-26 29v26H30zM1168 30l-23-19h-28l26 29v26h27zM32 690l23 18h28l-26-27v-27H30zM1168 690l-23 18h-28l26-27v-27h27z" fill="#425c76" stroke="#b9d8ef" stroke-width="3"/>
+<path d="M130 31h230M840 31h231M130 691h940" stroke="#009bff" stroke-width="2" opacity=".55"/>
+<g fill="#00c9fa" stroke="#ddfaff" stroke-width="2"><path d="m158 29 11-12 11 12-11 12z"/><path d="m1031 29 11-12 11 12-11 12z"/><path d="m600 43 8-8 8 8-8 8z"/></g>
+<path d="M608 15v52" stroke="#1d9efa" stroke-width="2" opacity=".28"/>
+<path d="M600 0v0" stroke="none"/>
+</svg>

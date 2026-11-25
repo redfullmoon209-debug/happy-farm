@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="250" height="75" viewBox="0 0 250 75"><defs>
+<linearGradient id="base" x2="0" y2="1"><stop stop-color="#061322"/><stop offset=".45" stop-color="#0c2138"/><stop offset="1" stop-color="#050e1a"/></linearGradient>
+<linearGradient id="steel"><stop stop-color="#f1f9ff"/><stop offset=".16" stop-color="#7c95ae"/><stop offset=".42" stop-color="#25394e"/><stop offset=".75" stop-color="#94bedf"/><stop offset="1" stop-color="#e2f4ff"/></linearGradient>
+<linearGradient id="blue" x2=".35" y2="1"><stop stop-color="#123c64"/><stop offset=".48" stop-color="#041221"/><stop offset="1" stop-color="#0b2c4d"/></linearGradient>
+<radialGradient id="glow"><stop stop-color="#20cafa" stop-opacity=".38"/><stop offset=".42" stop-color="#147fdb" stop-opacity=".12"/><stop offset="1" stop-color="#041221" stop-opacity="0"/></radialGradient>
+<filter id="halo" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="5"/></filter>
+</defs>
+<rect x="3" y="3" width="244" height="69" rx="11" fill="#041422" stroke="#2d5f83" stroke-width="5"/>
+<rect x="7" y="7" width="236" height="61" rx="9" fill="url(#blue)" stroke="#8bbbd4" stroke-width="2"/>
+<path d="M15 12H235M15 63H235" stroke="#11a2e1" opacity=".7"/>
+</svg>
