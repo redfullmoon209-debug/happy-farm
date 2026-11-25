@@ -2176,6 +2176,23 @@ func build_ui() -> void:
     sell_button = btn("ขายผลผลิตทั้งหมด", sell_produce, Color("#ad7c53"))
     sell_button.custom_minimum_size = Vector2(145, 55)
     shop_grid.add_child(sell_button)
+    # Earn coins from farm produce, then buy each individual gear piece.
+    # These test pieces use new generated modular 3D meshes; default GLB
+    # body/face/hair remain untouched.
+    var wardrobe_note: Label = text_label("เสื้อผ้า 3 ชุด • ซื้อด้วยเหรียญฟาร์ม แล้วรับไอเทมในกระเป๋า", 15, Color("#674e3c"))
+    wardrobe_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    wardrobe_note.custom_minimum_size = Vector2(145, 48)
+    shop_grid.add_child(wardrobe_note)
+    for item_id in WARDROBE.available_item_ids():
+        var gear_data: Dictionary = CLOTHING_CATALOG[item_id]
+        var price: int = WARDROBE.shop_price(item_id)
+        var wardrobe_buy: Button = btn("%s\n%d เหรียญ" % [str(gear_data["name"]), price], buy_clothing.bind(item_id))
+        wardrobe_buy.name = "BuyWardrobe_" + item_id
+        shop_wardrobe_buttons[item_id] = wardrobe_buy
+        wardrobe_buy.custom_minimum_size = Vector2(145, 55)
+        wardrobe_buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        wardrobe_buy.tooltip_text = "ซื้อด้วยเงินจากการทำฟาร์ม • สวมทีละชิ้นในกระเป๋า"
+        shop_grid.add_child(wardrobe_buy)
     for i in range(CROPS.size()):
         var buy: Button = btn("%s\n%d เหรียญ" % [CROPS[i]["name"], CROPS[i]["price"]], buy_seed.bind(i))
         buy.custom_minimum_size = Vector2(145, 55)
@@ -2197,23 +2214,6 @@ func build_ui() -> void:
         decor_buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         shop_grid.add_child(decor_buy)
         shop_decor_buttons.append(decor_buy)
-    # Earn coins from farm produce, then buy each individual gear piece.
-    # These test pieces use new generated modular 3D meshes; default GLB
-    # body/face/hair remain untouched.
-    var wardrobe_note: Label = text_label("เสื้อผ้า 3 ชุด • ซื้อทีละชิ้นด้วยเหรียญฟาร์ม", 15, Color("#674e3c"))
-    wardrobe_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    wardrobe_note.custom_minimum_size = Vector2(145, 48)
-    shop_grid.add_child(wardrobe_note)
-    for item_id in WARDROBE.available_item_ids():
-        var gear_data: Dictionary = CLOTHING_CATALOG[item_id]
-        var price: int = WARDROBE.shop_price(item_id)
-        var wardrobe_buy: Button = btn("%s\n%d เหรียญ" % [str(gear_data["name"]), price], buy_clothing.bind(item_id))
-        wardrobe_buy.name = "BuyWardrobe_" + item_id
-        shop_wardrobe_buttons[item_id] = wardrobe_buy
-        wardrobe_buy.custom_minimum_size = Vector2(145, 55)
-        wardrobe_buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        wardrobe_buy.tooltip_text = "ซื้อด้วยเงินจากการทำฟาร์ม • สวมทีละชิ้นในกระเป๋า"
-        shop_grid.add_child(wardrobe_buy)
     var ticket_for_sale: Button = btn("บัตรเปลี่ยนเพศ\n%d เหรียญ" % GENDER_CHANGE_CARD_PRICE, buy_gender_change_ticket, Color("#548780"))
     ticket_for_sale.name = "GenderChangeCardForSale"
     ticket_for_sale.custom_minimum_size = Vector2(145, 55)
@@ -3103,6 +3103,10 @@ func show_shop() -> void:
     if bag_panel != null:
         bag_panel.visible = false
     shop_panel.visible = not shop_panel.visible
+    if shop_panel.visible and shop_scroll != null:
+        # Make clothing discoverable instead of hiding it after every seed,
+        # tree and decoration item in the long scroll list.
+        shop_scroll.scroll_vertical = 0
 
 # Rotating the preview never rotates the farmer in the actual game.
 # Mouse drag works on PC; ScreenDrag works on Android / iOS landscape.
