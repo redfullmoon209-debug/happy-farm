@@ -1932,7 +1932,8 @@ func _fit_button_caption(button: Button) -> void:
         var active_slot: String = button.name.trim_prefix("EquipmentSlot_")
         var active_item: String = str(clothing_equipped.get(active_slot, ""))
         var worn_icon: Texture2D = _real_equipment_thumbnail(active_item) if not active_item.is_empty() else null
-        button.icon = worn_icon if worn_icon != null else visual_icons.get(button.name, USER_EQUIP_GLOVE) as Texture2D
+        var fallback_icon: Texture2D = visual_icons.get(button.name, USER_EQUIP_GLOVE) as Texture2D
+        button.icon = worn_icon if worn_icon != null else fallback_icon
         button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
         button.expand_icon = true
         button.add_theme_constant_override("icon_max_width", clampi(int(button.size.y)-24, 12, 35))
@@ -3253,7 +3254,8 @@ func refresh_character_panel() -> void:
             "shoes": USER_EQUIP_SHOES
         }
         var rendered_worn: Texture2D = _real_equipment_thumbnail(item_id) if not item_id.is_empty() else null
-        button.icon = rendered_worn if rendered_worn != null else equipment_images[slot] as Texture2D
+        var default_slot_icon: Texture2D = equipment_images[slot] as Texture2D
+        button.icon = rendered_worn if rendered_worn != null else default_slot_icon
         button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
         button.expand_icon = true
         button.add_theme_constant_override("icon_max_width", clampi(int(button.size.y)-24, 12, 35))
