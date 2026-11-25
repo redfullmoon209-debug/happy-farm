@@ -94,9 +94,14 @@ func _run() -> void:
     check(farm.shop_button.get_theme_stylebox("normal") is StyleBoxTexture, "buttons use imported PNG style texture")
     var shop_skin: StyleBoxTexture = farm.shop_button.get_theme_stylebox("normal") as StyleBoxTexture
     check(shop_skin != null and shop_skin.region_rect.size.x == 680.0,
-        "glossy standalone PNG button is fully used, not cropped from a screenshot")
+        "standalone ivory button PNG is fully used, not cropped from a screenshot")
     check(farm.UI_TOP != null and farm.UI_HUD != null and farm.UI_ZOOM != null,
-        "three separate matching farm UI graphic layers load")
+        "three separate matching ivory farm UI graphic layers load")
+    check(farm.UI_BUTTON.resource_path.contains("farmflex_cream"),
+        "all active HUD buttons use the new cream PNG instead of glossy green")
+    for name in ["cream_button", "cream_square", "cream_bar", "cream_hud"]:
+        check(ResourceLoader.exists("res://assets/ui/farmflex_cream/%s.png" % name),
+            "standalone cream PNG exists: " + name)
     check(not farm.tool_menu_open and not farm.ui_bottom.visible,
         "farming tools initially collapse to keep the play area clear")
     check(farm.tool_menu_toggle_button.visible and farm.tool_menu_toggle_button.text.contains("เครื่องมือ"),
@@ -111,8 +116,8 @@ func _run() -> void:
         "zoom buttons use dedicated square PNG")
     check((farm.zoom_in_button.get_theme_stylebox("normal") as StyleBoxTexture).texture == farm.UI_ZOOM,
         "zoom buttons use an independent glossy square PNG")
-    check(farm.money_label.get_theme_color("font_color").get_luminance() > 0.6,
-        "money text is bright enough against the glossy dark-green top bar")
+    check(farm.money_label.get_theme_color("font_color").get_luminance() < 0.5,
+        "money text is dark enough for the new cream HUD")
     check(farm.status_label.get_theme_font_size("font_size") >= 16,
         "farm HUD status is at least 16px")
     check(farm.shop_panel.get_theme_stylebox("panel") is StyleBoxTexture, "shop window uses imported PNG skin")
