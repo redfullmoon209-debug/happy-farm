@@ -9,13 +9,13 @@ const FARM_AUDIO = preload("res://scripts/FarmAudio.gd")
 const GARDEN_DECOR = preload("res://scripts/GardenDecor.gd")
 # Each visual element is imported from a standalone transparent PNG.
 # Text remains live Godot text for crisp rendering and future localization.
-const UI_BUTTON: Texture2D = preload("res://assets/ui/farmflex_cream/cream_button.svg")
+const UI_BUTTON: Texture2D = preload("res://assets/ui/farmflex_cream/cream_button.png")
 const UI_WINDOW: Texture2D = preload("res://assets/ui/happy/window_wood.png")
 const UI_HEADER: Texture2D = preload("res://assets/ui/happy/window_header.png")
 const UI_SLOT: Texture2D = preload("res://assets/ui/happy/inventory_slot.png")
-const UI_HUD: Texture2D = preload("res://assets/ui/farmflex_cream/cream_hud.svg")
-const UI_TOP: Texture2D = preload("res://assets/ui/farmflex_cream/cream_bar.svg")
-const UI_ZOOM: Texture2D = preload("res://assets/ui/farmflex_cream/cream_square.svg")
+const UI_HUD: Texture2D = preload("res://assets/ui/farmflex_cream/cream_hud.png")
+const UI_TOP: Texture2D = preload("res://assets/ui/farmflex_cream/cream_bar.png")
+const UI_ZOOM: Texture2D = preload("res://assets/ui/farmflex_cream/cream_square.png")
 const INV_TEXT = preload("res://scripts/InventoryI18n.gd")
 # New separated metallic-blue inventory art. Text is always rendered by Godot.
 # Standalone ORIGINAL ivory/gold vector layers, not screenshots or cropped graphics.
