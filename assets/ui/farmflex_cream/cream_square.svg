@@ -1,1 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><defs><linearGradient id="ivory" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fffdf6"/><stop offset=".42" stop-color="#f4eee5"/><stop offset="1" stop-color="#dfcfc0"/></linearGradient><linearGradient id="rim" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffefa"/><stop offset=".45" stop-color="#d4ad80"/><stop offset=".8" stop-color="#b79069"/><stop offset="1" stop-color="#ffefcf"/></linearGradient></defs><rect x="12" y="16" width="232" height="224" rx="43" fill="#422c20" opacity=".18"/><rect x="10" y="9" width="236" height="228" rx="46" fill="url(#ivory)" stroke="url(#rim)" stroke-width="8"/><rect x="20" y="19" width="216" height="209" rx="39" fill="none" stroke="#fffef7" stroke-width="4"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+<defs><linearGradient id="ivory" x2="0%" y2="100%"><stop stop-color="#fffdf6"/><stop offset="1" stop-color="#ecdfcd"/></linearGradient></defs>
+<rect x="1" y="1" width="46" height="46" rx="9" fill="url(#ivory)" fill-opacity=".94" stroke="#cbb490" stroke-width="1.5"/>
+<rect x="3" y="3" width="42" height="42" rx="7" fill="none" stroke="#fffdf6" stroke-opacity=".65"/>
+</svg>

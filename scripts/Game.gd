@@ -10,9 +10,9 @@ const GARDEN_DECOR = preload("res://scripts/GardenDecor.gd")
 # Each visual element is imported from a standalone transparent PNG.
 # Text remains live Godot text for crisp rendering and future localization.
 const UI_BUTTON: Texture2D = preload("res://assets/ui/farmflex_cream/cream_button.png")
-const UI_WINDOW: Texture2D = preload("res://assets/ui/happy/window_wood.png")
-const UI_HEADER: Texture2D = preload("res://assets/ui/happy/window_header.png")
-const UI_SLOT: Texture2D = preload("res://assets/ui/happy/inventory_slot.png")
+const UI_WINDOW: Texture2D = preload("res://assets/ui/farmflex_cream/cream_hud.png")
+const UI_HEADER: Texture2D = preload("res://assets/ui/farmflex_cream/cream_bar.png")
+const UI_SELECTED: Texture2D = preload("res://assets/ui/farmflex_cream/effects/selected.png")
 const UI_HUD: Texture2D = preload("res://assets/ui/farmflex_cream/cream_hud.png")
 const UI_TOP: Texture2D = preload("res://assets/ui/farmflex_cream/cream_bar.png")
 const UI_ZOOM: Texture2D = preload("res://assets/ui/farmflex_cream/cream_square.png")
@@ -1796,20 +1796,7 @@ func btn(txt: String, callback: Callable, background: Color = Color("#417c59")) 
     b.add_theme_color_override("font_color", Color("#634b39"))
     b.alignment = HORIZONTAL_ALIGNMENT_CENTER
     b.clip_text = true
-    # New standalone artist-generated glossy PNG. Never cut buttons out of
-    # screenshots: the whole source is a real transparent editable asset.
-    var style: StyleBoxTexture = StyleBoxTexture.new()
-    style.texture = UI_BUTTON
-    style.region_rect = Rect2(0.0, 0.0, 680.0, 170.0)
-    style.texture_margin_left = 4.0
-    style.texture_margin_right = 4.0
-    style.texture_margin_top = 2.0
-    style.texture_margin_bottom = 2.0
-    style.content_margin_left = 0.0
-    style.content_margin_right = 0.0
-    style.content_margin_top = 0.0
-    style.content_margin_bottom = 0.0
-    style.modulate_color = Color.WHITE
+    var style := _cream_style(UI_BUTTON)
     b.add_theme_stylebox_override("normal", style)
     var hover: StyleBoxTexture = style.duplicate()
     hover.modulate_color = Color(1.13, 1.13, 1.07, 1.0)
@@ -1817,7 +1804,9 @@ func btn(txt: String, callback: Callable, background: Color = Color("#417c59")) 
     var down: StyleBoxTexture = style.duplicate()
     down.modulate_color = Color("#eed8ba")
     b.add_theme_stylebox_override("pressed", down)
-    b.add_theme_stylebox_override("disabled", down)
+    var disabled: StyleBoxTexture = style.duplicate()
+    disabled.modulate_color = Color(0.94, 0.93, 0.91, 0.80)
+    b.add_theme_stylebox_override("disabled", disabled)
     b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
     b.add_theme_color_override("font_color", Color("#634b39"))
     b.add_theme_color_override("font_hover_color", Color("#493222"))
@@ -1829,14 +1818,21 @@ func btn(txt: String, callback: Callable, background: Color = Color("#417c59")) 
     b.pressed.connect(callback)
     return b
 
+func _cream_style(texture: Texture2D) -> StyleBoxTexture:
+    var style := StyleBoxTexture.new()
+    style.texture = texture
+    style.region_rect = Rect2(Vector2.ZERO, texture.get_size())
+    for side in [SIDE_LEFT, SIDE_RIGHT, SIDE_TOP, SIDE_BOTTOM]:
+        style.set_texture_margin(side, 13.0)
+        style.set_content_margin(side, 0.0)
+    return style
+
+func _select_cream_button(button: Button, selected: bool) -> void:
+    var skin := button.get_theme_stylebox("normal") as StyleBoxTexture
+    skin.texture = UI_SELECTED if selected else UI_BUTTON
+
 func _skin_window(p: Panel) -> void:
-    var frame: StyleBoxTexture = StyleBoxTexture.new()
-    frame.texture = UI_WINDOW
-    frame.texture_margin_left = 28.0
-    frame.texture_margin_right = 28.0
-    frame.texture_margin_top = 24.0
-    frame.texture_margin_bottom = 28.0
-    p.add_theme_stylebox_override("panel", frame)
+    p.add_theme_stylebox_override("panel", _cream_style(UI_WINDOW))
 
 # Nine-slice textures allow real independent UI art to resize without cutting corners.
 func _metal_panel_skin(p: Panel, art: Texture2D, margin: float = 12.0) -> void:
@@ -1881,24 +1877,10 @@ func _metal_right_overlay() -> void:
     bag_panel.move_child(bag_right_decoration, 0)
 
 func _skin_hud(p: Panel) -> void:
-    var frame: StyleBoxTexture = StyleBoxTexture.new()
-    frame.texture = UI_HUD
-    frame.region_rect = Rect2(0.0, 0.0, 1120.0, 350.0)
-    frame.texture_margin_left = 12.0
-    frame.texture_margin_right = 12.0
-    frame.texture_margin_top = 7.0
-    frame.texture_margin_bottom = 7.0
-    p.add_theme_stylebox_override("panel", frame)
+    p.add_theme_stylebox_override("panel", _cream_style(UI_HUD))
 
 func _skin_top(p: Panel) -> void:
-    var frame: StyleBoxTexture = StyleBoxTexture.new()
-    frame.texture = UI_TOP
-    frame.region_rect = Rect2(0.0, 0.0, 1050.0, 155.0)
-    frame.texture_margin_left = 10.0
-    frame.texture_margin_right = 10.0
-    frame.texture_margin_top = 4.0
-    frame.texture_margin_bottom = 4.0
-    p.add_theme_stylebox_override("panel", frame)
+    p.add_theme_stylebox_override("panel", _cream_style(UI_TOP))
 
 func _header_layer(parent: Control) -> TextureRect:
     var art: TextureRect = TextureRect.new()
@@ -1912,7 +1894,7 @@ func _header_layer(parent: Control) -> TextureRect:
 func _set_icon(button: Button, name: String) -> void:
     if button == null:
         return
-    var asset: String = "res://assets/ui/happy/icon_%s.png" % name
+    var asset: String = "res://assets/ui/farmflex_cream/icons/icon_%s.png" % name
     if ResourceLoader.exists(asset):
         button.icon = load(asset) as Texture2D
         button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -1938,7 +1920,7 @@ func _fit_button_caption(button: Button) -> void:
         button.icon = visual_icons.get(button.name, USER_EQUIP_GLOVE) as Texture2D
         button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
         button.expand_icon = true
-        button.add_theme_constant_override("icon_max_width", 46)
+        button.add_theme_constant_override("icon_max_width", clampi(int(button.size.y)-24, 12, 35))
         button.add_theme_font_size_override("font_size", 12)
         return
     var width: float = maxf(button.size.x, button.custom_minimum_size.x)
@@ -1950,18 +1932,18 @@ func _fit_button_caption(button: Button) -> void:
         button.add_theme_font_size_override("font_size", 29)
         return
     var preferred: int = 20 if height >= 48.0 else (18 if height >= 34.0 else 16)
-    var min_size: int = 14 if width < 115.0 else 15
+    var min_size: int = 11 if width < 115.0 else 13
     var original_icon: Texture2D = null
     if button.has_meta("happy_icon_texture"):
         original_icon = button.get_meta("happy_icon_texture") as Texture2D
     var icon_width: int = mini(24, maxi(16, int(height * 0.43)))
     var free_space: float = width - 16.0
     var preferred_text_width: float = 0.0
-    for caption_line in button.text.split("\n"):
+    for caption_line in button.tr(button.text).split("\n"):
         preferred_text_width = maxf(preferred_text_width, THAI_BOLD.get_string_size(
             caption_line, HORIZONTAL_ALIGNMENT_LEFT, -1.0, preferred).x)
     # Prioritize complete readable words over decoration on small controls.
-    var show_icon: bool = original_icon != null and width >= 145.0 and (
+    var show_icon: bool = original_icon != null and (
         preferred_text_width + float(icon_width) + 12.0 <= free_space)
     button.icon = original_icon if show_icon else null
     if show_icon:
@@ -1970,7 +1952,7 @@ func _fit_button_caption(button: Button) -> void:
     var font_size: int = preferred
     while font_size > min_size:
         var longest_line_width: float = 0.0
-        for caption_line in button.text.split("\n"):
+        for caption_line in button.tr(button.text).split("\n"):
             longest_line_width = maxf(longest_line_width, THAI_BOLD.get_string_size(
                 caption_line, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x)
         if longest_line_width <= free_space:
@@ -2032,6 +2014,7 @@ func set_box(node: Control, x: float, y: float, w: float, h: float) -> void:
     node.size = Vector2(w, h)
 
 func build_ui() -> void:
+    TranslationServer.set_locale(inventory_language)
     # Players asked for the on-screen controls even when using Chrome on a PC.
     # Godot Web can also report touchscreen availability inconsistently.
     # Keep the analog joystick and buttons visible on every device.
@@ -2243,11 +2226,10 @@ func build_ui() -> void:
     bag_heading.add_theme_font_override("font", THAI_BOLD)
     bag_panel.add_child(bag_heading)
     bag_close = btn("✕", show_bag, Color("#cf4765"))
-    _metal_button_skin(bag_close, USER_INV_CLOSE)
+    bag_close.add_theme_stylebox_override("normal", _cream_style(UI_ZOOM))
     bag_panel.add_child(bag_close)
     bag_language_button = btn("TH / EN", toggle_inventory_language, Color("#426e92"))
     bag_language_button.name = "InventoryLanguageToggle"
-    _metal_button_skin(bag_language_button, USER_INV_BUTTON)
     bag_panel.add_child(bag_language_button)
     # No extra wardrobe tab: MMO split screen always shows the player on
     # the left and all 200 item slots on the right.
@@ -2415,7 +2397,6 @@ func build_ui() -> void:
     character_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     character_panel.add_child(character_info_label)
     gender_item_button = btn("", request_gender_change, Color("#487f72"))
-    _metal_button_skin(gender_item_button, USER_INV_BUTTON)
     character_panel.add_child(gender_item_button)
     character_scroll = ScrollContainer.new()
     character_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -2435,7 +2416,7 @@ func build_ui() -> void:
     for entry in [
         [shop_button, "shop"], [bag_button, "bag"], [landscape_button, "tools"],
         [landscape_shop_button, "shop"], [change_seed_button, "farm"],
-        [gm_button, "gm"], [feed_button, "farm"], [run_button, "run"],
+        [gm_button, "gm"], [feed_button, "feed"], [run_button, "run"],
         [jump_button, "jump"], [audio_button, "sound"],
         [shop_plot_button, "plot"], [shop_feed, "farm"], [shop_pen_button, "farm"],
         [shop_pig_button, "farm"], [bag_close, "close"], [shop_close, "close"],
@@ -2545,13 +2526,7 @@ func update_sizes() -> void:
     # A wide pill image compressed into a 62px zoom button turns into a
     # thin line. Use the independent square PNG for these two controls.
     for zoom_button in [zoom_out_button, zoom_in_button]:
-        var square: StyleBoxTexture = StyleBoxTexture.new()
-        square.texture = UI_ZOOM
-        square.region_rect = Rect2(0.0, 0.0, 256.0, 256.0)
-        square.texture_margin_left = 2.0
-        square.texture_margin_right = 2.0
-        square.texture_margin_top = 2.0
-        square.texture_margin_bottom = 2.0
+        var square := _cream_style(UI_ZOOM)
         zoom_button.add_theme_stylebox_override("normal", square)
         var square_hover: StyleBoxTexture = square.duplicate()
         square_hover.modulate_color = Color(1.18, 1.18, 1.10)
@@ -2773,7 +2748,7 @@ func refresh_labels() -> void:
     if money_label == null:
         return
     if sell_button != null:
-        sell_button.text = "ขายผลผลิตทั้งหมด (%d เหรียญ)" % produce_value()
+        sell_button.text = tr("ขายผลผลิตทั้งหมด (%d เหรียญ)") % produce_value()
         sell_button.disabled = produce_value() == 0
     if get_viewport().get_visible_rect().size.x < 960.0:
         money_label.text = "เงิน %d | คอก %d | หมู %d/%d" % [coins, pens, pigs, pens*PEN_CAPACITY]
@@ -2784,8 +2759,8 @@ func refresh_labels() -> void:
         refresh_character_panel()
     if shop_livestock_label != null:
         shop_livestock_label.text = "คอก %d/%d  |  หมู %d/%d ตัว" % [pens, MAX_PENS, pigs, pens*PEN_CAPACITY]
-        shop_pen_button.text = "ขยายคอกหมู +1 (ราคา %d เหรียญ)" % pen_price() if pens < MAX_PENS else "คอกเต็มแล้ว (%d คอก)" % MAX_PENS
-        shop_pig_button.text = "ซื้อลูกหมู +1 (%d เหรียญ)" % PIG_PRICE if pigs < pens*PEN_CAPACITY else "คอกเต็ม! ซื้อคอกเพิ่มก่อน"
+        shop_pen_button.text = tr("ขยายคอกหมู +1 (ราคา %d เหรียญ)") % pen_price() if pens < MAX_PENS else tr("คอกเต็มแล้ว (%d คอก)") % MAX_PENS
+        shop_pig_button.text = tr("ซื้อลูกหมู +1 (%d เหรียญ)") % PIG_PRICE if pigs < pens*PEN_CAPACITY else "คอกเต็ม! ซื้อคอกเพิ่มก่อน"
         shop_pen_button.disabled = pens >= MAX_PENS
         shop_pig_button.disabled = pigs >= pens*PEN_CAPACITY
     status_label.text = message
@@ -2818,7 +2793,7 @@ func refresh_labels() -> void:
     for key in action_buttons.keys():
         var is_garden: bool = ["place_plot", "plant_tree", "chop_tree", "place_decor", "buy_land"].has(str(key))
         action_buttons[key].visible = is_garden == landscaping_mode
-        action_buttons[key].modulate = Color.WHITE if key == tool_mode else Color("#d7e0d2")
+        _select_cream_button(action_buttons[key], key == tool_mode)
     _fit_all_ui_text()
 
 # Stable 200 slots. Only actual owned items get entries, the rest are empty.
@@ -2961,7 +2936,7 @@ func select_seed(index: int) -> void:
 
 func toggle_run() -> void:
     run_toggle = not run_toggle
-    run_button.modulate = Color.WHITE if run_toggle else Color("#aeb9a8")
+    _select_cream_button(run_button, run_toggle)
 
 func show_bag() -> void:
     if shop_panel != null:
@@ -3069,10 +3044,12 @@ func refresh_character_preview() -> void:
 # Can be extended with additional locale dictionaries without changing PNGs.
 func toggle_inventory_language() -> void:
     inventory_language = "en" if inventory_language == "th" else "th"
+    TranslationServer.set_locale(inventory_language)
     bag_heading.text = INV_TEXT.label("bag_title", inventory_language)
     character_title.text = INV_TEXT.label("character_info", inventory_language)
     refresh_bag_cards()
     refresh_character_panel()
+    refresh_labels()
 
 func refresh_character_panel() -> void:
     if character_panel == null or character_slot_list == null:
@@ -3089,7 +3066,8 @@ func refresh_character_panel() -> void:
         var item_id: String = str(clothing_equipped.get(slot, ""))
         var slot_label: String = INV_TEXT.label(slot, inventory_language)
         var button: Button = character_equipment_buttons[slot]
-        button.text = "" # Standalone icon only; full name and status live in tooltip.
+        button.text = slot_label
+        button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
         var equipment_images: Dictionary = {
             "headwear": USER_EQUIP_HAT, "top": USER_EQUIP_TOP,
             "gloves": USER_EQUIP_GLOVE, "bottom": USER_EQUIP_PANTS,
@@ -3098,7 +3076,7 @@ func refresh_character_panel() -> void:
         button.icon = equipment_images[slot] as Texture2D
         button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
         button.expand_icon = true
-        button.add_theme_constant_override("icon_max_width", 46)
+        button.add_theme_constant_override("icon_max_width", clampi(int(button.size.y)-24, 12, 35))
         button.tooltip_text = "%s: %s" % [slot_label, str(CLOTHING_CATALOG.get(item_id, {}).get("name", INV_TEXT.label("empty_equipment", inventory_language)))]
         button.modulate = Color.WHITE
         var equipped_skin: StyleBoxTexture = button.get_theme_stylebox("normal") as StyleBoxTexture

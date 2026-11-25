@@ -93,7 +93,7 @@ func _run() -> void:
         "shop item names and prices have their own lines")
     check(farm.shop_button.get_theme_stylebox("normal") is StyleBoxTexture, "buttons use imported PNG style texture")
     var shop_skin: StyleBoxTexture = farm.shop_button.get_theme_stylebox("normal") as StyleBoxTexture
-    check(shop_skin != null and shop_skin.region_rect.size.x == 680.0,
+    check(shop_skin != null and shop_skin.region_rect == Rect2(Vector2.ZERO, farm.UI_BUTTON.get_size()) and shop_skin.texture == farm.UI_BUTTON,
         "standalone ivory button PNG is fully used, not cropped from a screenshot")
     check(farm.UI_TOP != null and farm.UI_HUD != null and farm.UI_ZOOM != null,
         "three separate matching ivory farm UI graphic layers load")
@@ -135,12 +135,22 @@ func _run() -> void:
     check(farm.WORLD_SIZE == 450.0 and farm.zone_covers.size() == 324, "450m map and parcel progression")
 
     for file in [
-        "button_green.png", "window_wood.png", "window_header.png", "inventory_slot.png",
-        "hud_bar.png", "hud_top.png", "button_zoom.png", "joystick_base.png", "joystick_thumb.png",
+        "window_wood.png", "window_header.png", "inventory_slot.png",
+        "hud_bar.png", "hud_top.png", "button_zoom.png",
         "icon_bag.png", "icon_shop.png", "icon_plant.png", "icon_water.png",
         "icon_harvest.png", "icon_farm.png", "icon_gm.png"
     ]:
         check(ResourceLoader.exists("res://assets/ui/happy/" + file), "real PNG layer exists: " + file)
+    for button in [farm.bag_button, farm.feed_button, farm.run_button, farm.jump_button, farm.audio_button,
+            farm.tool_menu_toggle_button, farm.bag_export_button, farm.bag_import_button, farm.gm_button]:
+        for state in ["normal", "hover", "pressed", "disabled"]:
+            var skin := button.get_theme_stylebox(state) as StyleBoxTexture
+            check(skin != null and skin.texture.resource_path.contains("farmflex_cream/"), str(button.text) + " " + state)
+        check(button.pressed.has_connections(), "action connected: " + str(button.text))
+    farm.toggle_inventory_language()
+    check(farm.bag_button.tr(farm.bag_button.text) == "Bag" and farm.jump_button.tr(farm.jump_button.text) == "Jump", "HUD translates independently of art")
+    farm.toggle_inventory_language()
+    check(farm.bag_button.tr(farm.bag_button.text) == "กระเป๋า", "Thai HUD restores")
     if errors.is_empty():
         print("WASD UI TESTS PASS: W A S D, Shift, keyup, browser focus, PNG panels/icons and joystick")
         quit(0)

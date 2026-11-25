@@ -1,0 +1,214 @@
+msgid ""
+msgstr ""
+"Language: en\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "กระเป๋า"
+msgstr "Bag"
+
+msgid "ร้านค้า"
+msgstr "Shop"
+
+msgid "ให้อาหาร"
+msgstr "Feed"
+
+msgid "วิ่ง"
+msgstr "Run"
+
+msgid "กระโดด"
+msgstr "Jump"
+
+msgid "เปิดเสียง"
+msgstr "Enable sound"
+
+msgid "เลือกเมล็ด"
+msgstr "Seeds"
+
+msgid "เปิดร้านค้า"
+msgstr "Shop"
+
+msgid "จัดสวน"
+msgstr "Garden"
+
+msgid "กลับทำฟาร์ม"
+msgstr "Farm tools"
+
+msgid "พรวนดิน"
+msgstr "Till"
+
+msgid "ปลูกผัก"
+msgstr "Plant"
+
+msgid "รดน้ำ"
+msgstr "Water"
+
+msgid "เก็บเกี่ยว"
+msgstr "Harvest"
+
+msgid "แปลง"
+msgstr "Plots"
+
+msgid "ต้นไม้"
+msgstr "Trees"
+
+msgid "ตัดไม้"
+msgstr "Chop"
+
+msgid "ของแต่ง"
+msgstr "Decor"
+
+msgid "ซื้อที่ดิน"
+msgstr "Buy land"
+
+msgid "ปิด"
+msgstr "Close"
+
+msgid "ดาวน์โหลดเซฟ"
+msgstr "Export save"
+
+msgid "นำเข้าเซฟ"
+msgstr "Import save"
+
+msgid "ขยายคอกหมู"
+msgstr "Expand pen"
+
+msgid "ซื้อลูกหมู"
+msgstr "Buy piglet"
+
+msgid "ตั้งเงิน"
+msgstr "Set coins"
+
+msgid "ตั้งเลเวล"
+msgstr "Set level"
+
+msgid "ตัวละครชาย"
+msgstr "Male"
+
+msgid "ตัวละครหญิง"
+msgstr "Female"
+
+msgid "เดินอิสระ"
+msgstr "Move"
+
+msgid "☰ เครื่องมือ"
+msgstr "Tools"
+
+msgid "▲ ปิดเครื่องมือ"
+msgstr "Close tools"
+
+msgid "เสียง: ปิด"
+msgstr "Sound off"
+
+msgid "เสียง: เปิด"
+msgstr "Sound on"
+
+msgid "ชุดแปลงปลูก\n75 เหรียญ"
+msgstr "Plot kit\n75 coins"
+
+msgid "ซื้ออาหารหมู +5 (35 เหรียญ)"
+msgstr "Feed +5 (35 coins)"
+
+msgid "บัตรเปลี่ยนเพศ\n%d เหรียญ"
+msgstr "Gender ticket\n%d coins"
+
+msgid "ขายผลผลิตทั้งหมด (%d เหรียญ)"
+msgstr "Sell produce (%d coins)"
+
+msgid "ขยายคอกหมู +1 (ราคา %d เหรียญ)"
+msgstr "Expand pen (%d coins)"
+
+msgid "คอกเต็มแล้ว (%d คอก)"
+msgstr "Pens full (%d)"
+
+msgid "ซื้อลูกหมู +1 (%d เหรียญ)"
+msgstr "Buy piglet (%d coins)"
+
+msgid "คอกเต็ม! ซื้อคอกเพิ่มก่อน"
+msgstr "Pens full"
+
+msgid "ขายผลผลิตทั้งหมด"
+msgstr "Sell produce"
+
+msgid "แครอต\n8 เหรียญ"
+msgstr "Carrot\n8 coins"
+
+msgid "ผักกาด\n10 เหรียญ"
+msgstr "Lettuce\n10 coins"
+
+msgid "มะเขือเทศ\n14 เหรียญ"
+msgstr "Tomato\n14 coins"
+
+msgid "ข้าวโพด\n18 เหรียญ"
+msgstr "Corn\n18 coins"
+
+msgid "ฟักทอง\n24 เหรียญ"
+msgstr "Pumpkin\n24 coins"
+
+msgid "สตรอว์เบอร์รี\n22 เหรียญ"
+msgstr "Strawberry\n22 coins"
+
+msgid "ต้นโอ๊ก\n65 เหรียญ"
+msgstr "Oak\n65 coins"
+
+msgid "ต้นสน\n75 เหรียญ"
+msgstr "Pine\n75 coins"
+
+msgid "ต้นวิลโลว์\n80 เหรียญ"
+msgstr "Willow\n80 coins"
+
+msgid "ต้นทรงสูง\n75 เหรียญ"
+msgstr "Columnar\n75 coins"
+
+msgid "ต้นกิ่งโค้ง\n90 เหรียญ"
+msgstr "Swiggly\n90 coins"
+
+msgid "ม้านั่งไม้\n110 เหรียญ"
+msgstr "Bench\n110 coins"
+
+msgid "รั้วไม้\n35 เหรียญ"
+msgstr "Fence\n35 coins"
+
+msgid "กระถางดอกไม้\n45 เหรียญ"
+msgstr "Flowerpot\n45 coins"
+
+msgid "โคมไฟสวน\n120 เหรียญ"
+msgstr "Garden lamp\n120 coins"
+
+msgid "น้ำพุ\n600 เหรียญ"
+msgstr "Fountain\n600 coins"
+
+msgid "หุ่นไล่กา\n175 เหรียญ"
+msgstr "Scarecrow\n175 coins"
+
+msgid "ป้ายไม้\n80 เหรียญ"
+msgstr "Sign\n80 coins"
+
+msgid "กองฟาง\n45 เหรียญ"
+msgstr "Hay bale\n45 coins"
+
+msgid "โต๊ะปิกนิก\n220 เหรียญ"
+msgstr "Picnic table\n220 coins"
+
+msgid "บ่อน้ำ\n320 เหรียญ"
+msgstr "Well\n320 coins"
+
+msgid "พุ่มไม้\n35 เหรียญ"
+msgstr "Shrub\n35 coins"
+
+msgid "ทางเดินหิน\n25 เหรียญ"
+msgstr "Stone path\n25 coins"
+
+msgid "ตู้จดหมาย\n70 เหรียญ"
+msgstr "Mailbox\n70 coins"
+
+msgid "ศาลาพัก\n850 เหรียญ"
+msgstr "Gazebo\n850 coins"
+
+msgid "สวนหิน\n95 เหรียญ"
+msgstr "Rock garden\n95 coins"
+
+msgid "ตะเกียง\n55 เหรียญ"
+msgstr "Lantern\n55 coins"
+
+msgid "บัตรเปลี่ยนเพศ\n200 เหรียญ"
+msgstr "Gender ticket\n200 coins"

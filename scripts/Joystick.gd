@@ -6,6 +6,8 @@ const ARROWS_TEXTURE: Texture2D = preload("res://assets/ui/farmflex_joystick/joy
 const THUMB_TEXTURE: Texture2D = preload("res://assets/ui/farmflex_joystick/joystick_thumb.png")
 const EFFECT_TEXTURE: Texture2D = preload("res://assets/ui/farmflex_joystick/joystick_effect.png")
 # Thumb joystick that tracks a single finger and never steals other touches.
+const TRAVEL_RATIO := 0.29
+const BASE_RATIO := 0.94
 var direction: Vector2 = Vector2.ZERO
 var finger_id: int = -1
 var mouse_drag: bool = false
@@ -62,13 +64,13 @@ func reset_input() -> void:
 
 func _move_stick(screen: Vector2) -> void:
     var center: Vector2 = global_position + size * 0.5
-    var travel: float = minf(size.x, size.y) * 0.31
+    var travel: float = minf(size.x, size.y) * BASE_RATIO * TRAVEL_RATIO
     direction = ((screen - center) / maxf(1.0, travel)).limit_length(1.0)
     queue_redraw()
 
 func _draw() -> void:
     var center: Vector2 = size * 0.5
-    var diameter: float = minf(size.x, size.y) * 0.94
+    var diameter: float = minf(size.x, size.y) * BASE_RATIO
     var base_rect: Rect2 = Rect2(center - Vector2.ONE*diameter*0.5, Vector2.ONE*diameter)
     draw_texture_rect(BASE_TEXTURE, base_rect, false)
     draw_texture_rect(ARROWS_TEXTURE, base_rect, false)
@@ -77,6 +79,6 @@ func _draw() -> void:
         draw_texture_rect(EFFECT_TEXTURE, base_rect, false, Color(1.0, 1.0, 1.0, 0.40))
     # Only the center knob with the new silver/red logo moves with a finger.
     var knob_diameter: float = diameter * 0.43
-    var thumb_center: Vector2 = center + direction * diameter * 0.29
+    var thumb_center: Vector2 = center + direction * diameter * TRAVEL_RATIO
     var thumb_rect: Rect2 = Rect2(thumb_center - Vector2.ONE*knob_diameter*0.5, Vector2.ONE*knob_diameter)
     draw_texture_rect(THUMB_TEXTURE, thumb_rect, false)

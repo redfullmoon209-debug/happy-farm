@@ -303,11 +303,25 @@ func _check() -> void:
         farm.toggle_inventory_language()
         if not glove_button.text.contains("ถุงมือ"):
             problems.append("Thai equipment label did not restore")
-        for i in range(farm.CLOTHING_SLOTS.size()-1):
-            var left_btn: Button = farm.character_equipment_buttons[farm.CLOTHING_SLOTS[i]]
-            var right_btn: Button = farm.character_equipment_buttons[farm.CLOTHING_SLOTS[i+1]]
-            if right_btn.position.x <= left_btn.position.x or absf(right_btn.position.y-left_btn.position.y) > 2.0:
-                problems.append("equipment slots are not ordered left to right")
+        var previous: Array[Rect2] = []
+        var tall: bool = farm.character_panel.size.y >= 440 and farm.character_panel.size.x >= 340
+        for i in farm.CLOTHING_SLOTS.size():
+            var gear: Button = farm.character_equipment_buttons[farm.CLOTHING_SLOTS[i]]
+            var bounds := gear.get_rect()
+            var model: Rect2 = farm.character_preview_frame.get_rect()
+            if not Rect2(Vector2.ZERO, farm.character_panel.size).encloses(bounds) or model.intersects(bounds):
+                problems.append("gear outside wardrobe or overlapping the model")
+            for other in previous:
+                if bounds.intersects(other):
+                    problems.append("gear slots overlap")
+            if tall:
+                if (i < 3 and bounds.end.x > model.position.x) or (i >= 3 and bounds.position.x < model.end.x):
+                    problems.append("gear on wrong preview rail")
+                if i in [1,2,4] and bounds.position.y <= previous[i-1].position.y:
+                    problems.append("gear rail ordering")
+            elif i > 0 and (bounds.position.x <= previous[i-1].position.x or absf(bounds.position.y-previous[i-1].position.y)>2.0):
+                problems.append("compact gear row ordering")
+            previous.append(bounds)
         if farm.character_info_label == null or not farm.character_info_label.text.contains("EXP"):
             problems.append("character stats missing beneath equipment slots")
     if farm.gender_item_button.disabled == false:
@@ -347,6 +361,11 @@ func _check() -> void:
     farm.bag_button.pressed.emit()
     if farm.bag_panel.visible:
         problems.append("backpack close did not hide inventory")
+    farm.farm_audio.music.stop()
+    await create_timer(0.15).timeout
+    farm.queue_free()
+    await process_frame
+    await process_frame
     if problems.is_empty():
         print("FARMER TESTS PASS: joystick walking, jumping, FBX fallback, gender item and modular wardrobe")
         quit(0)

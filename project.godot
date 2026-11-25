@@ -22,3 +22,7 @@ renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/default_filters/use_nearest_mipmap_filter=false
 environment/defaults/default_clear_color=Color(0.69, 0.82, 0.86, 1)
+
+[internationalization]
+locale/fallback="th"
+locale/translations=PackedStringArray("res://assets/ui/farmflex_cream/en.po")

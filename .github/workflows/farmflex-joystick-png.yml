@@ -1,49 +1,46 @@
-name: Generate FarmFlex joystick PNG layers
+name: Verify FarmFlex UI artwork
 on:
   push:
     branches: [main]
     paths:
-      - "assets/ui/farmflex_joystick/*.svg"
-      - "assets/ui/farmflex_cream/*.svg"
+      - "assets/ui/farmflex_joystick/**"
+      - "assets/ui/farmflex_cream/**"
       - ".github/workflows/farmflex-joystick-png.yml"
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 jobs:
-  render-png:
+  verify-art:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          persist-credentials: true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Rasterize independently authored SVG layers to transparent PNG
+      - name: Compare transparent PNG layers with their standalone vector sources
         run: |
-          python -m pip install --quiet cairosvg
+          python -m pip install --quiet cairosvg pillow
           python - <<'PY'
-          import pathlib, cairosvg
-          root = pathlib.Path("assets/ui/farmflex_joystick")
-          names = ("joystick_base", "joystick_arrows", "joystick_thumb", "joystick_effect")
-          for name in names:
-              src = root / (name + ".svg")
-              assert src.is_file(), src
-              cairosvg.svg2png(url=str(src), write_to=str(root / (name + ".png")), output_width=512, output_height=512)
-              print("Rendered", name)
-          cream = pathlib.Path("assets/ui/farmflex_cream")
-          for name in ("cream_button", "cream_square", "cream_bar", "cream_hud"):
-              src = cream / (name + ".svg")
-              assert src.is_file(), src
-              cairosvg.svg2png(url=str(src), write_to=str(cream / (name + ".png")))
-              print("Rendered", name)
+          from pathlib import Path
+          from io import BytesIO
+          from xml.etree import ElementTree
+          import cairosvg
+          from PIL import Image, ImageChops, ImageStat
+          for folder in ("farmflex_cream", "farmflex_joystick"):
+              root = Path("assets/ui") / folder
+              sources = sorted(root.rglob("*.svg"))
+              assert sources
+              for src in sources:
+                  tags = {node.tag.split("}")[-1] for node in ElementTree.parse(src).iter()}
+                  assert tags.isdisjoint({"text", "image", "foreignObject"}), src
+                  actual = Image.open(src.with_suffix(".png")).convert("RGBA")
+                  assert actual.getchannel("A").getextrema()[0] == 0, src
+                  expected = Image.open(BytesIO(cairosvg.svg2png(url=str(src)))).convert("RGBA")
+                  assert actual.size == expected.size, src
+                  for bg in ("black", "white"):
+                      canvas = Image.new("RGBA", actual.size, bg)
+                      a = Image.alpha_composite(canvas, actual)
+                      b = Image.alpha_composite(canvas, expected)
+                      assert max(ImageStat.Stat(ImageChops.difference(a,b)).mean) < 4, src
+                  print(src, actual.size)
           PY
-      - name: Commit PNG assets back to FarmFlex
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add assets/ui/farmflex_joystick/*.png assets/ui/farmflex_cream/*.png
-          if ! git diff --cached --quiet; then
-            git commit -m "FarmFlex: render separate transparent joystick PNG assets"
-            git push
-          fi
