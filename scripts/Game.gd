@@ -3219,11 +3219,176 @@ func toggle_character_panel() -> void:
 func show_shop() -> void:
     if bag_panel != null:
         bag_panel.visible = false
+    _cancel_shop_trade()
     shop_panel.visible = not shop_panel.visible
     if shop_panel.visible and shop_scroll != null:
         shop_scroll.scroll_vertical = 0
         shop_sell_selected = -1
         _refresh_shop_sell_grid()
+
+func _request_shop_buy(kind: String, item: Variant) -> void:
+    var item_name: String = ""
+    var item_price: int = -1
+    var item_description: String = "รับไอเทมหลังยืนยันการซื้อ"
+    var icon_texture: Texture2D = null
+    match kind:
+        "clothing":
+            var id: String = str(item)
+            if not CLOTHING_CATALOG.has(id) or int(clothing_owned.get(id, 0)) > 0:
+                return
+            item_name = str(CLOTHING_CATALOG[id]["name"])
+            item_price = WARDROBE.shop_price(id)
+            icon_texture = _real_equipment_thumbnail(id)
+            item_description = "ชิ้นส่วนชุด • ซื้อแล้วเข้ากระเป๋าฝั่งขวา"
+        "seed":
+            var idx: int = int(item)
+            if idx < 0 or idx >= CROPS.size():
+                return
+            item_name = "เมล็ด" + str(CROPS[idx]["name"])
+            item_price = int(CROPS[idx]["price"])
+            item_description = "เมล็ดพันธุ์สำหรับปลูกในฟาร์ม • จำนวน 1"
+        "plot":
+            item_name = "ชุดแปลงปลูก"
+            item_price = PLOT_KIT_PRICE
+        "tree":
+            var idx: int = int(item)
+            if idx < 0 or idx >= TREE_NAMES.size():
+                return
+            item_name = "ต้น" + str(TREE_NAMES[idx])
+            item_price = int(TREE_PRICES[idx])
+        "decor":
+            var idx: int = int(item)
+            if idx < 0 or idx >= DECOR_NAMES.size():
+                return
+            item_name = str(DECOR_NAMES[idx])
+            item_price = int(DECOR_PRICES[idx])
+        "gender":
+            item_name = "บัตรเปลี่ยนเพศ"
+            item_price = GENDER_CHANGE_CARD_PRICE
+        "feed":
+            item_name = "อาหารหมู ×5"
+            item_price = 35
+        "pen":
+            item_name = "ขยายคอกหมู"
+            item_price = pen_price()
+        "pig":
+            item_name = "ลูกหมู"
+            item_price = PIG_PRICE
+        _:
+            return
+    if item_price < 0 or shop_trade_panel == null:
+        return
+    shop_pending_trade = {"mode": "buy", "kind": kind, "item": item, "price": item_price}
+    shop_trade_title.text = "รายละเอียดสินค้า • ซื้อ"
+    shop_trade_details.text = "%s\n%s\nราคา %d เหรียญ\nยอดเงินปัจจุบัน %d เหรียญ\nหลังซื้อเหลือ %d เหรียญ" % [
+        item_name, item_description, item_price, coins, coins-item_price
+    ]
+    shop_trade_icon.texture = icon_texture
+    shop_trade_confirm.text = "ยืนยันซื้อ"
+    shop_trade_confirm.disabled = coins < item_price
+    shop_trade_panel.visible = true
+
+func _request_sell_selected() -> void:
+    if shop_sell_selected < 0 or shop_sell_selected >= shop_sell_entries.size():
+        return
+    var entry: Dictionary = shop_sell_entries[shop_sell_selected]
+    var crop_idx: int = int(entry["crop"])
+    if int(produce[crop_idx]) <= 0:
+        return
+    _show_shop_sell_confirmation(crop_idx, 1)
+
+func _request_sell_all() -> void:
+    if produce_value() <= 0:
+        return
+    shop_pending_trade = {"mode": "sell_all", "expected_value": produce_value()}
+    shop_trade_title.text = "รายละเอียดสินค้า • ขายทั้งหมด"
+    shop_trade_details.text = "ผลผลิตทั้งหมด %d ชนิด\nรวมได้เงิน %d เหรียญ\nเหรียญหลังขาย %d" % [
+        _count_shop_sale_types(), produce_value(), coins + produce_value()
+    ]
+    shop_trade_icon.texture = null
+    shop_trade_confirm.text = "ยืนยันขายทั้งหมด"
+    shop_trade_confirm.disabled = coins > 1000000000 - produce_value()
+    shop_trade_panel.visible = true
+
+func _count_shop_sale_types() -> int:
+    var total: int = 0
+    for stock in produce:
+        if int(stock) > 0:
+            total += 1
+    return total
+
+func _show_shop_sell_confirmation(crop_idx: int, amount: int) -> void:
+    var unit_price: int = int(CROPS[crop_idx]["reward"])
+    shop_pending_trade = {"mode": "sell_one", "crop": crop_idx, "amount": amount, "price": unit_price}
+    shop_trade_title.text = "รายละเอียดสินค้า • ขาย"
+    shop_trade_details.text = "%s ผลผลิต\nในกระเป๋า %d ชิ้น\nขาย %d ชิ้น × %d เหรียญ\nรับ %d เหรียญ\nยอดหลังขาย %d เหรียญ" % [
+        str(CROPS[crop_idx]["name"]), int(produce[crop_idx]),
+        amount, unit_price, amount*unit_price, coins+amount*unit_price
+    ]
+    shop_trade_icon.texture = null
+    shop_trade_confirm.text = "ยืนยันขาย"
+    shop_trade_confirm.disabled = int(produce[crop_idx]) < amount or coins > 1000000000 - amount*unit_price
+    shop_trade_panel.visible = true
+
+func _cancel_shop_trade() -> void:
+    shop_pending_trade.clear()
+    if shop_trade_panel != null:
+        shop_trade_panel.visible = false
+
+func _confirm_shop_trade() -> void:
+    # Confirmation always revalidates quantity, price and currency.
+    if shop_pending_trade.is_empty():
+        return
+    var pending: Dictionary = shop_pending_trade.duplicate()
+    _cancel_shop_trade()
+    match str(pending.get("mode", "")):
+        "buy":
+            var kind: String = str(pending["kind"])
+            var item: Variant = pending["item"]
+            # Check that prices haven't changed since the details appeared.
+            var current_price: int = -1
+            match kind:
+                "clothing": current_price = WARDROBE.shop_price(str(item))
+                "seed": current_price = int(CROPS[int(item)]["price"])
+                "plot": current_price = PLOT_KIT_PRICE
+                "tree": current_price = int(TREE_PRICES[int(item)])
+                "decor": current_price = int(DECOR_PRICES[int(item)])
+                "gender": current_price = GENDER_CHANGE_CARD_PRICE
+                "feed": current_price = 35
+                "pen": current_price = pen_price()
+                "pig": current_price = PIG_PRICE
+            if current_price != int(pending["price"]) or current_price < 0 or coins < current_price:
+                message = "ราคาเปลี่ยนหรือเหรียญไม่เพียงพอ กรุณาเลือกใหม่"
+                refresh_labels()
+                return
+            match kind:
+                "clothing": buy_clothing(str(item))
+                "seed": buy_seed(int(item))
+                "plot": buy_plot_kit()
+                "tree": buy_tree_kit(int(item))
+                "decor": buy_decor_kit(int(item))
+                "gender": buy_gender_change_ticket()
+                "feed": buy_feed()
+                "pen": buy_pen()
+                "pig": buy_pig()
+        "sell_one":
+            var crop_idx: int = int(pending["crop"])
+            if crop_idx < 0 or crop_idx >= CROPS.size():
+                return
+            var current_price: int = int(CROPS[crop_idx]["reward"])
+            if current_price != int(pending["price"]) or int(produce[crop_idx]) < 1 or coins > 1000000000 - current_price:
+                return
+            produce[crop_idx] = int(produce[crop_idx])-1
+            coins += current_price
+            message = "ขาย%s +%d เหรียญ" % [str(CROPS[crop_idx]["name"]), current_price]
+            save_game()
+            refresh_labels()
+        "sell_all":
+            if produce_value() != int(pending["expected_value"]):
+                message = "จำนวนผลผลิตเปลี่ยน กรุณาเลือกขายอีกครั้ง"
+                refresh_labels()
+                return
+            sell_produce()
 
 # Right side of the shop lists only harvested produce that can be exchanged
 # at the game's existing crop.reward price. Seeds, clothing, and farm tools
@@ -3270,8 +3435,12 @@ func _select_shop_sale_slot(index: int) -> void:
         return
     shop_sell_selected = index
     _refresh_shop_sell_grid()
+    _request_sell_selected()
 
 func _sell_selected_shop_item() -> void:
+    _request_sell_selected()
+
+func _sell_selected_shop_item_legacy() -> void:
     if shop_sell_selected < 0 or shop_sell_selected >= shop_sell_entries.size():
         return
     var crop_index: int = int(shop_sell_entries[shop_sell_selected]["crop"])
