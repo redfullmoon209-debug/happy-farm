@@ -3500,15 +3500,14 @@ func _request_shop_buy(kind: String, item: Variant) -> void:
             return
     if item_price < 0 or shop_trade_panel == null:
         return
-    shop_pending_trade = {"mode": "buy", "kind": kind, "item": item, "price": item_price}
+    shop_pending_trade = {"mode": "buy", "kind": kind, "item": item, "price": item_price,
+        "name": item_name, "description": item_description}
     shop_trade_title.text = "รายละเอียดสินค้า • ซื้อ"
-    shop_trade_details.text = "%s\n%s\nราคา %d เหรียญ\nยอดเงินปัจจุบัน %d เหรียญ\nหลังซื้อเหลือ %d เหรียญ" % [
-        item_name, item_description, item_price, coins, coins-item_price
-    ]
-    shop_trade_icon.texture = icon_texture
+    shop_trade_icon.texture = _shop_item_picture(kind, item)
     shop_trade_confirm.text = "ยืนยันซื้อ"
-    shop_trade_confirm.disabled = coins < item_price
     shop_trade_panel.visible = true
+    var maximum: int = mini(9999, _shop_buy_capacity(kind, item))
+    _show_trade_quantity(1, maximum)
 
 func _request_sell_selected() -> void:
     if shop_sell_selected < 0 or shop_sell_selected >= shop_sell_entries.size():
@@ -3524,13 +3523,13 @@ func _request_sell_all() -> void:
         return
     shop_pending_trade = {"mode": "sell_all", "expected_value": produce_value()}
     shop_trade_title.text = "รายละเอียดสินค้า • ขายทั้งหมด"
-    shop_trade_details.text = "ผลผลิตทั้งหมด %d ชนิด\nรวมได้เงิน %d เหรียญ\nเหรียญหลังขาย %d" % [
-        _count_shop_sale_types(), produce_value(), coins + produce_value()
-    ]
-    shop_trade_icon.texture = null
+    shop_trade_icon.texture = ITEM_ICONS.texture("basket")
     shop_trade_confirm.text = "ยืนยันขายทั้งหมด"
-    shop_trade_confirm.disabled = coins > 1000000000 - produce_value()
     shop_trade_panel.visible = true
+    var total_count: int = 0
+    for amount in produce:
+        total_count += int(amount)
+    _show_trade_quantity(total_count, total_count, false)
 
 func _count_shop_sale_types() -> int:
     var total: int = 0
@@ -3543,14 +3542,10 @@ func _show_shop_sell_confirmation(crop_idx: int, amount: int) -> void:
     var unit_price: int = int(CROPS[crop_idx]["reward"])
     shop_pending_trade = {"mode": "sell_one", "crop": crop_idx, "amount": amount, "price": unit_price}
     shop_trade_title.text = "รายละเอียดสินค้า • ขาย"
-    shop_trade_details.text = "%s ผลผลิต\nในกระเป๋า %d ชิ้น\nขาย %d ชิ้น × %d เหรียญ\nรับ %d เหรียญ\nยอดหลังขาย %d เหรียญ" % [
-        str(CROPS[crop_idx]["name"]), int(produce[crop_idx]),
-        amount, unit_price, amount*unit_price, coins+amount*unit_price
-    ]
-    shop_trade_icon.texture = null
+    shop_trade_icon.texture = _shop_item_picture("produce", crop_idx)
     shop_trade_confirm.text = "ยืนยันขาย"
-    shop_trade_confirm.disabled = int(produce[crop_idx]) < amount or coins > 1000000000 - amount*unit_price
     shop_trade_panel.visible = true
+    _show_trade_quantity(amount, mini(9999, int(produce[crop_idx])))
 
 func _cancel_shop_trade() -> void:
     shop_pending_trade.clear()
