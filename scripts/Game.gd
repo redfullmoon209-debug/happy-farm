@@ -3262,6 +3262,72 @@ func toggle_character_panel() -> void:
     else:
         open_backpack_view()
 
+func _square_shop_slot(button: Button) -> void:
+    var normal_style: StyleBoxFlat = StyleBoxFlat.new()
+    normal_style.bg_color = Color("#fffaf5")
+    normal_style.border_color = Color("#d6c9b9")
+    normal_style.set_border_width_all(1)
+    normal_style.set_corner_radius_all(0)
+    var hover_style: StyleBoxFlat = normal_style.duplicate() as StyleBoxFlat
+    hover_style.bg_color = Color("#f1e4ce")
+    hover_style.border_color = Color("#b89d72")
+    var disabled_style: StyleBoxFlat = normal_style.duplicate() as StyleBoxFlat
+    disabled_style.bg_color = Color("#e8e4de")
+    button.add_theme_stylebox_override("normal", normal_style)
+    for state in ["hover", "pressed", "focus"]:
+        button.add_theme_stylebox_override(state, hover_style)
+    button.add_theme_stylebox_override("disabled", disabled_style)
+    button.custom_minimum_size = Vector2(54, 54)
+    button.add_theme_font_size_override("font_size", 10)
+    button.clip_text = true
+
+func _register_shop_product(button: Button, category: String, clothing_slot: String = "") -> void:
+    shop_item_categories[button.name] = category
+    shop_item_slots[button.name] = clothing_slot
+
+func _set_shop_category(category: String) -> void:
+    if not shop_category_buttons.has(category):
+        return
+    shop_category = category
+    shop_clothing_slot = "all"
+    _refresh_shop_category()
+    if shop_scroll != null:
+        shop_scroll.scroll_vertical = 0
+
+func _set_shop_clothing_slot(slot: String) -> void:
+    if not shop_slot_buttons.has(slot):
+        return
+    shop_category = "clothing"
+    shop_clothing_slot = slot
+    _refresh_shop_category()
+    if shop_scroll != null:
+        shop_scroll.scroll_vertical = 0
+
+func _refresh_shop_category() -> void:
+    if shop_grid == null:
+        return
+    for key in shop_category_buttons.keys():
+        var tab: Button = shop_category_buttons[key]
+        tab.modulate = Color("#e6ceb0") if str(key) == shop_category else Color.WHITE
+    for key in shop_slot_buttons.keys():
+        var subtab: Button = shop_slot_buttons[key]
+        subtab.visible = shop_category == "clothing"
+        subtab.modulate = Color("#e6ceb0") if str(key) == shop_clothing_slot else Color.WHITE
+    var labels: Dictionary = {
+        "clothing":"ชุด • ซื้อแยกชิ้น", "seed":"เมล็ดพันธุ์",
+        "tree":"ต้นไม้", "decor":"ของตกแต่ง", "other":"อุปกรณ์ฟาร์ม"
+    }
+    if shop_buy_title != null:
+        shop_buy_title.text = str(labels.get(shop_category, "ซื้อสินค้า"))
+    for child in shop_grid.get_children():
+        if not (child is Button):
+            continue
+        var cat: String = str(shop_item_categories.get(child.name, ""))
+        var part: String = str(shop_item_slots.get(child.name, ""))
+        child.visible = cat == shop_category and (cat != "clothing" or shop_clothing_slot == "all" or part == shop_clothing_slot)
+    if shop_buy_information != null:
+        shop_buy_information.text = "แตะไอเทมเพื่อดูรายละเอียด แล้วกดยืนยันซื้อ"
+
 func show_shop() -> void:
     if bag_panel != null:
         bag_panel.visible = false
