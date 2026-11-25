@@ -2,6 +2,7 @@ extends Node3D
 # FarmFlex: identical Codex-authored male/female GLB models, including skeleton, hair and face morphs.
 # Animation binding can be added when matching Mixamo clips are provided.
 const ANIMATION_CONTROLLER = preload("res://scripts/ModularAnimations.gd")
+const GARMENTS = preload("res://scripts/FarmFlexGarments.gd")
 const FEMALE_PATH = "res://assets/characters/Female_Character_Complete.glb"
 const MALE_PATH = "res://assets/characters/Male_Character_Complete.glb"
 # Player-requested 0.90 scene height; scale the imported GLB uniformly without editing the source model.
@@ -18,6 +19,7 @@ var motion_controller: Node = null
 var anim_player: AnimationPlayer = null
 var can_prop: Node3D = null
 var hoe_prop: Node3D = null
+var model_gender: String = "female"
 
 func _find_meshes(node: Node, out: Array[MeshInstance3D]) -> void:
     if node is Skeleton3D and skeleton == null:
@@ -28,6 +30,7 @@ func _find_meshes(node: Node, out: Array[MeshInstance3D]) -> void:
         _find_meshes(child, out)
 
 func initialize(gender: String, appearance: Dictionary = {}) -> bool:
+    model_gender = gender
     var selected_path: String = MALE_PATH if gender == "male" else FEMALE_PATH
     if not ResourceLoader.exists(selected_path):
         push_warning("Modular character model is missing: " + selected_path)
@@ -167,57 +170,21 @@ func _apply_skin_tone(body: MeshInstance3D, hex_color: String, gender: String) -
         material_copy.albedo_texture = ImageTexture.create_from_image(result_image)
         body.set_surface_override_material(idx, material_copy)
 
-# Match independent skinned outfit meshes by gender, collection and slot.
-# Never replace the original body/face/hair or synthesize fake character art.
-# The currently bundled GLB supplies only the two female shoe meshes; other
-# inventory pieces become visually active when matching GLB meshes are imported.
+# 3D modular garment prototypes follow the existing Mixamo bones.
+# The original GLB shoes are hidden here to prevent double-rendering.
+# Each part is individually purchased and can be mixed across collections.
 func apply_equipment(equipped: Dictionary) -> void:
-    if imported_character == null:
+    if imported_character == null or skeleton == null:
         return
-    var parts: Array[MeshInstance3D] = []
-    _find_meshes(imported_character, parts)
-    for part in parts:
-        var mesh_name: String = str(part.name).to_lower()
-        if not mesh_name.contains("_outfit_"):
-            continue
-        var slot_id: String = ""
-        if mesh_name.contains("_shoes_") or mesh_name.contains("_boots_"):
-            slot_id = "shoes"
-        elif mesh_name.contains("_gloves_") or mesh_name.contains("_arms_"):
-            slot_id = "gloves"
-        elif mesh_name.contains("_shirt_") or mesh_name.contains("_top_") or mesh_name.contains("_vest_"):
-            slot_id = "top"
-        elif mesh_name.contains("_pants_") or mesh_name.contains("_skirt_") or mesh_name.contains("_bottom_"):
-            slot_id = "bottom"
-        elif mesh_name.contains("_hat_") or mesh_name.contains("_mask_") or mesh_name.contains("_headwear_"):
-            slot_id = "headwear"
-        if slot_id.is_empty():
+    var meshes: Array[MeshInstance3D] = []
+    _find_meshes(imported_character, meshes)
+    for part in meshes:
+        if str(part.name).contains("_Outfit_"):
             part.visible = false
-            continue
-        var item_id: String = str(equipped.get(slot_id, ""))
-        var collection: String = ""
-        if item_id.contains("_martial_"):
-            collection = "martial"
-        elif item_id.contains("_survivor_"):
-            collection = "survivor"
-        elif item_id.contains("_villager_"):
-            collection = "villager"
-        var correct_set: bool = (
-            collection == "martial" and (mesh_name.contains("_martial_") or mesh_name.contains("_martial_artist_"))
-        ) or (
-            collection == "survivor" and (mesh_name.contains("_survivor_") or mesh_name.contains("_apocalypse_survivor_"))
-        ) or (
-            collection == "villager" and mesh_name.contains("_villager_")
-        )
-        var matching_gender: bool = (item_id.begins_with("female_") and mesh_name.contains("female_")) or (item_id.begins_with("male_") and not mesh_name.contains("female_") and mesh_name.contains("male_"))
-        part.visible = matching_gender and correct_set
+    GARMENTS.build_worn(skeleton, equipped, model_gender)
 
 func has_equipment_mesh(item_id: String) -> bool:
-    if imported_character == null:
-        return false
-    # The two female shoe assets are verified in the character GLB.
-    # Other outfit parts are not represented as actual meshes in this build.
-    return item_id in ["female_survivor_shoes", "female_martial_shoes"]
+    return skeleton != null and GARMENTS.valid_id(item_id) and item_id.begins_with(model_gender + "_")
 
 func has_visible_avatar() -> bool:
     return imported_character != null and mesh_count > 0 and display_height >= 0.85 and display_height <= 0.95
