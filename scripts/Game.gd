@@ -2193,6 +2193,17 @@ func build_ui() -> void:
         decor_buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         shop_grid.add_child(decor_buy)
         shop_decor_buttons.append(decor_buy)
+    # Clothing is bought with coins earned by selling farm produce.
+    # Show only garments with matching source meshes in the character GLB.
+    for item_id in ["female_martial_shoes", "female_survivor_shoes"]:
+        var gear_data: Dictionary = CLOTHING_CATALOG[item_id]
+        var price: int = WARDROBE.shop_price(item_id)
+        var wardrobe_buy: Button = btn("%s\n%d เหรียญ" % [str(gear_data["name"]), price], buy_clothing.bind(item_id))
+        wardrobe_buy.name = "BuyWardrobe_" + item_id
+        wardrobe_buy.custom_minimum_size = Vector2(145, 55)
+        wardrobe_buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        wardrobe_buy.tooltip_text = "ซื้อด้วยเงินจากการทำฟาร์ม • สวมทีละชิ้นในกระเป๋า"
+        shop_grid.add_child(wardrobe_buy)
     var ticket_for_sale: Button = btn("บัตรเปลี่ยนเพศ\n%d เหรียญ" % GENDER_CHANGE_CARD_PRICE, buy_gender_change_ticket, Color("#548780"))
     ticket_for_sale.name = "GenderChangeCardForSale"
     ticket_for_sale.custom_minimum_size = Vector2(145, 55)
@@ -2914,8 +2925,8 @@ func refresh_bag_cards() -> void:
     for item_entry in inventory_entries:
         if str(item_entry.get("kind", "")) == "clothing":
             actual_outfits += 1
-    bag_summary.text = "ชุดที่มีโมเดลจริง %d ชิ้น | %d/%d" % [actual_outfits, inventory_entries.size(), INVENTORY_CAPACITY]
-    bag_footer.text = "โมเดลชายยังไม่มีชิ้นส่วนชุดแยก" if avatar_gender == "male" else "รองเท้าจอมยุทธ์ / ผู้รอดชีวิต (โมเดลจริง)"
+    bag_summary.text = "ชุดที่ซื้อแล้ว %d ชิ้น | %d/%d" % [actual_outfits, inventory_entries.size(), INVENTORY_CAPACITY]
+    bag_footer.text = "โมเดลชายยังไม่มีชุดแยกวางขาย" if avatar_gender == "male" else "ทำฟาร์มขายผลผลิต แล้วซื้อเสื้อผ้าที่ร้านค้า"
     if inventory_selected_index >= 0 and inventory_selected_index < inventory_entries.size():
         var selected_entry: Dictionary = inventory_entries[inventory_selected_index]
         if str(selected_entry.get("kind", "")) == "clothing":
@@ -3373,6 +3384,28 @@ func consume_gender_change_ticket() -> void:
     message = "ใช้บัตรเปลี่ยนเพศสำเร็จ เป็น%sแล้ว" % ("ผู้ชาย" if avatar_gender == "male" else "ผู้หญิง")
     refresh_labels()
 
+func buy_clothing(item_id: String) -> void:
+    if not CLOTHING_CATALOG.has(item_id) or not REAL_CLOTHING_MESH_IDS.has(item_id):
+        message = "ยังไม่มีโมเดลชุดนี้ จึงไม่เปิดขาย"
+    elif str(CLOTHING_CATALOG[item_id].get("gender", "")) != avatar_gender:
+        message = "ชุดนี้ใช้กับเพศปัจจุบันไม่ได้"
+    elif int(clothing_owned.get(item_id, 0)) > 0:
+        message = "มีไอเทมชิ้นนี้ในกระเป๋าแล้ว"
+    else:
+        var price: int = WARDROBE.shop_price(item_id)
+        if price < 0:
+            message = "ไอเทมนี้ยังไม่วางขาย"
+        elif coins < price:
+            message = "เหรียญไม่พอ ต้องทำฟาร์มและขายผลผลิตเพื่อซื้อชุด"
+        else:
+            coins -= price
+            clothing_owned[item_id] = 1
+            message = "ซื้อ%sแล้ว เปิดกระเป๋าเพื่อสวม" % str(CLOTHING_CATALOG[item_id]["name"])
+            if farm_audio != null:
+                farm_audio.play_effect("buy")
+            save_game()
+    refresh_labels()
+
 func buy_plot_kit() -> void:
     if coins < PLOT_KIT_PRICE:
         message = "เหรียญไม่พอซื้อชุดแปลงผัก"
@@ -3595,6 +3628,7 @@ func snapshot() -> Dictionary:
         "avatar_gender": str(original_locked_profile.get("sex", avatar_gender)) if not test_avatar_gender.is_empty() else avatar_gender,
         "character_profile": original_locked_profile.duplicate(true) if not test_avatar_gender.is_empty() else character_profile.duplicate(true),
         "gender_change_tickets": gender_change_tickets,
+        "wardrobe_market_v1": true,
         "clothing_owned": clothing_owned.duplicate(true),
         "clothing_equipped": clothing_equipped.duplicate(true),
         "feed": feed,
