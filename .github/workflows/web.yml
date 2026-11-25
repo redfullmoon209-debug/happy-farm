@@ -194,6 +194,32 @@ jobs:
             CODE=$(curl -L -sS --connect-timeout 6 --max-time 20 -o /dev/null -w "%{http_code}" "$URL" || true)
             echo "$path => HTTP $CODE"
           done
+      - name: Assert live website actually contains this joystick build
+        run: |
+          set -euo pipefail
+          LIVE="https://redfullmoon209-debug.github.io/happy-farm"
+          EXPECTED="$GITHUB_SHA"
+          echo "Expected published revision: $EXPECTED"
+          MATCHED=0
+          for attempt in $(seq 1 12); do
+            ACTUAL="$(curl -fLsS --max-time 12 -H 'Cache-Control: no-cache' "$LIVE/farmflex-build.txt?verify=$EXPECTED&attempt=$attempt" || true)"
+            echo "Pages revision attempt $attempt: $ACTUAL"
+            if [ "$ACTUAL" = "$EXPECTED" ]; then MATCHED=1; break; fi
+            sleep 10
+          done
+          if [ "$MATCHED" -ne 1 ]; then
+            echo "::error::Published FarmFlex is stale! Pages does not serve this commit."
+            exit 1
+          fi
+          for name in joystick_base joystick_arrows joystick_thumb joystick_effect; do
+            curl -fLsS --max-time 18 -H 'Cache-Control: no-cache' "$LIVE/ui/joystick/$name.png?verify=$EXPECTED" -o "/tmp/$name.png"
+            file "/tmp/$name.png"
+            test "$(head -c 8 "/tmp/$name.png" | od -An -tx1 | tr -d ' \\n')" = "89504e470d0a1a0a" || {
+              echo "::error::Published $name is not a PNG"
+              exit 1
+            }
+          done
+          echo "FARMFLEX LIVE JOYSTICK BUILD VERIFIED"
       - name: Save backup regression tests
         run: |
           set -o pipefail
