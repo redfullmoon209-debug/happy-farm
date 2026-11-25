@@ -80,11 +80,16 @@ func _check() -> void:
             if int(farm.produce[0]) != 3 or farm.coins != money_before_sale:
                 problems.append("cancelling sale modified currency or produce")
             farm._request_sell_selected()
+            if farm.shop_trade_icon.texture == null:
+                problems.append("sell confirmation is missing the crop picture")
+            farm.shop_trade_quantity.value = 2
+            if not farm.shop_trade_details.text.contains(str(2 * crop_value)):
+                problems.append("sell confirmation total did not update for quantity two")
             farm._confirm_shop_trade()
-            if int(farm.produce[0]) != 2 or farm.coins != money_before_sale + crop_value:
-                problems.append("confirmed sale did not exchange one item for configured coins")
+            if int(farm.produce[0]) != 1 or farm.coins != money_before_sale + 2 * crop_value:
+                problems.append("confirmed bulk sale did not exchange two crops for configured coins")
             farm._request_sell_all()
-            if int(farm.produce[0]) != 2:
+            if int(farm.produce[0]) != 1:
                 problems.append("request to sell all mutated items before confirmation")
             farm._confirm_shop_trade()
             if int(farm.produce[0]) != 0 or farm.coins != money_before_sale + 3 * crop_value:
@@ -101,9 +106,22 @@ func _check() -> void:
             if farm.coins != money_before_buy or int(farm.seeds[0]) != seeds_before_buy:
                 problems.append("cancelling purchase modified inventory or money")
             farm._request_shop_buy("seed", 0)
+            if farm.shop_trade_icon.texture == null:
+                problems.append("buy confirmation did not display the same item picture")
+            farm.shop_trade_quantity.value = 3
+            if not farm.shop_trade_details.text.contains(str(3 * int(farm.CROPS[0]["price"]))):
+                problems.append("buy total did not update for quantity three")
             farm._confirm_shop_trade()
-            if farm.coins != money_before_buy - int(farm.CROPS[0]["price"]) or int(farm.seeds[0]) != seeds_before_buy + 1:
-                problems.append("confirmed store purchase did not deduct exact price or grant seed")
+            if farm.coins != money_before_buy - 3 * int(farm.CROPS[0]["price"]) or int(farm.seeds[0]) != seeds_before_buy + 3:
+                problems.append("confirmed bulk purchase did not deduct three prices or grant three seeds")
+            var verified_shop_icon: bool = false
+            for child in farm.shop_grid.get_children():
+                if child is Button and farm.shop_item_categories.get(child.name, "") == "seed" and child.icon != null and child.text.is_empty():
+                    verified_shop_icon = true
+            if not verified_shop_icon:
+                problems.append("seed shop slots still display words instead of product illustrations")
+            if farm.shop_sell_cards[0].icon == null and int(farm.produce[0]) > 0:
+                problems.append("sell slots missing crop illustrations")
 
     if not farm.touch_controls or not farm.stick.is_visible_in_tree():
         problems.append("joystick must be visible automatically on PC web")
