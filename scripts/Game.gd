@@ -2154,7 +2154,7 @@ func build_ui() -> void:
     ui.add_child(shop_panel)
     shop_panel.visible = false
     shop_header_art = _header_layer(shop_panel)
-    shop_heading = text_label("ร้านฟาร์ม • ของตกแต่ง • สัตว์เลี้ยง", 21, Color("#fff2c6"))
+    shop_heading = text_label("ร้านฟาร์ม • เสื้อผ้า • ของตกแต่ง • สัตว์เลี้ยง", 21, Color("#fff2c6"))
     shop_heading.add_theme_font_override("font", THAI_BOLD)
     shop_panel.add_child(shop_heading)
     shop_close = btn("ปิด", show_shop, Color("#73817a"))
