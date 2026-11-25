@@ -1851,6 +1851,15 @@ func _set_icon(button: Button, name: String) -> void:
 func _fit_button_caption(button: Button) -> void:
     if button == null or button.text.is_empty():
         return
+    if button.name == "EquipmentSlot_gloves":
+        # Keep a SINGLE glove icon visible even in narrow phone landscape.
+        # The caption is still a real Button text field for localization.
+        button.icon = ICON_GLOVE_SINGLE
+        button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+        button.expand_icon = true
+        button.add_theme_constant_override("icon_max_width", 24)
+        button.add_theme_font_size_override("font_size", 12)
+        return
     var width: float = maxf(button.size.x, button.custom_minimum_size.x)
     var height: float = maxf(button.size.y, button.custom_minimum_size.y)
     if width < 45.0 or height < 22.0:
