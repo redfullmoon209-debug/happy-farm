@@ -102,6 +102,21 @@ var unlocked_zones: Array = STARTER_ZONES.duplicate()
 var produce: Array = [0,0,0,0,0,0]
 var avatar_gender: String = "female"
 var character_profile: Dictionary = {}
+# Gender change is a consumed item, never a free UI toggle.
+const GENDER_CHANGE_CARD_PRICE: int = 200
+const CLOTHING_SLOTS: Array[String] = ["headwear", "top", "gloves", "bottom", "shoes"]
+const CLOTHING_SLOT_NAMES: Dictionary = {
+    "headwear": "หมวก", "top": "เสื้อ", "gloves": "ถุงมือ",
+    "bottom": "กางเกง/กระโปรง", "shoes": "รองเท้า"
+}
+const CLOTHING_CATALOG: Dictionary = {
+    # These are the only separate skinned footwear meshes in the source GLB.
+    "female_survivor_shoes": {"name": "รองเท้าผู้รอดชีวิต", "slot": "shoes", "gender": "female"},
+    "female_martial_shoes": {"name": "รองเท้าจอมยุทธ์", "slot": "shoes", "gender": "female"}
+}
+var gender_change_tickets: int = 0
+var clothing_owned: Dictionary = {"female_survivor_shoes": 1, "female_martial_shoes": 1}
+var clothing_equipped: Dictionary = {}
 # Temporary browser-only avatar preview; never persisted into the farm save.
 var test_avatar_gender: String = ""
 var original_locked_profile: Dictionary = {}
@@ -228,6 +243,15 @@ var bag_footer: Label
 var bag_save_status: Label
 var bag_export_button: Button
 var bag_import_button: Button
+var character_button: Button
+var character_panel: Panel
+var character_title: Label
+var character_close: Button
+var character_gender_label: Label
+var gender_item_button: Button
+var character_scroll: ScrollContainer
+var character_slot_list: VBoxContainer
+var gender_change_confirmation: ConfirmationDialog
 var farm_audio: Node
 var audio_button: Button
 var voice_caption: Panel
@@ -1089,6 +1113,7 @@ func build_farmer() -> void:
     farmer.add_child(chosen_model)
     if chosen_model.initialize(avatar_gender, character_profile) and chosen_model.has_visible_avatar():
         farmer_visual = chosen_model
+        chosen_model.apply_equipment(clothing_equipped)
         for old_part in farmer.get_children():
             if old_part != farmer_visual:
                 old_part.visible = false
@@ -1934,6 +1959,9 @@ func build_ui() -> void:
     ui_top.add_child(money_label)
     bag_button = btn("กระเป๋า", show_bag, Color("#426d55"))
     ui_top.add_child(bag_button)
+    character_button = btn("เปลี่ยนตัวละคร", toggle_character_panel, Color("#547f78"))
+    character_button.name = "CharacterButton"
+    ui_top.add_child(character_button)
     # The bag button now uses its own imported transparent PNG icon layer.
     shop_button = btn("ร้านค้า", show_shop, Color("#ad7c53"))
     ui_top.add_child(shop_button)
@@ -2071,6 +2099,11 @@ func build_ui() -> void:
         decor_buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         shop_grid.add_child(decor_buy)
         shop_decor_buttons.append(decor_buy)
+    var ticket_for_sale: Button = btn("บัตรเปลี่ยนเพศ\n%d เหรียญ" % GENDER_CHANGE_CARD_PRICE, buy_gender_change_ticket, Color("#548780"))
+    ticket_for_sale.name = "GenderChangeCardForSale"
+    ticket_for_sale.custom_minimum_size = Vector2(145, 55)
+    ticket_for_sale.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    shop_grid.add_child(ticket_for_sale)
     shop_feed = btn("ซื้ออาหารหมู +5 (35 เหรียญ)", buy_feed, Color("#ad7c53"))
     shop_panel.add_child(shop_feed)
     shop_pen_button = btn("ขยายคอกหมู", buy_pen, Color("#7c985d"))
@@ -2211,6 +2244,35 @@ func build_ui() -> void:
     gm_female.name = "GMFemale"
     gm_panel.add_child(gm_female)
 
+    # Above the HUD, shop and bag. All equipment is changed inside this window.
+    character_panel = panel(Color("#e9f1e6fb"))
+    _skin_window(character_panel)
+    ui.add_child(character_panel)
+    character_panel.name = "CharacterWardrobe"
+    character_panel.visible = false
+    character_title = text_label("ตัวละคร • คลังเสื้อผ้า", 23, Color.WHITE)
+    character_title.add_theme_font_override("font", THAI_BOLD)
+    character_panel.add_child(character_title)
+    character_close = btn("ปิด", toggle_character_panel, Color("#bd9160"))
+    character_panel.add_child(character_close)
+    character_gender_label = text_label("", 17, Color("#ffefc6"))
+    character_panel.add_child(character_gender_label)
+    gender_item_button = btn("", request_gender_change, Color("#487f72"))
+    character_panel.add_child(gender_item_button)
+    character_scroll = ScrollContainer.new()
+    character_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    character_scroll.clip_contents = true
+    character_panel.add_child(character_scroll)
+    character_slot_list = VBoxContainer.new()
+    character_slot_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    character_slot_list.add_theme_constant_override("separation", 8)
+    character_scroll.add_child(character_slot_list)
+    gender_change_confirmation = ConfirmationDialog.new()
+    gender_change_confirmation.title = "ยืนยันใช้บัตรเปลี่ยนเพศ"
+    gender_change_confirmation.dialog_text = "ใช้บัตรเปลี่ยนเพศ 1 ใบหรือไม่?"
+    gender_change_confirmation.confirmed.connect(consume_gender_change_ticket)
+    ui.add_child(gender_change_confirmation)
+
     # PNG glyphs stay separate from PNG button bases and live labels.
     for entry in [
         [shop_button, "shop"], [bag_button, "bag"], [landscape_button, "tools"],
@@ -2255,17 +2317,19 @@ func update_sizes() -> void:
         set_box(title_label, 12, 5, 118, 30)
         set_box(ui_top.get_node("CoinIcon"), 132, 8, 24, 24)
         set_box(money_label, 158, 7, maxf(80.0, header_width-169.0), 27)
-        var button_w: float = (header_width-32.0)/3.0
-        set_box(bag_button, 9, 44, button_w, 39)
-        set_box(shop_button, 16+button_w, 44, button_w, 39)
-        set_box(feed_button, 23+2.0*button_w, 44, button_w, 39)
+        var button_w: float = (header_width-38.0)/4.0
+        set_box(bag_button, 8, 44, button_w, 39)
+        set_box(shop_button, 14+button_w, 44, button_w, 39)
+        set_box(feed_button, 20+2.0*button_w, 44, button_w, 39)
+        set_box(character_button, 26+3.0*button_w, 44, button_w, 39)
     else:
         set_box(title_label, 12, 12, 115, 30)
         set_box(ui_top.get_node("CoinIcon"), 131, 15, 24, 24)
-        set_box(money_label, 158, 13, 348, 30)
-        set_box(bag_button, 517, 8, 115, 43)
-        set_box(shop_button, 640, 8, 113, 43)
-        set_box(feed_button, 761, 8, 150, 43)
+        set_box(money_label, 158, 13, 246, 30)
+        set_box(bag_button, 413, 8, 101, 43)
+        set_box(shop_button, 518, 8, 101, 43)
+        set_box(feed_button, 623, 8, 126, 43)
+        set_box(character_button, 753, 8, 168, 43)
 
     # Small tool tray keeps the working 3D farm visible.
     var toolbar_width: float = minf(650.0, maxf(300.0, w-20.0))
@@ -2407,6 +2471,15 @@ func update_sizes() -> void:
     set_box(bag_export_button, 12, bag_height-54.0, backup_button_width, 41)
     set_box(bag_import_button, 24.0+backup_button_width, bag_height-54.0, backup_button_width, 41)
     bag_grid.columns = 3 if bag_width >= 345.0 else 2
+    if character_panel != null:
+        var character_w: float = minf(w-20.0, 590.0)
+        var character_h: float = minf(h-20.0, 575.0)
+        set_box(character_panel, (w-character_w)*0.5, (h-character_h)*0.5, character_w, character_h)
+        set_box(character_title, 17, 12, character_w-108, 36)
+        set_box(character_close, character_w-83, 10, 68, 37)
+        set_box(character_gender_label, 17, 56, character_w-34, 28)
+        set_box(gender_item_button, 17, 91, character_w-34, 49)
+        set_box(character_scroll, 15, 149, character_w-30, maxf(50.0, character_h-164))
     for card in bag_cards:
         card.custom_minimum_size = Vector2(95.0, 119.0)
     _fit_all_ui_text()
@@ -2417,6 +2490,8 @@ func point_on_ui(pos: Vector2) -> bool:
     for panel_node in [ui_top,ui_bottom,tool_menu_toggle_button,save_chip,stick_label,voice_caption]:
         if panel_node != null and panel_node.is_visible_in_tree() and panel_node.get_global_rect().has_point(pos):
             return true
+    if character_panel != null and character_panel.is_visible_in_tree() and character_panel.get_global_rect().has_point(pos):
+        return true
     if GM_TEST_MODE and gm_button != null and gm_button.visible and gm_button.get_global_rect().has_point(pos):
         return true
     if touch_controls:
@@ -2508,6 +2583,8 @@ func refresh_labels() -> void:
     else:
         money_label.text = "เงิน %d | คอก %d/%d | หมู %d/%d | อาหาร %d" % [coins, pens, MAX_PENS, pigs, pens*PEN_CAPACITY, feed]
     money_label.add_theme_font_size_override("font_size", 16)
+    if character_panel != null and character_panel.visible:
+        refresh_character_panel()
     if shop_livestock_label != null:
         shop_livestock_label.text = "คอก %d/%d  |  หมู %d/%d ตัว" % [pens, MAX_PENS, pigs, pens*PEN_CAPACITY]
         shop_pen_button.text = "ขยายคอกหมู +1 (ราคา %d เหรียญ)" % pen_price() if pens < MAX_PENS else "คอกเต็มแล้ว (%d คอก)" % MAX_PENS
@@ -2645,15 +2722,181 @@ func toggle_run() -> void:
     run_button.modulate = Color.WHITE if run_toggle else Color("#aeb9a8")
 
 func show_bag() -> void:
+    if character_panel != null:
+        character_panel.visible = false
     if shop_panel.visible:
         shop_panel.visible = false
     bag_panel.visible = not bag_panel.visible
     refresh_bag_cards()
 
 func show_shop() -> void:
+    if character_panel != null:
+        character_panel.visible = false
     if bag_panel != null:
         bag_panel.visible = false
     shop_panel.visible = not shop_panel.visible
+
+
+# The character button opens the item-gated gender switch and modular slots.
+func toggle_character_panel() -> void:
+    if character_panel == null:
+        return
+    var should_open: bool = not character_panel.visible
+    character_panel.visible = should_open
+    if should_open:
+        if bag_panel != null:
+            bag_panel.visible = false
+        if shop_panel != null:
+            shop_panel.visible = false
+        if gm_panel != null:
+            gm_panel.visible = false
+        refresh_character_panel()
+
+func refresh_character_panel() -> void:
+    if character_panel == null or character_slot_list == null:
+        return
+    character_gender_label.text = "เพศปัจจุบัน: %s  |  ช่องเสื้อผ้าแยกชิ้น" % ("ผู้ชาย" if avatar_gender == "male" else "ผู้หญิง")
+    gender_item_button.text = "ใช้บัตรเปลี่ยนเพศ  ×%d  (ซื้อในร้านค้า %d เหรียญ)" % [gender_change_tickets, GENDER_CHANGE_CARD_PRICE]
+    gender_item_button.disabled = gender_change_tickets < 1 or work_plot >= 0
+    for previous in character_slot_list.get_children():
+        character_slot_list.remove_child(previous)
+        previous.queue_free()
+    var heading: Label = text_label("ช่องสวมใส่ — แตะไอเทมเพื่อใส่ทีละชิ้น", 18, Color("#264b37"))
+    heading.add_theme_font_override("font", THAI_BOLD)
+    character_slot_list.add_child(heading)
+    for slot in CLOTHING_SLOTS:
+        var row: HBoxContainer = HBoxContainer.new()
+        row.add_theme_constant_override("separation", 5)
+        character_slot_list.add_child(row)
+        var equipped_id: String = str(clothing_equipped.get(slot, ""))
+        var worn_name: String = str(CLOTHING_CATALOG.get(equipped_id, {}).get("name", "ว่าง"))
+        var slot_text: Label = text_label("%s: %s" % [CLOTHING_SLOT_NAMES[slot], worn_name], 17, Color("#2b523e"))
+        slot_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        row.add_child(slot_text)
+        if not equipped_id.is_empty():
+            var take_off: Button = btn("ถอด", unequip_clothing.bind(slot), Color("#987b62"))
+            take_off.custom_minimum_size = Vector2(79, 38)
+            row.add_child(take_off)
+        var found_for_slot: bool = false
+        for item_id in CLOTHING_CATALOG.keys():
+            var entry: Dictionary = CLOTHING_CATALOG[item_id]
+            if str(entry["slot"]) != slot or int(clothing_owned.get(item_id, 0)) < 1:
+                continue
+            found_for_slot = true
+            var item_button: Button = btn("   %s  ×%d%s" % [
+                str(entry["name"]), int(clothing_owned[item_id]),
+                "  ✓ สวมแล้ว" if equipped_id == item_id else "  • แตะเพื่อสวม"
+            ], equip_clothing.bind(item_id), Color("#578878"))
+            item_button.custom_minimum_size = Vector2(190, 42)
+            item_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+            item_button.disabled = str(entry["gender"]) != avatar_gender or equipped_id == item_id
+            character_slot_list.add_child(item_button)
+            if str(entry["gender"]) != avatar_gender:
+                item_button.tooltip_text = "ไอเทมสำหรับตัวละครหญิงเท่านั้น"
+        if not found_for_slot:
+            var no_asset: Label = text_label("   ยังไม่มีชิ้นส่วนโมเดลสำหรับช่องนี้", 15, Color("#627566"))
+            character_slot_list.add_child(no_asset)
+    var note: Label = text_label("ชุดเริ่มต้นฝังใน BaseBody • ไอเทมแยกที่มีจริงตอนนี้คือรองเท้าผู้หญิง 2 คู่", 15, Color("#445849"))
+    note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    character_slot_list.add_child(note)
+
+func equip_clothing(item_id: String) -> void:
+    if not CLOTHING_CATALOG.has(item_id) or int(clothing_owned.get(item_id, 0)) < 1:
+        return
+    var data: Dictionary = CLOTHING_CATALOG[item_id]
+    if str(data["gender"]) != avatar_gender:
+        message = "ไอเทมชิ้นนี้ใช้กับเพศปัจจุบันไม่ได้"
+        refresh_labels()
+        return
+    var slot: String = str(data["slot"])
+    clothing_equipped[slot] = item_id
+    if farmer_visual != null and farmer_visual.has_method("apply_equipment"):
+        farmer_visual.apply_equipment(clothing_equipped)
+    message = "สวม%sแล้ว" % str(data["name"])
+    save_game()
+    refresh_labels()
+
+func unequip_clothing(slot: String) -> void:
+    if not CLOTHING_SLOTS.has(slot) or not clothing_equipped.has(slot):
+        return
+    clothing_equipped.erase(slot)
+    if farmer_visual != null and farmer_visual.has_method("apply_equipment"):
+        farmer_visual.apply_equipment(clothing_equipped)
+    message = "ถอด%sแล้ว" % str(CLOTHING_SLOT_NAMES[slot])
+    save_game()
+    refresh_labels()
+
+func buy_gender_change_ticket() -> void:
+    if coins < GENDER_CHANGE_CARD_PRICE:
+        message = "เหรียญไม่พอซื้อบัตรเปลี่ยนเพศ"
+    elif gender_change_tickets >= 999:
+        message = "บัตรเปลี่ยนเพศเต็มกระเป๋าแล้ว"
+    else:
+        coins -= GENDER_CHANGE_CARD_PRICE
+        gender_change_tickets += 1
+        message = "ซื้อบัตรเปลี่ยนเพศแล้ว! กดปุ่มเปลี่ยนตัวละครเพื่อใช้"
+        save_game()
+        if shop_panel != null:
+            shop_panel.visible = false
+    refresh_labels()
+
+func request_gender_change() -> void:
+    if gender_change_tickets < 1:
+        message = "ต้องมีบัตรเปลี่ยนเพศก่อน ซื้อได้ในร้านค้า"
+        refresh_labels()
+        return
+    if work_plot >= 0:
+        message = "ทำฟาร์มให้เสร็จก่อนเปลี่ยนเพศ"
+        refresh_labels()
+        return
+    if gender_change_confirmation != null:
+        var target_name: String = "ผู้ชาย" if avatar_gender == "female" else "ผู้หญิง"
+        gender_change_confirmation.dialog_text = "ใช้บัตรเปลี่ยนเพศ 1 ใบ เพื่อเปลี่ยนเป็น%s?\nไอเทมเสื้อผ้าจะอยู่ในคลังเดิม แต่ชิ้นที่ใส่ไม่ได้จะถูกถอดออก" % target_name
+        gender_change_confirmation.popup_centered()
+
+func consume_gender_change_ticket() -> void:
+    # Gate the actual mutation again, not only the button/menu callback.
+    if gender_change_tickets < 1 or work_plot >= 0:
+        return
+    var target_gender: String = "male" if avatar_gender == "female" else "female"
+    var previous_gender: String = avatar_gender
+    var old_profile: Dictionary = character_profile.duplicate(true)
+    var old_equipment: Dictionary = clothing_equipped.duplicate(true)
+    var previous_preview: String = test_avatar_gender
+    var previous_original: Dictionary = original_locked_profile.duplicate(true)
+    avatar_gender = target_gender
+    character_profile["sex"] = target_gender
+    character_profile["locked"] = true
+    # A ticket makes the change permanent, even when the page was in test mode.
+    test_avatar_gender = ""
+    original_locked_profile.clear()
+    if target_gender != "female":
+        clothing_equipped.erase("shoes")
+    gender_change_tickets -= 1
+    if not save_game():
+        avatar_gender = previous_gender
+        character_profile = old_profile
+        clothing_equipped = old_equipment
+        test_avatar_gender = previous_preview
+        original_locked_profile = previous_original
+        gender_change_tickets += 1
+        message = "บันทึกเซฟไม่สำเร็จ จึงยังไม่ได้ใช้บัตร"
+        refresh_labels()
+        return
+    var last_position: Vector3 = farmer.position
+    var last_rotation: Vector3 = farmer.rotation
+    farmer.queue_free()
+    farmer_visual = null
+    build_farmer()
+    farmer.position = last_position
+    farmer.rotation = last_rotation
+    if OS.has_feature("web"):
+        # The character-creation lock must follow the item-confirmed change,
+        # otherwise reloading the page silently changes the gender back.
+        var saved_json: String = JSON.stringify(character_profile)
+        JavaScriptBridge.eval("window.localStorage.setItem('farmflex_character_v1'," + JSON.stringify(saved_json) + ")", true)
+    message = "ใช้บัตรเปลี่ยนเพศสำเร็จ เป็น%sแล้ว" % ("ผู้ชาย" if avatar_gender == "male" else "ผู้หญิง")
+    refresh_labels()
 
 func buy_plot_kit() -> void:
     if coins < PLOT_KIT_PRICE:
@@ -2872,6 +3115,9 @@ func snapshot() -> Dictionary:
         # Never overwrite a player's committed avatar choice during previews.
         "avatar_gender": str(original_locked_profile.get("sex", avatar_gender)) if not test_avatar_gender.is_empty() else avatar_gender,
         "character_profile": original_locked_profile.duplicate(true) if not test_avatar_gender.is_empty() else character_profile.duplicate(true),
+        "gender_change_tickets": gender_change_tickets,
+        "clothing_owned": clothing_owned.duplicate(true),
+        "clothing_equipped": clothing_equipped.duplicate(true),
         "feed": feed,
         "pigs": pigs,
         "pens": pens,
@@ -2894,15 +3140,23 @@ func _apply_snapshot(state: Dictionary) -> void:
     coins = int(state["coins"])
     produce = state.get("produce", [0,0,0,0,0,0]).duplicate()
     var restored_gender: String = str(state.get("avatar_gender", "female"))
-    if farmer != null and avatar_gender != restored_gender:
-        var old_position: Vector3 = farmer.position
-        farmer.queue_free()
-        farmer_visual = null
-        avatar_gender = restored_gender
-        build_farmer()
-        farmer.position = old_position
+    var previous_gender: String = avatar_gender
     avatar_gender = restored_gender
     character_profile = state.get("character_profile", {}).duplicate(true)
+    gender_change_tickets = int(state.get("gender_change_tickets", 0))
+    clothing_owned = state.get("clothing_owned", {"female_survivor_shoes": 1, "female_martial_shoes": 1}).duplicate(true)
+    clothing_equipped = state.get("clothing_equipped", {}).duplicate(true)
+    if farmer != null:
+        if previous_gender != restored_gender:
+            var old_position: Vector3 = farmer.position
+            var old_rotation: Vector3 = farmer.rotation
+            farmer.queue_free()
+            farmer_visual = null
+            build_farmer()
+            farmer.position = old_position
+            farmer.rotation = old_rotation
+        elif farmer_visual != null and farmer_visual.has_method("apply_equipment"):
+            farmer_visual.apply_equipment(clothing_equipped)
     feed = int(state["feed"])
     pigs = int(state["pigs"])
     pens = int(state["pens"])
