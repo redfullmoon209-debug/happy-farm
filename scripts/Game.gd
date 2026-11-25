@@ -10,6 +10,7 @@ const EQUIPMENT_THUMBNAIL = preload("res://scripts/EquipmentThumbnail.gd")
 const ITEM_ICONS = preload("res://scripts/FarmItemIcons.gd")
 const FARM_AUDIO = preload("res://scripts/FarmAudio.gd")
 const GARDEN_DECOR = preload("res://scripts/GardenDecor.gd")
+const GM_PROPS = preload("res://scripts/GMProps.gd")
 # Each visual element is imported from a standalone transparent PNG.
 # Text remains live Godot text for crisp rendering and future localization.
 const UI_BUTTON: Texture2D = preload("res://assets/ui/farmflex_cream/cream_button.png")
@@ -102,7 +103,9 @@ const DECOR_PRICES = [110, 35, 45, 120, 600, 175, 80, 45, 220, 320, 35, 25, 70, 
 const DECOR_RADII = [1.1, 0.7, 0.9, 0.9, 2.1, 1.0, 0.7, 1.1, 1.8, 1.6, 1.1, 0.9, 0.7, 2.8, 1.5, 0.8]
 # Temporary browser playtest only. Set false AND remove the GM tool before launch.
 # Client-side currency is not secure for real-money or competitive economies.
-var GM_TEST_MODE: bool = not OS.has_feature("web")
+# Browser GM preview is intentionally an INSECURE single-player debug gate.
+# Never use a URL parameter as authentication on a production shared server.
+var GM_TEST_MODE: bool = not OS.has_feature("web") or str(JavaScriptBridge.eval("(new URLSearchParams(window.location.search)).get('gmtest')", true)) == "1"
 # Close enough to inspect the farmer; wide enough for all 10 x 5 beds.
 # Every zoom input uses the same limits (orthographic size is derived below).
 const CAMERA_ZOOM_MIN: float = 6.0
@@ -158,6 +161,13 @@ var pending_zone_id: int = -1
 var decor_kits: Array = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 var selected_decor: int = 0
 var placed_decor_data: Array = []
+var gm_placed_props: Array = []
+var gm_prop_nodes: Array[Node3D] = []
+var gm_selected_asset: String = ""
+var gm_build_mode: String = ""
+var gm_target_index: int = -1
+var gm_rotation_deg: float = 0.0
+var gm_scale_value: float = 1.0
 var decor_nodes: Array[Node3D] = []
 var placement_preview: MeshInstance3D
 var landscaping_mode: bool = false
@@ -234,6 +244,19 @@ var gm_panel: Panel
 var gm_title: Label
 var gm_coin_input: SpinBox
 var gm_level_input: SpinBox
+var gm_build_panel: Panel
+var gm_build_title: Label
+var gm_build_description: Label
+var gm_build_scroll: ScrollContainer
+var gm_build_grid: GridContainer
+var gm_build_category_buttons: Dictionary = {}
+var gm_build_item_buttons: Dictionary = {}
+var gm_build_category: String = "trees"
+var gm_build_mode_buttons: Dictionary = {}
+var gm_build_scale: SpinBox
+var gm_build_rotate: SpinBox
+var gm_build_open_button: Button
+var gm_build_close_button: Button
 var land_confirm: ConfirmationDialog
 var run_button: Button
 var jump_button: Button
