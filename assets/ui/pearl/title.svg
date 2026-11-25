@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="64" viewBox="0 0 360 64"><defs>
+<linearGradient id="base" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff9f3"/><stop offset=".48" stop-color="#f3e8e1"/><stop offset="1" stop-color="#dfd0c8"/></linearGradient>
+<linearGradient id="glass" x1="0" y1="0" x2=".9" y2="1"><stop stop-color="#ffffff" stop-opacity=".80"/><stop offset=".50" stop-color="#e9dcd7" stop-opacity=".66"/><stop offset="1" stop-color="#cfbeb6" stop-opacity=".82"/></linearGradient>
+<linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff8e2"/><stop offset=".45" stop-color="#d9b885"/><stop offset=".8" stop-color="#ac8c6a"/><stop offset="1" stop-color="#f7e8ca"/></linearGradient>
+<radialGradient id="mist"><stop stop-color="#fffdfa" stop-opacity=".90"/><stop offset=".62" stop-color="#f6e7db" stop-opacity=".55"/><stop offset="1" stop-color="#dcc8bc" stop-opacity=".18"/></radialGradient>
+</defs><rect x="1" y="6" width="358" height="52" rx="9" fill="url(#glass)" stroke="#fdf7ed" stroke-opacity=".55" stroke-width="1.7"/><path d="M18 16H342" stroke="#d8bb91" stroke-width="1" stroke-opacity=".33"/></svg>
