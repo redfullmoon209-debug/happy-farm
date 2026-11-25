@@ -36,14 +36,38 @@ func _check() -> void:
             problems.append("farm produce not displayed as item in right sale inventory")
         else:
             farm._select_shop_sale_slot(0)
-            if farm.shop_sell_one_button.disabled:
-                problems.append("selected sellable produce did not enable sell button")
-            farm._sell_selected_shop_item()
+            if not farm.shop_trade_panel.visible or farm.shop_trade_confirm.text != "ยืนยันขาย":
+                problems.append("tapping sale item did not show details and confirmation")
+            if int(farm.produce[0]) != 3 or farm.coins != money_before_sale:
+                problems.append("tapping sale item sold it without confirmation")
+            farm._cancel_shop_trade()
+            if int(farm.produce[0]) != 3 or farm.coins != money_before_sale:
+                problems.append("cancelling sale modified currency or produce")
+            farm._request_sell_selected()
+            farm._confirm_shop_trade()
             if int(farm.produce[0]) != 2 or farm.coins != money_before_sale + crop_value:
-                problems.append("selling one produce did not exchange exactly one item for its configured coins")
-            farm.sell_produce()
+                problems.append("confirmed sale did not exchange one item for configured coins")
+            farm._request_sell_all()
+            if int(farm.produce[0]) != 2:
+                problems.append("request to sell all mutated items before confirmation")
+            farm._confirm_shop_trade()
             if int(farm.produce[0]) != 0 or farm.coins != money_before_sale + 3 * crop_value:
-                problems.append("selling all produce did not exchange remaining items at configured price")
+                problems.append("confirmed sell-all did not exchange remaining items at configured price")
+            # Purchases also require an explicit confirmation.
+            var money_before_buy: int = farm.coins
+            var seeds_before_buy: int = int(farm.seeds[0])
+            farm._request_shop_buy("seed", 0)
+            if not farm.shop_trade_panel.visible or farm.shop_trade_confirm.text != "ยืนยันซื้อ":
+                problems.append("tapping store item did not show purchase detail overlay")
+            if farm.coins != money_before_buy or int(farm.seeds[0]) != seeds_before_buy:
+                problems.append("tapping shop item purchased without confirmation")
+            farm._cancel_shop_trade()
+            if farm.coins != money_before_buy or int(farm.seeds[0]) != seeds_before_buy:
+                problems.append("cancelling purchase modified inventory or money")
+            farm._request_shop_buy("seed", 0)
+            farm._confirm_shop_trade()
+            if farm.coins != money_before_buy - int(farm.CROPS[0]["price"]) or int(farm.seeds[0]) != seeds_before_buy + 1:
+                problems.append("confirmed store purchase did not deduct exact price or grant seed")
 
     if not farm.touch_controls or not farm.stick.is_visible_in_tree():
         problems.append("joystick must be visible automatically on PC web")
