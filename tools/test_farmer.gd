@@ -39,6 +39,11 @@ func _check() -> void:
             ):
                 problems.append("shoe subcategory displays other equipment")
         farm._set_shop_clothing_slot("all")
+        for child in farm.shop_grid.get_children():
+            if child is Button and child.visible and child.name.begins_with("BuyWardrobe_"):
+                var shop_item_id: String = str(child.name).trim_prefix("BuyWardrobe_")
+                if not shop_item_id.begins_with(farm.avatar_gender + "_"):
+                    problems.append("clothing page displays items for the wrong gender")
         var square_cell: StyleBoxFlat = farm.shop_sell_cards[0].get_theme_stylebox("normal") as StyleBoxFlat
         if square_cell == null or square_cell.corner_radius_top_left != 0 or square_cell.corner_radius_top_right != 0:
             problems.append("shop inventory cells are not flat right-angled squares")
