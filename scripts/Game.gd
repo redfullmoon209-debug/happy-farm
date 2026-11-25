@@ -268,6 +268,13 @@ var shop_sell_selected: int = -1
 var shop_sell_detail: Label
 var shop_sell_one_button: Button
 var shop_buy_information: Label
+var shop_trade_panel: Panel
+var shop_trade_title: Label
+var shop_trade_details: Label
+var shop_trade_icon: TextureRect
+var shop_trade_confirm: Button
+var shop_trade_cancel: Button
+var shop_pending_trade: Dictionary = {}
 var shop_livestock_label: Label
 var shop_pen_button: Button
 var shop_pig_button: Button
@@ -2214,9 +2221,9 @@ func build_ui() -> void:
     shop_sell_detail = text_label("เลือกผลผลิตทางขวาเพื่อขายแลกเหรียญ", 14, Color("#624b39"))
     shop_sell_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     shop_panel.add_child(shop_sell_detail)
-    shop_sell_one_button = btn("ขาย 1 ชิ้น", _sell_selected_shop_item, Color("#ad7c53"))
+    shop_sell_one_button = btn("ขาย 1 ชิ้น", _request_sell_selected, Color("#ad7c53"))
     shop_panel.add_child(shop_sell_one_button)
-    sell_button = btn("ขายผลผลิตทั้งหมด", sell_produce, Color("#ad7c53"))
+    sell_button = btn("ขายผลผลิตทั้งหมด", _request_sell_all, Color("#ad7c53"))
     shop_panel.add_child(sell_button)
     # Earn coins from farm produce, then buy each individual gear piece.
     # These test pieces use new generated modular 3D meshes; default GLB
@@ -2225,7 +2232,7 @@ func build_ui() -> void:
     for item_id in WARDROBE.available_item_ids():
         var gear_data: Dictionary = CLOTHING_CATALOG[item_id]
         var price: int = WARDROBE.shop_price(item_id)
-        var wardrobe_buy: Button = btn("%s\n%d เหรียญ" % [str(gear_data["name"]), price], buy_clothing.bind(item_id))
+        var wardrobe_buy: Button = btn("%s\n%d เหรียญ" % [str(gear_data["name"]), price], _request_shop_buy.bind("clothing", item_id))
         wardrobe_buy.name = "BuyWardrobe_" + item_id
         shop_wardrobe_buttons[item_id] = wardrobe_buy
         wardrobe_buy.custom_minimum_size = Vector2(145, 55)
@@ -2233,27 +2240,27 @@ func build_ui() -> void:
         wardrobe_buy.tooltip_text = "ซื้อด้วยเงินจากการทำฟาร์ม • สวมทีละชิ้นในกระเป๋า"
         shop_grid.add_child(wardrobe_buy)
     for i in range(CROPS.size()):
-        var buy: Button = btn("%s\n%d เหรียญ" % [CROPS[i]["name"], CROPS[i]["price"]], buy_seed.bind(i))
+        var buy: Button = btn("%s\n%d เหรียญ" % [CROPS[i]["name"], CROPS[i]["price"]], _request_shop_buy.bind("seed", i))
         buy.custom_minimum_size = Vector2(145, 55)
         buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         shop_grid.add_child(buy)
-    shop_plot_button = btn("ชุดแปลงปลูก\n75 เหรียญ", buy_plot_kit, Color("#5d9d75"))
+    shop_plot_button = btn("ชุดแปลงปลูก\n75 เหรียญ", _request_shop_buy.bind("plot", 0), Color("#5d9d75"))
     shop_plot_button.custom_minimum_size = Vector2(145, 55)
     shop_plot_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     shop_grid.add_child(shop_plot_button)
     for i in range(TREE_VARIANTS.size()):
-        var tree_buy: Button = btn("ต้น%s\n%d เหรียญ" % [TREE_NAMES[i], TREE_PRICES[i]], buy_tree_kit.bind(i), Color("#568768"))
+        var tree_buy: Button = btn("ต้น%s\n%d เหรียญ" % [TREE_NAMES[i], TREE_PRICES[i]], _request_shop_buy.bind("tree", i), Color("#568768"))
         tree_buy.custom_minimum_size = Vector2(145, 55)
         tree_buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         shop_grid.add_child(tree_buy)
         shop_tree_buttons.append(tree_buy)
     for i in range(DECOR_NAMES.size()):
-        var decor_buy: Button = btn("%s\n%d เหรียญ" % [DECOR_NAMES[i], DECOR_PRICES[i]], buy_decor_kit.bind(i), Color("#7e9070"))
+        var decor_buy: Button = btn("%s\n%d เหรียญ" % [DECOR_NAMES[i], DECOR_PRICES[i]], _request_shop_buy.bind("decor", i), Color("#7e9070"))
         decor_buy.custom_minimum_size = Vector2(145, 55)
         decor_buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         shop_grid.add_child(decor_buy)
         shop_decor_buttons.append(decor_buy)
-    var ticket_for_sale: Button = btn("บัตรเปลี่ยนเพศ\n%d เหรียญ" % GENDER_CHANGE_CARD_PRICE, buy_gender_change_ticket, Color("#548780"))
+    var ticket_for_sale: Button = btn("บัตรเปลี่ยนเพศ\n%d เหรียญ" % GENDER_CHANGE_CARD_PRICE, _request_shop_buy.bind("gender", 0), Color("#548780"))
     ticket_for_sale.name = "GenderChangeCardForSale"
     ticket_for_sale.custom_minimum_size = Vector2(145, 55)
     ticket_for_sale.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2267,12 +2274,35 @@ func build_ui() -> void:
             shop_item_card.clip_text = true
             shop_item_card.add_theme_font_size_override("font_size", 11)
             _metal_button_skin(shop_item_card, USER_INV_SLOT)
-    shop_feed = btn("ซื้ออาหารหมู +5 (35 เหรียญ)", buy_feed, Color("#ad7c53"))
+    shop_feed = btn("ซื้ออาหารหมู +5 (35 เหรียญ)", _request_shop_buy.bind("feed", 0), Color("#ad7c53"))
     shop_panel.add_child(shop_feed)
-    shop_pen_button = btn("ขยายคอกหมู", buy_pen, Color("#7c985d"))
+    shop_pen_button = btn("ขยายคอกหมู", _request_shop_buy.bind("pen", 0), Color("#7c985d"))
     shop_panel.add_child(shop_pen_button)
-    shop_pig_button = btn("ซื้อลูกหมู", buy_pig, Color("#bb7c91"))
+    shop_pig_button = btn("ซื้อลูกหมู", _request_shop_buy.bind("pig", 0), Color("#bb7c91"))
     shop_panel.add_child(shop_pig_button)
+    # Shared detail/confirmation overlay: no trading on the initial item tap.
+    shop_trade_panel = panel(Color("#f6efe3f8"))
+    shop_trade_panel.name = "ShopTradeConfirmation"
+    shop_trade_panel.z_index = 35
+    shop_trade_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+    shop_trade_panel.visible = false
+    shop_panel.add_child(shop_trade_panel)
+    shop_trade_title = text_label("", 20, Color("#624b39"))
+    shop_trade_title.add_theme_font_override("font", THAI_BOLD)
+    shop_trade_panel.add_child(shop_trade_title)
+    shop_trade_details = text_label("", 16, Color("#624b39"))
+    shop_trade_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    shop_trade_panel.add_child(shop_trade_details)
+    shop_trade_icon = TextureRect.new()
+    shop_trade_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    shop_trade_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    shop_trade_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    shop_trade_panel.add_child(shop_trade_icon)
+    shop_trade_confirm = btn("ยืนยัน", _confirm_shop_trade, Color("#64896b"))
+    shop_trade_confirm.name = "ConfirmShopTrade"
+    shop_trade_panel.add_child(shop_trade_confirm)
+    shop_trade_cancel = btn("ยกเลิก", _cancel_shop_trade, Color("#897d70"))
+    shop_trade_panel.add_child(shop_trade_cancel)
 
     # Dedicated seed inventory in the left-side area shown in the reference.
     # The panel is a fixed-size Panel, not a PanelContainer; it cannot grow.
@@ -2665,6 +2695,15 @@ func update_sizes() -> void:
     set_box(shop_feed, shop_left_x, shop_h-78.0, extra_width, 62.0)
     set_box(shop_pen_button, shop_left_x+extra_width+6.0, shop_h-78.0, extra_width, 62.0)
     set_box(shop_pig_button, shop_left_x+2.0*(extra_width+6.0), shop_h-78.0, extra_width, 62.0)
+    var trade_w: float = minf(390.0, shop_w-24.0)
+    var trade_h: float = minf(250.0, shop_h-24.0)
+    set_box(shop_trade_panel, (shop_w-trade_w)*0.5, (shop_h-trade_h)*0.5, trade_w, trade_h)
+    set_box(shop_trade_title, 14, 12, trade_w-28.0, 30)
+    set_box(shop_trade_icon, 15, 53, 68, 68)
+    set_box(shop_trade_details, 92, 49, trade_w-106.0, trade_h-111.0)
+    var trade_button_w: float = (trade_w-42.0)*0.5
+    set_box(shop_trade_confirm, 14, trade_h-57.0, trade_button_w, 42)
+    set_box(shop_trade_cancel, 28+trade_button_w, trade_h-57.0, trade_button_w, 42)
 
     # On narrow screens the badge sits below the header.
     var badge_y: float = 8.0 if w > 960.0 else header_height+15.0
