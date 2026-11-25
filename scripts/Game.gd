@@ -2774,7 +2774,7 @@ func update_sizes() -> void:
     set_box(shop_trade_icon, 15, 53, 76, 76)
     set_box(shop_trade_details, 101, 42, trade_w-115.0, trade_h-111.0)
     set_box(shop_trade_quantity, 15, trade_h-105.0, 90, 37)
-    var trade_button_w:  = (trade_w-42.0)*0.5
+    var trade_button_w: float = (trade_w-42.0)*0.5
     set_box(shop_trade_confirm, 14, trade_h-57.0, trade_button_w, 42)
     set_box(shop_trade_cancel, 28+trade_button_w, trade_h-57.0, trade_button_w, 42)
 
