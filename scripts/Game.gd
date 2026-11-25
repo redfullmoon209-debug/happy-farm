@@ -2500,6 +2500,67 @@ func build_ui() -> void:
     var gm_close: Button = btn("ปิด", toggle_gm_panel, Color("#7c8880"))
     gm_close.name = "GMClose"
     gm_panel.add_child(gm_close)
+    gm_build_open_button = btn("ปลูกสร้าง • FBX", toggle_gm_construction, Color("#89745c"))
+    gm_build_open_button.name = "GMConstruction"
+    gm_panel.add_child(gm_build_open_button)
+    # Asset chooser is separate from the small existing GM currency panel.
+    gm_build_panel = panel(Color("#f4efe9"))
+    gm_build_panel.name = "GMConstructionPanel"
+    gm_build_panel.visible = false
+    gm_build_panel.z_index = 32
+    ui.add_child(gm_build_panel)
+    gm_build_title = text_label("GM • ปลูกสร้าง", 20, Color("#624b39"))
+    gm_build_title.add_theme_font_override("font", THAI_BOLD)
+    gm_build_panel.add_child(gm_build_title)
+    gm_build_close_button = btn("ปิด", toggle_gm_construction)
+    gm_build_panel.add_child(gm_build_close_button)
+    gm_build_description = text_label("เลือกหมวดและโมเดล → แตะพื้นเพื่อวาง", 15, Color("#624b39"))
+    gm_build_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    gm_build_panel.add_child(gm_build_description)
+    for group_id in ["trees", "bushes", "flowers", "rocks", "paths"]:
+        var group_tab: Button = btn(str(GM_PROPS.GROUP_LABELS[group_id]), _gm_select_category.bind(group_id))
+        group_tab.name = "GMCategory_" + group_id
+        gm_build_panel.add_child(group_tab)
+        gm_build_category_buttons[group_id] = group_tab
+    gm_build_scroll = ScrollContainer.new()
+    gm_build_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    gm_build_panel.add_child(gm_build_scroll)
+    gm_build_grid = GridContainer.new()
+    gm_build_grid.columns = 3
+    gm_build_grid.add_theme_constant_override("h_separation", 5)
+    gm_build_grid.add_theme_constant_override("v_separation", 5)
+    gm_build_scroll.add_child(gm_build_grid)
+    for group_id in ["trees", "bushes", "flowers", "rocks", "paths"]:
+        for basename in GM_PROPS.GROUPS[group_id]:
+            var asset_name: String = str(basename)
+            var model_btn: Button = btn(asset_name.replace("_", " "), _gm_select_asset.bind(asset_name))
+            model_btn.name = "GMProp_" + asset_name
+            model_btn.custom_minimum_size = Vector2(90, 43)
+            model_btn.tooltip_text = asset_name + ".fbx"
+            gm_build_grid.add_child(model_btn)
+            gm_build_item_buttons[asset_name] = model_btn
+    for mode in ["place", "move", "rotate", "delete"]:
+        var label_text: String = {
+            "place": "วาง", "move": "ย้าย", "rotate": "หมุน +15°", "delete": "ลบ"
+        }[mode]
+        var action_btn: Button = btn(label_text, _gm_set_build_mode.bind(mode))
+        action_btn.name = "GMBuild_" + mode
+        gm_build_panel.add_child(action_btn)
+        gm_build_mode_buttons[mode] = action_btn
+    gm_build_scale = SpinBox.new()
+    gm_build_scale.min_value = 0.1
+    gm_build_scale.max_value = 10.0
+    gm_build_scale.step = 0.1
+    gm_build_scale.value = 1.0
+    gm_build_scale.value_changed.connect(_gm_scale_changed)
+    gm_build_panel.add_child(gm_build_scale)
+    gm_build_rotate = SpinBox.new()
+    gm_build_rotate.min_value = -360.0
+    gm_build_rotate.max_value = 360.0
+    gm_build_rotate.step = 15.0
+    gm_build_rotate.value_changed.connect(_gm_rotation_changed)
+    gm_build_panel.add_child(gm_build_rotate)
+    _gm_select_category("trees")
     for entry in [[1000, "+1,000 เหรียญ"],[10000, "+10,000 เหรียญ"],[100000, "+100,000 เหรียญ"]]:
         var amount: int = int(entry[0])
         var add_coins: Button = btn(str(entry[1]), gm_grant_coins.bind(amount), Color("#4f9b70"))
@@ -2526,6 +2587,7 @@ func build_ui() -> void:
     restore_confirm.visibility_changed.connect(_reset_camera_input)
     land_confirm.visibility_changed.connect(_reset_camera_input)
     gm_panel.visibility_changed.connect(_reset_camera_input)
+    gm_build_panel.visibility_changed.connect(_reset_camera_input)
     gm_coin_input = SpinBox.new()
     gm_coin_input.max_value = 1000000000
     gm_coin_input.step = 1
@@ -2856,6 +2918,25 @@ func update_sizes() -> void:
     set_box(gm_panel.get_node("GMMax"), 17+half, 60+3*gm_row, half, gm_row-4)
     set_box(gm_panel.get_node("GMMale"), 13, 60+4*gm_row, half, gm_row-4)
     set_box(gm_panel.get_node("GMFemale"), 17+half, 60+4*gm_row, half, gm_row-4)
+    set_box(gm_build_open_button, 13, gm_height-46.0, gm_width-26.0, 35.0)
+    var construct_w: float = minf(w-24.0, 720.0)
+    var construct_h: float = minf(h-24.0, 590.0)
+    set_box(gm_build_panel, (w-construct_w)*0.5, (h-construct_h)*0.5, construct_w, construct_h)
+    set_box(gm_build_title, 12, 9, construct_w-98.0, 33)
+    set_box(gm_build_close_button, construct_w-85.0, 8, 73, 37)
+    var cat_width: float = (construct_w-24.0)/5.0
+    var cat_order: Array[String] = ["trees", "bushes", "flowers", "rocks", "paths"]
+    for tab_i in range(cat_order.size()):
+        set_box(gm_build_category_buttons[cat_order[tab_i]], 11.0+float(tab_i)*cat_width, 53.0, cat_width-4.0, 34.0)
+    set_box(gm_build_scroll, 10.0, 94.0, construct_w-20.0, maxf(55.0, construct_h-221.0))
+    gm_build_grid.columns = 5 if construct_w > 540.0 else 3
+    var action_width: float = (construct_w-24.0)/4.0
+    var mode_order: Array[String] = ["place", "move", "rotate", "delete"]
+    for action_i in range(mode_order.size()):
+        set_box(gm_build_mode_buttons[mode_order[action_i]], 11.0+float(action_i)*action_width, construct_h-118.0, action_width-4.0, 38)
+    set_box(gm_build_scale, 11.0, construct_h-72.0, 110.0, 32.0)
+    set_box(gm_build_rotate, 131.0, construct_h-72.0, 110.0, 32.0)
+    set_box(gm_build_description, 250.0, construct_h-74.0, construct_w-262.0, 51.0)
     var caption_width: float = minf(w-22.0, 540.0)
     var caption_y: float = 70.0 if not narrow else header_height+56.0
     set_box(voice_caption, (w-caption_width)*0.5, caption_y, caption_width, 53.0)
