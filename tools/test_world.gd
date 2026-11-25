@@ -73,12 +73,22 @@ func _test() -> void:
     game.gm_level_input.value = 7
     game.gm_set_exact_level()
     check(game.farm_level == 7, "GM sets exact farm level")
+    # The player MUST own and consume an item for each permanent sex switch.
+    # GM testing no longer grants a free bypass of the item requirement.
     var old_position: Vector3 = game.farmer.position
-    game.gm_change_gender("male")
-    check(game.avatar_gender == "male" and game.farmer.position == old_position, "GM switches avatar while preserving position")
-    check(SAVES.normalize(game.snapshot()).get("avatar_gender") == "male", "avatar gender survives save normalization")
-    game.gm_change_gender("female")
-    check(game.avatar_gender == "female", "GM switches back to original avatar")
+    var old_gender: String = game.avatar_gender
+    game.gender_change_tickets = 0
+    game.consume_gender_change_ticket()
+    check(game.avatar_gender == old_gender, "gender cannot change for free")
+    game.buy_gender_change_ticket()
+    check(game.gender_change_tickets == 1, "gender change card can be bought")
+    game.consume_gender_change_ticket()
+    check(game.avatar_gender != old_gender and game.farmer.position == old_position, "item changes sex preserving position")
+    check(game.gender_change_tickets == 0, "gender change item is consumed")
+    check(SAVES.normalize(game.snapshot()).get("avatar_gender") == game.avatar_gender, "avatar gender survives save normalization")
+    game.buy_gender_change_ticket()
+    game.consume_gender_change_ticket()
+    check(game.avatar_gender == old_gender, "second item switches avatar back")
 
     var buy_position: Vector3 = Vector3(-23,0,3)
     check(game._can_place_on_grass(buy_position, "plot"), "free placement works inside purchased remote parcel")
