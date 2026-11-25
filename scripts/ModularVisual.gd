@@ -167,22 +167,57 @@ func _apply_skin_tone(body: MeshInstance3D, hex_color: String, gender: String) -
         material_copy.albedo_texture = ImageTexture.create_from_image(result_image)
         body.set_surface_override_material(idx, material_copy)
 
-# Clothing attaches only to matching, pre-existing skinned GLB meshes.
-# At present the supplied character pack contains TWO female shoe pairs;
-# shirt, pants, gloves, hat and male shoe meshes have not been supplied yet.
+# Match independent skinned outfit meshes by gender, collection and slot.
+# Never replace the original body/face/hair or synthesize fake character art.
+# The currently bundled GLB supplies only the two female shoe meshes; other
+# inventory pieces become visually active when matching GLB meshes are imported.
 func apply_equipment(equipped: Dictionary) -> void:
     if imported_character == null:
         return
-    var shoes_id: String = str(equipped.get("shoes", ""))
     var parts: Array[MeshInstance3D] = []
     _find_meshes(imported_character, parts)
     for part in parts:
-        var piece_name: String = str(part.name)
-        if not piece_name.contains("_Outfit_"):
+        var mesh_name: String = str(part.name).to_lower()
+        if not mesh_name.contains("_outfit_"):
             continue
-        var survivor: bool = shoes_id == "female_survivor_shoes" and piece_name.contains("Female_Outfit_Apocalypse_Survivor_Shoes_")
-        var martial: bool = shoes_id == "female_martial_shoes" and piece_name.contains("Female_Outfit_Martial_Artist_Shoes_")
-        part.visible = survivor or martial
+        var slot_id: String = ""
+        if mesh_name.contains("_shoes_") or mesh_name.contains("_boots_"):
+            slot_id = "shoes"
+        elif mesh_name.contains("_gloves_") or mesh_name.contains("_arms_"):
+            slot_id = "gloves"
+        elif mesh_name.contains("_shirt_") or mesh_name.contains("_top_") or mesh_name.contains("_vest_"):
+            slot_id = "top"
+        elif mesh_name.contains("_pants_") or mesh_name.contains("_skirt_") or mesh_name.contains("_bottom_"):
+            slot_id = "bottom"
+        elif mesh_name.contains("_hat_") or mesh_name.contains("_mask_") or mesh_name.contains("_headwear_"):
+            slot_id = "headwear"
+        if slot_id.is_empty():
+            part.visible = false
+            continue
+        var item_id: String = str(equipped.get(slot_id, ""))
+        var collection: String = ""
+        if item_id.contains("_martial_"):
+            collection = "martial"
+        elif item_id.contains("_survivor_"):
+            collection = "survivor"
+        elif item_id.contains("_villager_"):
+            collection = "villager"
+        var correct_set: bool = (
+            collection == "martial" and (mesh_name.contains("_martial_") or mesh_name.contains("_martial_artist_"))
+        ) or (
+            collection == "survivor" and (mesh_name.contains("_survivor_") or mesh_name.contains("_apocalypse_survivor_"))
+        ) or (
+            collection == "villager" and mesh_name.contains("_villager_")
+        )
+        var matching_gender: bool = (item_id.begins_with("female_") and mesh_name.contains("female_")) or (item_id.begins_with("male_") and not mesh_name.contains("female_") and mesh_name.contains("male_"))
+        part.visible = matching_gender and correct_set
+
+func has_equipment_mesh(item_id: String) -> bool:
+    if imported_character == null:
+        return false
+    # The two female shoe assets are verified in the character GLB.
+    # Other outfit parts are not represented as actual meshes in this build.
+    return item_id in ["female_survivor_shoes", "female_martial_shoes"]
 
 func has_visible_avatar() -> bool:
     return imported_character != null and mesh_count > 0 and display_height >= 0.85 and display_height <= 0.95
