@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - "assets/ui/farmflex_joystick/*.svg"
+      - "assets/ui/farmflex_cream/*.svg"
       - ".github/workflows/farmflex-joystick-png.yml"
   workflow_dispatch:
 permissions:
@@ -30,12 +31,18 @@ jobs:
               assert src.is_file(), src
               cairosvg.svg2png(url=str(src), write_to=str(root / (name + ".png")), output_width=512, output_height=512)
               print("Rendered", name)
+          cream = pathlib.Path("assets/ui/farmflex_cream")
+          for name in ("cream_button", "cream_square", "cream_bar", "cream_hud"):
+              src = cream / (name + ".svg")
+              assert src.is_file(), src
+              cairosvg.svg2png(url=str(src), write_to=str(cream / (name + ".png")))
+              print("Rendered", name)
           PY
       - name: Commit PNG assets back to FarmFlex
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add assets/ui/farmflex_joystick/*.png
+          git add assets/ui/farmflex_joystick/*.png assets/ui/farmflex_cream/*.png
           if ! git diff --cached --quiet; then
             git commit -m "FarmFlex: render separate transparent joystick PNG assets"
             git push
