@@ -2807,9 +2807,13 @@ func _inventory_contents() -> Array[Dictionary]:
             out.append({"kind": "produce", "index": i, "name": str(CROPS[i]["name"])+" ผลผลิต", "count": int(produce[i])})
     if gender_change_tickets > 0:
         out.append({"kind": "gender", "name": "บัตรเปลี่ยนเพศ", "count": gender_change_tickets})
+    # All three complete sets belong in the bag; show the current gender's
+    # fifteen pieces so the grid stays usable on landscape mobile screens.
     for id in CLOTHING_CATALOG:
+        var item: Dictionary = CLOTHING_CATALOG[id]
+        if str(item.get("gender", "")) != avatar_gender:
+            continue
         if int(clothing_owned.get(id, 0)) > 0:
-            var item: Dictionary = CLOTHING_CATALOG[id]
             out.append({"kind": "clothing", "item_id": id, "name": str(item["name"]), "count": int(clothing_owned[id])})
     if plot_kits > 0:
         out.append({"kind": "plot", "name": "ชุดแปลง", "count": plot_kits})
@@ -3155,7 +3159,8 @@ func equip_clothing(item_id: String) -> void:
     if farmer_visual != null and farmer_visual.has_method("apply_equipment"):
         farmer_visual.apply_equipment(clothing_equipped)
     character_preview_gender = ""
-    message = "สวม%sแล้ว" % str(data["name"])
+    var real_mesh: bool = farmer_visual != null and farmer_visual.has_method("has_equipment_mesh") and farmer_visual.has_equipment_mesh(item_id)
+    message = "สวม%sแล้ว" % str(data["name"]) if real_mesh else "เลือก%sแล้ว (กำลังรอโมเดลชิ้นนี้)" % str(data["name"])
     save_game()
     refresh_labels()
 
