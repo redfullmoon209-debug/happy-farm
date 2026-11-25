@@ -2196,6 +2196,10 @@ func build_ui() -> void:
         shop_decor_buttons.append(decor_buy)
     # Clothing is bought with coins earned by selling farm produce.
     # Show only garments with matching source meshes in the character GLB.
+    var wardrobe_note: Label = text_label("ชุด 3 แบบจาก Character Test: ตอนนี้มีโมเดลแยกจริงเฉพาะรองเท้าผู้หญิง 2 คู่", 15, Color("#674e3c"))
+    wardrobe_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    wardrobe_note.custom_minimum_size = Vector2(145, 48)
+    shop_grid.add_child(wardrobe_note)
     for item_id in ["female_martial_shoes", "female_survivor_shoes"]:
         var gear_data: Dictionary = CLOTHING_CATALOG[item_id]
         var price: int = WARDROBE.shop_price(item_id)
