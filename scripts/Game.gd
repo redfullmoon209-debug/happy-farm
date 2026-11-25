@@ -2258,7 +2258,7 @@ func build_ui() -> void:
     bag_scroll.clip_contents = true
     bag_panel.add_child(bag_scroll)
     bag_grid = GridContainer.new()
-    bag_grid.columns = 6
+    bag_grid.columns = 10
     bag_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     bag_grid.add_theme_constant_override("h_separation", 4)
     bag_grid.add_theme_constant_override("v_separation", 4)
@@ -2266,7 +2266,7 @@ func build_ui() -> void:
     for slot_index in range(INVENTORY_CAPACITY):
         var slot: Button = btn("", inventory_slot_pressed.bind(slot_index), Color("#34463c"))
         slot.name = "InventorySlot_%03d" % slot_index
-        slot.custom_minimum_size = Vector2(52, 54)
+        slot.custom_minimum_size = Vector2(38, 42)
         slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         slot.add_theme_font_size_override("font_size", 11)
         slot.clip_text = true
@@ -2657,7 +2657,7 @@ func update_sizes() -> void:
     var backup_button_width: float = maxf(60.0, (inventory_w-18.0)*0.5)
     set_box(bag_export_button, inventory_x+4.0, bag_height-34.0, backup_button_width, 29.0)
     set_box(bag_import_button, inventory_x+13.0+backup_button_width, bag_height-34.0, backup_button_width, 29.0)
-    bag_grid.columns = 6 if inventory_w >= 390.0 else (5 if inventory_w >= 315.0 else (4 if inventory_w >= 260.0 else 3))
+    bag_grid.columns = 10 if inventory_w >= 390.0 else (8 if inventory_w >= 315.0 else (6 if inventory_w >= 260.0 else 4))
     _fit_all_ui_text()
     update_camera()
 func point_on_ui(pos: Vector2) -> bool:
