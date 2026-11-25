@@ -261,9 +261,12 @@ func _check() -> void:
 
     # Inventory gate: clicking character button is free, changing gender is NOT.
     var previous_gender: String = farm.avatar_gender
+    farm.bag_button.pressed.emit()
+    if not farm.bag_panel.visible or farm.character_panel.visible:
+        problems.append("backpack does not open on farm-items tab")
     farm.character_button.pressed.emit()
-    if not farm.character_panel.visible:
-        problems.append("character wardrobe button does not open")
+    if not farm.bag_panel.visible or not farm.character_panel.visible:
+        problems.append("equipment tab does not open inside backpack")
     if farm.gender_item_button.disabled == false:
         problems.append("gender card usable with zero inventory")
     farm.consume_gender_change_ticket()
@@ -298,9 +301,12 @@ func _check() -> void:
             problems.append("consumed gender choice not persisted in farm snapshot")
         if after_change.get("clothing_owned", {}).size() < 2:
             problems.append("changing gender deleted owned clothing")
-    farm.character_button.pressed.emit()
-    if farm.character_panel.visible:
-        problems.append("character button did not close wardrobe")
+    farm.bag_items_tab.pressed.emit()
+    if farm.character_panel.visible or not farm.bag_scroll.visible:
+        problems.append("farm items tab did not restore seed inventory")
+    farm.bag_button.pressed.emit()
+    if farm.bag_panel.visible:
+        problems.append("backpack close did not hide inventory")
     if problems.is_empty():
         print("FARMER TESTS PASS: joystick walking, jumping, FBX fallback, gender item and modular wardrobe")
         quit(0)
