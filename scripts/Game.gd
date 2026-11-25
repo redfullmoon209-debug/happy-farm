@@ -2282,11 +2282,13 @@ func build_ui() -> void:
         buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         shop_grid.add_child(buy)
         _register_shop_product(buy, "seed")
+        _shop_card_picture(buy, "seed", i, "%s • %d เหรียญ" % [str(CROPS[i]["name"]), int(CROPS[i]["price"])])
     shop_plot_button = btn("ชุดแปลงปลูก\n75 เหรียญ", _request_shop_buy.bind("plot", 0), Color("#5d9d75"))
     shop_plot_button.custom_minimum_size = Vector2(145, 55)
     shop_plot_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     shop_grid.add_child(shop_plot_button)
     _register_shop_product(shop_plot_button, "other")
+    _shop_card_picture(shop_plot_button, "plot", 0, "ชุดแปลงปลูก • %d เหรียญ" % PLOT_KIT_PRICE)
     for i in range(TREE_VARIANTS.size()):
         var tree_buy: Button = btn("ต้น%s\n%d เหรียญ" % [TREE_NAMES[i], TREE_PRICES[i]], _request_shop_buy.bind("tree", i), Color("#568768"))
         tree_buy.custom_minimum_size = Vector2(145, 55)
@@ -2294,6 +2296,7 @@ func build_ui() -> void:
         shop_grid.add_child(tree_buy)
         shop_tree_buttons.append(tree_buy)
         _register_shop_product(tree_buy, "tree")
+        _shop_card_picture(tree_buy, "tree", i, "%s • %d เหรียญ" % [str(TREE_NAMES[i]), int(TREE_PRICES[i])])
     for i in range(DECOR_NAMES.size()):
         var decor_buy: Button = btn("%s\n%d เหรียญ" % [DECOR_NAMES[i], DECOR_PRICES[i]], _request_shop_buy.bind("decor", i), Color("#7e9070"))
         decor_buy.custom_minimum_size = Vector2(145, 55)
@@ -2301,12 +2304,14 @@ func build_ui() -> void:
         shop_grid.add_child(decor_buy)
         shop_decor_buttons.append(decor_buy)
         _register_shop_product(decor_buy, "decor")
+        _shop_card_picture(decor_buy, "decor", i, "%s • %d เหรียญ" % [str(DECOR_NAMES[i]), int(DECOR_PRICES[i])])
     var ticket_for_sale: Button = btn("บัตรเปลี่ยนเพศ\n%d เหรียญ" % GENDER_CHANGE_CARD_PRICE, _request_shop_buy.bind("gender", 0), Color("#548780"))
     ticket_for_sale.name = "GenderChangeCardForSale"
     ticket_for_sale.custom_minimum_size = Vector2(145, 55)
     ticket_for_sale.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     shop_grid.add_child(ticket_for_sale)
     _register_shop_product(ticket_for_sale, "other")
+    _shop_card_picture(ticket_for_sale, "gender", 0, "บัตรเปลี่ยนเพศ • %d เหรียญ" % GENDER_CHANGE_CARD_PRICE)
     # The left half uses compact item cards like an MMORPG inventory,
     # not the previous two-column list of oversized shop buttons.
     for shop_child in shop_grid.get_children():
@@ -2319,14 +2324,17 @@ func build_ui() -> void:
     shop_feed = btn("ซื้ออาหารหมู +5 (35 เหรียญ)", _request_shop_buy.bind("feed", 0), Color("#ad7c53"))
     shop_grid.add_child(shop_feed)
     _register_shop_product(shop_feed, "other")
+    _shop_card_picture(shop_feed, "feed", 0, "อาหารหมู +5 • 35 เหรียญ")
     _square_shop_slot(shop_feed)
     shop_pen_button = btn("ขยายคอกหมู", _request_shop_buy.bind("pen", 0), Color("#7c985d"))
     shop_grid.add_child(shop_pen_button)
     _register_shop_product(shop_pen_button, "other")
+    _shop_card_picture(shop_pen_button, "pen", 0, "ขยายคอกหมู")
     _square_shop_slot(shop_pen_button)
     shop_pig_button = btn("ซื้อลูกหมู", _request_shop_buy.bind("pig", 0), Color("#bb7c91"))
     shop_grid.add_child(shop_pig_button)
     _register_shop_product(shop_pig_button, "other")
+    _shop_card_picture(shop_pig_button, "pig", 0, "ลูกหมู")
     _square_shop_slot(shop_pig_button)
     _refresh_shop_category()
     # Shared detail/confirmation overlay: no trading on the initial item tap.
@@ -3001,7 +3009,7 @@ func refresh_labels() -> void:
             buy_button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
             buy_button.expand_icon = true
             buy_button.add_theme_constant_override("icon_max_width", 32)
-            buy_button.text = str(WARDROBE.shop_price(str(garment_id)))
+            buy_button.text = ""
         buy_button.tooltip_text = "%s • %d เหรียญ%s" % [
             str(CLOTHING_CATALOG[garment_id]["name"]),
             WARDROBE.shop_price(str(garment_id)),
@@ -3660,8 +3668,12 @@ func _refresh_shop_sell_grid() -> void:
             card.modulate = Color.WHITE
         else:
             var entry: Dictionary = shop_sell_entries[index]
-            card.text = "%s\n×%d" % [str(CROPS[int(entry["crop"])]["name"]), int(entry["count"])]
-            card.tooltip_text = "%s • ขายได้ %d เหรียญ/ชิ้น" % [str(entry["name"]), int(entry["price"])]
+            card.icon = _shop_item_picture("produce", int(entry["crop"]))
+            card.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+            card.expand_icon = true
+            card.add_theme_constant_override("icon_max_width", 31)
+            card.text = "×%d" % int(entry["count"])
+            card.tooltip_text = "%s ×%d • ขายได้ %d เหรียญ/ชิ้น" % [str(entry["name"]), int(entry["count"]), int(entry["price"])]
             card.disabled = false
             card.modulate = Color("#f1dbbb") if index == shop_sell_selected else Color.WHITE
     shop_sell_one_button.disabled = shop_sell_selected < 0
