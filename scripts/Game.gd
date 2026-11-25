@@ -1927,8 +1927,8 @@ func _set_icon(button: Button, name: String) -> void:
 func _fit_button_caption(button: Button) -> void:
     if button == null or button.text.is_empty():
         return
-    if button.name.begins_with("InventorySlot_"):
-        # Inventory artwork must stay independent from button text and width fitting.
+    if button.name.begins_with("InventorySlot_") or button.name.begins_with("ShopSellSlot_") or button.name.begins_with("BuyWardrobe_"):
+        # Keep the item's actual texture visible in compact buy/sell grids.
         return
     if button.name.begins_with("EquipmentSlot_"):
         # Real extracted PNG artwork is separate from the live button caption.
@@ -2221,10 +2221,7 @@ func build_ui() -> void:
     # Earn coins from farm produce, then buy each individual gear piece.
     # These test pieces use new generated modular 3D meshes; default GLB
     # body/face/hair remain untouched.
-    var wardrobe_note: Label = text_label("เสื้อผ้า 3 ชุด • ซื้อด้วยเหรียญฟาร์ม แล้วรับไอเทมในกระเป๋า", 15, Color("#674e3c"))
-    wardrobe_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    wardrobe_note.custom_minimum_size = Vector2(145, 48)
-    shop_grid.add_child(wardrobe_note)
+    shop_buy_information.text = "แตะช่องสินค้าเพื่อซื้อ • เสื้อผ้าซื้อแยกชิ้น"
     for item_id in WARDROBE.available_item_ids():
         var gear_data: Dictionary = CLOTHING_CATALOG[item_id]
         var price: int = WARDROBE.shop_price(item_id)
@@ -2263,7 +2260,6 @@ func build_ui() -> void:
     shop_grid.add_child(ticket_for_sale)
     # The left half uses compact item cards like an MMORPG inventory,
     # not the previous two-column list of oversized shop buttons.
-    wardrobe_note.custom_minimum_size = Vector2(56, 65)
     for shop_child in shop_grid.get_children():
         if shop_child is Button:
             var shop_item_card: Button = shop_child as Button
@@ -2887,7 +2883,18 @@ func refresh_labels() -> void:
         var already_owned: bool = int(clothing_owned.get(garment_id, 0)) > 0
         buy_button.visible = gender_ok
         buy_button.disabled = already_owned
-        buy_button.tooltip_text = "ซื้อแล้ว อยู่ในกระเป๋า" if already_owned else "ทำฟาร์มขายผลผลิตเพื่อซื้อเสื้อผ้า"
+        var item_art: Texture2D = _real_equipment_thumbnail(str(garment_id)) if gender_ok else null
+        if item_art != null:
+            buy_button.icon = item_art
+            buy_button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+            buy_button.expand_icon = true
+            buy_button.add_theme_constant_override("icon_max_width", 32)
+            buy_button.text = str(WARDROBE.shop_price(str(garment_id)))
+        buy_button.tooltip_text = "%s • %d เหรียญ%s" % [
+            str(CLOTHING_CATALOG[garment_id]["name"]),
+            WARDROBE.shop_price(str(garment_id)),
+            " • ซื้อแล้ว" if already_owned else ""
+        ]
     if get_viewport().get_visible_rect().size.x < 960.0:
         money_label.text = "เงิน %d | คอก %d | หมู %d/%d" % [coins, pens, pigs, pens*PEN_CAPACITY]
     else:
