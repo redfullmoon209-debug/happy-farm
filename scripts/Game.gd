@@ -2627,19 +2627,40 @@ func update_sizes() -> void:
     set_box(bag_right_decoration, 20.0+side_w, 52.0, side_w, bag_height-65.0)
     set_box(character_title, 12.0, 8.0, side_w-24.0, 28.0)
     var left_inner_h: float = bag_height-65.0
-    # Reserve the lower part for gear row, character data and gender-card action.
-    var preview_h: float = maxf(67.0, minf(310.0, left_inner_h-215.0))
-    set_box(character_preview_frame, 12.0, 36.0, side_w-24.0, preview_h)
-    set_box(bag_character_backdrop, 12.0, 36.0, side_w-24.0, preview_h)
-    var row_y: float = 40.0+preview_h
-    var gear_gap: float = 3.0
-    var gear_w: float = (side_w-24.0-4.0*gear_gap)/5.0
-    var gear_h: float = 48.0 if left_inner_h >= 320.0 else 37.0
-    for slot_idx in range(CLOTHING_SLOTS.size()):
-        var equipment_slot: String = CLOTHING_SLOTS[slot_idx]
-        set_box(character_equipment_buttons[equipment_slot], 12.0+float(slot_idx)*(gear_w+gear_gap),
-            row_y, gear_w, gear_h)
-    var info_y: float = row_y+gear_h+6.0
+    # Full landscape: independent equipment icons flank the live 3D avatar.
+    # Compact landscape: move the same functional icons below the preview,
+    # rather than placing buttons over the character or hiding gear controls.
+    var tall_wardrobe: bool = left_inner_h >= 440.0 and side_w >= 340.0
+    var preview_h: float = maxf(67.0, minf(310.0, left_inner_h-(170.0 if tall_wardrobe else 215.0)))
+    var info_y: float = 0.0
+    if tall_wardrobe:
+        var rail_w: float = minf(78.0, maxf(52.0, side_w*0.17))
+        var rail_gap: float = 8.0
+        var model_x: float = 12.0+rail_w+rail_gap
+        var model_w: float = side_w-24.0-2.0*(rail_w+rail_gap)
+        set_box(character_preview_frame, model_x, 36.0, model_w, preview_h)
+        set_box(bag_character_backdrop, model_x, 36.0, model_w, preview_h)
+        var rail_step: float = minf(96.0, (preview_h-8.0)/3.0)
+        for slot_idx in range(CLOTHING_SLOTS.size()):
+            var equipment_slot: String = CLOTHING_SLOTS[slot_idx]
+            var left_rail: bool = slot_idx < 3
+            var column_index: int = slot_idx if left_rail else slot_idx-3
+            var rail_x: float = 12.0 if left_rail else side_w-12.0-rail_w
+            set_box(character_equipment_buttons[equipment_slot], rail_x,
+                43.0+float(column_index)*rail_step, rail_w, minf(rail_step-6.0, 76.0))
+        info_y = 46.0+preview_h
+    else:
+        set_box(character_preview_frame, 12.0, 36.0, side_w-24.0, preview_h)
+        set_box(bag_character_backdrop, 12.0, 36.0, side_w-24.0, preview_h)
+        var row_y: float = 40.0+preview_h
+        var gear_gap: float = 3.0
+        var gear_w: float = (side_w-24.0-4.0*gear_gap)/5.0
+        var gear_h: float = 48.0 if left_inner_h >= 320.0 else 37.0
+        for slot_idx in range(CLOTHING_SLOTS.size()):
+            var equipment_slot: String = CLOTHING_SLOTS[slot_idx]
+            set_box(character_equipment_buttons[equipment_slot], 12.0+float(slot_idx)*(gear_w+gear_gap),
+                row_y, gear_w, gear_h)
+        info_y = row_y+gear_h+6.0
     set_box(bag_stats_backdrop, 6.0, info_y-7.0, side_w-12.0, 61.0)
     set_box(character_info_label, 12.0, info_y, side_w-24.0, 43.0)
     set_box(gender_item_button, 12.0, info_y+47.0, side_w-24.0, 34.0)
@@ -2874,7 +2895,9 @@ func refresh_bag_cards() -> void:
             slot.modulate = Color.WHITE
             continue
         var entry: Dictionary = inventory_entries[i]
-        slot.text = "%s\n×%d" % [str(entry["name"]), int(entry["count"])]
+        # A ten-column inventory cannot fit full item names inside each cell.
+        # Keep the names in tooltips and display a legible quantity on the art.
+        slot.text = "×%d" % int(entry["count"])
         slot.tooltip_text = "%s (%d) • ช่อง %d" % [str(entry["name"]), int(entry["count"]), i+1]
         slot.disabled = false
         slot.modulate = Color.WHITE
@@ -3067,7 +3090,7 @@ func refresh_character_panel() -> void:
         var slot_label: String = INV_TEXT.label(slot, inventory_language)
         var worn: String = " ✓" if not item_id.is_empty() else " +"
         var button: Button = character_equipment_buttons[slot]
-        button.text = slot_label + worn
+        button.text = "" # Standalone icon only; full name and status live in tooltip.
         var equipment_images: Dictionary = {
             "headwear": USER_EQUIP_HAT, "top": USER_EQUIP_TOP,
             "gloves": USER_EQUIP_GLOVE, "bottom": USER_EQUIP_PANTS,
@@ -3077,7 +3100,7 @@ func refresh_character_panel() -> void:
         button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
         button.expand_icon = true
         button.add_theme_constant_override("icon_max_width", 26)
-        button.tooltip_text = str(CLOTHING_CATALOG.get(item_id, {}).get("name", INV_TEXT.label("empty_equipment", inventory_language)))
+        button.tooltip_text = "%s: %s" % [slot_label, str(CLOTHING_CATALOG.get(item_id, {}).get("name", INV_TEXT.label("empty_equipment", inventory_language)))]
         button.modulate = Color.WHITE
         var equipped_skin: StyleBoxTexture = button.get_theme_stylebox("normal") as StyleBoxTexture
         if equipped_skin != null:
