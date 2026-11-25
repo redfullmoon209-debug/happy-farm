@@ -35,17 +35,25 @@ static func all_items() -> Dictionary:
                 }
     return items
 
+# Same names as the source character creation/test page, not invented outfits.
+# The currently shipped character GLBs contain only these individual garments.
+# Never charge players for the missing top/glove/pants/hat meshes.
+const SHOP_ITEMS: Dictionary = {
+    "female_martial_shoes": 120,
+    "female_survivor_shoes": 160
+}
 static func starter_inventory() -> Dictionary:
     var result: Dictionary = {}
     for id in all_items().keys():
-        result[id] = 1
+        result[id] = 0
     return result
 
 static func migrate_inventory(old: Dictionary) -> Dictionary:
-    # All three test sets are free once per player; preserve any existing
-    # quantities and previously equipped legacy shoe IDs.
     var result: Dictionary = starter_inventory()
     for id in result.keys():
         if old.has(id):
-            result[id] = clampi(int(old[id]), 1, 99)
+            result[id] = clampi(int(old[id]), 0, 99)
     return result
+
+static func shop_price(item_id: String) -> int:
+    return int(SHOP_ITEMS.get(item_id, -1))
