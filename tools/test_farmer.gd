@@ -16,6 +16,35 @@ func _check() -> void:
         problems.append("run/jump buttons missing")
     if farm.zoom_in_button == null or farm.zoom_out_button == null:
         problems.append("camera plus/minus buttons missing")
+    # 50/50 trade window: shop stock on the left, player's produce on the right.
+    if farm.shop_scroll == null or farm.shop_sell_scroll == null:
+        problems.append("two halves of shop window not created")
+    else:
+        var buy_width: float = farm.shop_scroll.size.x
+        var sell_width: float = farm.shop_sell_scroll.size.x
+        if absf(buy_width - sell_width) > 1.0:
+            problems.append("shop buy/sell areas are not equal width")
+        if farm.shop_scroll.position.x >= farm.shop_sell_scroll.position.x:
+            problems.append("shop selling inventory is not on the right")
+        if farm.shop_sell_cards.size() != 50:
+            problems.append("shop selling grid missing 50 inventory slots")
+        var crop_value: int = int(farm.CROPS[0]["reward"])
+        farm.produce[0] = 3
+        var money_before_sale: int = farm.coins
+        farm._refresh_shop_sell_grid()
+        if farm.shop_sell_entries.size() < 1 or farm.shop_sell_cards[0].disabled:
+            problems.append("farm produce not displayed as item in right sale inventory")
+        else:
+            farm._select_shop_sale_slot(0)
+            if farm.shop_sell_one_button.disabled:
+                problems.append("selected sellable produce did not enable sell button")
+            farm._sell_selected_shop_item()
+            if int(farm.produce[0]) != 2 or farm.coins != money_before_sale + crop_value:
+                problems.append("selling one produce did not exchange exactly one item for its configured coins")
+            farm.sell_produce()
+            if int(farm.produce[0]) != 0 or farm.coins != money_before_sale + 3 * crop_value:
+                problems.append("selling all produce did not exchange remaining items at configured price")
+
     if not farm.touch_controls or not farm.stick.is_visible_in_tree():
         problems.append("joystick must be visible automatically on PC web")
     if not farm.run_button.is_visible_in_tree() or not farm.jump_button.is_visible_in_tree():
