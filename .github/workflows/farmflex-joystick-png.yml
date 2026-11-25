@@ -1,0 +1,42 @@
+name: Generate FarmFlex joystick PNG layers
+on:
+  push:
+    branches: [main]
+    paths:
+      - "assets/ui/farmflex_joystick/*.svg"
+      - ".github/workflows/farmflex-joystick-png.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  render-png:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Rasterize independently authored SVG layers to transparent PNG
+        run: |
+          python -m pip install --quiet cairosvg
+          python - <<'PY'
+          import pathlib, cairosvg
+          root = pathlib.Path("assets/ui/farmflex_joystick")
+          names = ("joystick_base", "joystick_arrows", "joystick_thumb", "joystick_effect")
+          for name in names:
+              src = root / (name + ".svg")
+              assert src.is_file(), src
+              cairosvg.svg2png(url=str(src), write_to=str(root / (name + ".png")), output_width=512, output_height=512)
+              print("Rendered", name)
+          PY
+      - name: Commit PNG assets back to FarmFlex
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/ui/farmflex_joystick/*.png
+          if ! git diff --cached --quiet; then
+            git commit -m "FarmFlex: render separate transparent joystick PNG assets"
+            git push
+          fi
