@@ -1,5 +1,6 @@
 extends RefCounted
 const WARDROBE = preload("res://scripts/WardrobeCatalog.gd")
+const GM_PROPS = preload("res://scripts/GMProps.gd")
 # Browser-friendly, versioned and validated Happy Farm save data.
 # This module keeps existing flat user:// saves compatible.
 
@@ -342,7 +343,32 @@ static func normalize(raw: Variant) -> Dictionary:
         var item: Dictionary = catalog[item_name]
         if str(item["slot"]) == slot and str(item["gender"]) == gender and int(safe_clothing.get(item_name, 0)) > 0:
             safe_equipment[slot] = item_name
+    var raw_gm_props: Variant = data.get("gm_placed_props", [])
+    if not (raw_gm_props is Array) or raw_gm_props.size() > 500:
+        return {}
+    var safe_gm_props: Array = []
+    for raw_prop in raw_gm_props:
+        if not (raw_prop is Dictionary):
+            return {}
+        var prop_name: String = str(raw_prop.get("name", ""))
+        if not GM_PROPS.is_known(prop_name):
+            return {}
+        for component in ["x", "z"]:
+            if not _valid_world_position(raw_prop.get(component, null)):
+                return {}
+        if not _valid_position_number(raw_prop.get("rotation", null), 360000.0):
+            return {}
+        if not _valid_position_number(raw_prop.get("scale", null), 10.0):
+            return {}
+        var prop_scale: float = float(raw_prop["scale"])
+        if prop_scale < 0.05 or prop_scale > 10.0:
+            return {}
+        safe_gm_props.append({
+            "name": prop_name, "x": float(raw_prop["x"]), "z": float(raw_prop["z"]),
+            "rotation": float(raw_prop["rotation"]), "scale": prop_scale
+        })
     return {
+        "gm_placed_props": safe_gm_props,
         "coins": balance,
         "land_grid": 2,
         "produce": safe_produce,
