@@ -2719,28 +2719,38 @@ func update_sizes() -> void:
     var shop_half: float = (shop_w-28.0)*0.5
     var shop_left_x: float = 10.0
     var shop_right_x: float = 18.0+shop_half
-    var shop_body_top: float = 105.0
-    var shop_body_h: float = maxf(58.0, shop_h-239.0)
+    var shop_body_top: float = 156.0
+    var shop_body_h: float = maxf(58.0, shop_h-290.0)
     set_box(shop_panel, (w-shop_w)*0.5, (h-shop_h)*0.5, shop_w, shop_h)
-    set_box(shop_header_art, 7, 3, shop_w-14, 57)
-    set_box(shop_heading, 15, 10, shop_w-105, 33)
+    shop_header_art.visible = false
+    set_box(shop_heading, 13, 9, shop_w-108, 31)
     set_box(shop_close, shop_w-85, 8, 73, 37)
-    set_box(shop_livestock_label, 15, 44, shop_w-30, 25)
-    set_box(shop_buy_title, shop_left_x+3.0, 76.0, shop_half-6.0, 25.0)
-    set_box(shop_sell_title, shop_right_x+3.0, 76.0, shop_half-6.0, 25.0)
+    set_box(shop_livestock_label, 13, 39, shop_w-26, 21)
+    var category_keys: Array[String] = ["clothing", "seed", "tree", "decor", "other"]
+    var category_width: float = (shop_half-8.0)/5.0
+    for j in range(category_keys.size()):
+        set_box(shop_category_buttons[category_keys[j]], shop_left_x+float(j)*category_width, 65.0, category_width-3.0, 31.0)
+    var slot_keys: Array[String] = ["all", "headwear", "top", "gloves", "bottom", "shoes"]
+    var slot_width: float = (shop_half-8.0)/6.0
+    for j in range(slot_keys.size()):
+        set_box(shop_slot_buttons[slot_keys[j]], shop_left_x+float(j)*slot_width, 100.0, slot_width-3.0, 29.0)
+    set_box(shop_buy_title, shop_left_x+3.0, 130.0, shop_half-6.0, 25.0)
+    set_box(shop_sell_title, shop_right_x+3.0, 130.0, shop_half-6.0, 25.0)
     set_box(shop_scroll, shop_left_x, shop_body_top, shop_half, shop_body_h)
     set_box(shop_sell_scroll, shop_right_x, shop_body_top, shop_half, shop_body_h)
     var shop_grid_cols: int = 5 if shop_half >= 345.0 else (4 if shop_half >= 255.0 else 3)
     shop_grid.columns = shop_grid_cols
     shop_sell_grid.columns = shop_grid_cols
+    var slot_side: float = maxf(42.0, (shop_half-16.0-float(shop_grid_cols-1)*4.0)/float(shop_grid_cols))
+    for child in shop_grid.get_children():
+        if child is Button:
+            child.custom_minimum_size = Vector2(slot_side, slot_side)
+    for child in shop_sell_cards:
+        child.custom_minimum_size = Vector2(slot_side, slot_side)
     set_box(shop_buy_information, shop_left_x+2.0, shop_h-126.0, shop_half-4.0, 36.0)
     set_box(shop_sell_detail, shop_right_x+2.0, shop_h-126.0, shop_half-4.0, 36.0)
     set_box(sell_button, shop_right_x+2.0, shop_h-81.0, shop_half-4.0, 31.0)
     set_box(shop_sell_one_button, shop_right_x+2.0, shop_h-45.0, shop_half-4.0, 33.0)
-    var extra_width: float = (shop_half-12.0)/3.0
-    set_box(shop_feed, shop_left_x, shop_h-78.0, extra_width, 62.0)
-    set_box(shop_pen_button, shop_left_x+extra_width+6.0, shop_h-78.0, extra_width, 62.0)
-    set_box(shop_pig_button, shop_left_x+2.0*(extra_width+6.0), shop_h-78.0, extra_width, 62.0)
     var trade_w: float = minf(390.0, shop_w-24.0)
     var trade_h: float = minf(250.0, shop_h-24.0)
     set_box(shop_trade_panel, (shop_w-trade_w)*0.5, (shop_h-trade_h)*0.5, trade_w, trade_h)
