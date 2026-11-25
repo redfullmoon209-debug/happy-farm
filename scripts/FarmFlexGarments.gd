@@ -98,8 +98,17 @@ static func build_worn(skeleton: Skeleton3D, equipped: Dictionary, gender: Strin
             "gloves": anchors = ["mixamorig:LeftHand", "mixamorig:RightHand"]
             "shoes": anchors = ["mixamorig:LeftFoot", "mixamorig:RightFoot"]
         for anchor in anchors:
-            if skeleton.find_bone(anchor) >= 0:
-                _attach(skeleton, anchor, item_id, slot, set_id, gender)
+            # glTF import may retain "mixamorig:" or normalize it away.
+            var requested: String = anchor.get_slice(":", 1).to_lower()
+            var found_name: String = ""
+            for bone_index in range(skeleton.get_bone_count()):
+                var candidate: String = str(skeleton.get_bone_name(bone_index))
+                var clean: String = candidate.to_lower().replace(":", "").replace("_", "")
+                if clean.ends_with(requested):
+                    found_name = candidate
+                    break
+            if not found_name.is_empty():
+                _attach(skeleton, found_name, item_id, slot, set_id, gender)
 
 static func make_icon_model(item_id: String) -> Node3D:
     var root: Node3D = Node3D.new()
