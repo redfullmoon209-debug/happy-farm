@@ -2237,7 +2237,7 @@ func build_ui() -> void:
     shop_sell_scroll.clip_contents = true
     shop_panel.add_child(shop_sell_scroll)
     shop_sell_grid = GridContainer.new()
-    shop_sell_grid.columns = 5
+    shop_sell_grid.columns = 10
     shop_sell_grid.add_theme_constant_override("h_separation", 4)
     shop_sell_grid.add_theme_constant_override("v_separation", 4)
     shop_sell_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2245,12 +2245,13 @@ func build_ui() -> void:
     for sale_slot_index in range(50):
         var sale_slot: Button = btn("", _select_shop_sale_slot.bind(sale_slot_index))
         sale_slot.name = "ShopSellSlot_%02d" % sale_slot_index
-        sale_slot.custom_minimum_size = Vector2(40, 44)
+        sale_slot.custom_minimum_size = Vector2(30, 36)
         sale_slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         _metal_button_skin(sale_slot, USER_INV_SLOT)
         shop_sell_grid.add_child(sale_slot)
         shop_sell_cards.append(sale_slot)
         _square_shop_slot(sale_slot)
+        sale_slot.custom_minimum_size = Vector2(30, 36)
     shop_sell_detail = text_label("เลือกผลผลิตทางขวาเพื่อขายแลกเหรียญ", 14, Color("#624b39"))
     shop_sell_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     shop_panel.add_child(shop_sell_detail)
@@ -2740,13 +2741,15 @@ func update_sizes() -> void:
     set_box(shop_sell_scroll, shop_right_x, shop_body_top, shop_half, shop_body_h)
     var shop_grid_cols: int = 5 if shop_half >= 345.0 else (4 if shop_half >= 255.0 else 3)
     shop_grid.columns = shop_grid_cols
-    shop_sell_grid.columns = shop_grid_cols
     var slot_side: float = maxf(42.0, (shop_half-16.0-float(shop_grid_cols-1)*4.0)/float(shop_grid_cols))
     for child in shop_grid.get_children():
         if child is Button:
             child.custom_minimum_size = Vector2(slot_side, slot_side)
+    # Exactly the same responsive columns and 30×36 minimum cell size as
+    # bag_grid. Do not stretch sale items into the five oversized shop cells.
+    shop_sell_grid.columns = 10 if shop_half >= 390.0 else (8 if shop_half >= 315.0 else (6 if shop_half >= 260.0 else 4))
     for child in shop_sell_cards:
-        child.custom_minimum_size = Vector2(slot_side, slot_side)
+        child.custom_minimum_size = Vector2(30, 36)
     set_box(shop_buy_information, shop_left_x+2.0, shop_h-126.0, shop_half-4.0, 36.0)
     set_box(shop_sell_detail, shop_right_x+2.0, shop_h-126.0, shop_half-4.0, 36.0)
     set_box(sell_button, shop_right_x+2.0, shop_h-81.0, shop_half-4.0, 31.0)
