@@ -259,8 +259,50 @@ func _check() -> void:
                     problems.append("male Idle pose still T-pose")
         male_avatar.queue_free()
 
+    # Inventory gate: clicking character button is free, changing gender is NOT.
+    var previous_gender: String = farm.avatar_gender
+    farm.character_button.pressed.emit()
+    if not farm.character_panel.visible:
+        problems.append("character wardrobe button does not open")
+    if farm.gender_item_button.disabled == false:
+        problems.append("gender card usable with zero inventory")
+    farm.consume_gender_change_ticket()
+    if farm.avatar_gender != previous_gender:
+        problems.append("gender changed without consuming a purchased card")
+    if previous_gender == "female" and farm.farmer_visual != null:
+        farm.equip_clothing("female_survivor_shoes")
+        if str(farm.clothing_equipped.get("shoes", "")) != "female_survivor_shoes":
+            problems.append("shoe item failed to equip into independent slot")
+        else:
+            var real_shoes: Array[MeshInstance3D] = []
+            farm.farmer_visual._find_meshes(farm.farmer_visual.imported_character, real_shoes)
+            var visible_shoes: int = 0
+            for piece in real_shoes:
+                if str(piece.name).contains("Female_Outfit_Apocalypse_Survivor_Shoes") and piece.visible:
+                    visible_shoes += 1
+            if visible_shoes != 2:
+                problems.append("wearing shoes did not reveal both real GLB shoe meshes")
+        farm.unequip_clothing("shoes")
+        if farm.clothing_equipped.has("shoes"):
+            problems.append("unequip did not empty shoe slot")
+    var money_before_cards: int = farm.coins
+    if money_before_cards >= farm.GENDER_CHANGE_CARD_PRICE:
+        farm.buy_gender_change_ticket()
+        if farm.gender_change_tickets != 1 or farm.coins != money_before_cards - farm.GENDER_CHANGE_CARD_PRICE:
+            problems.append("shop did not sell the gender item correctly")
+        farm.consume_gender_change_ticket()
+        if farm.avatar_gender == previous_gender or farm.gender_change_tickets != 0:
+            problems.append("gender card was not consumed when changing gender")
+        var after_change: Dictionary = farm.snapshot()
+        if str(after_change.get("avatar_gender", "")) != farm.avatar_gender:
+            problems.append("consumed gender choice not persisted in farm snapshot")
+        if after_change.get("clothing_owned", {}).size() < 2:
+            problems.append("changing gender deleted owned clothing")
+    farm.character_button.pressed.emit()
+    if farm.character_panel.visible:
+        problems.append("character button did not close wardrobe")
     if problems.is_empty():
-        print("FARMER TESTS PASS: joystick walking, jumping, FBX fallback and animation libraries")
+        print("FARMER TESTS PASS: joystick walking, jumping, FBX fallback, gender item and modular wardrobe")
         quit(0)
     else:
         for err in problems:
