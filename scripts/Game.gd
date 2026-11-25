@@ -3191,9 +3191,10 @@ func refresh_character_preview() -> void:
     # shoes-only cache because shirts/gloves/pants/headwear are independent.
     if character_preview_avatar != null and is_instance_valid(character_preview_avatar):
         if character_preview_gender == avatar_gender:
-            if character_preview_avatar.has_method("apply_equipment"):
-                character_preview_avatar.call("apply_equipment", clothing_equipped)
-            character_preview_equipment = clothing_equipped.duplicate(true)
+            if character_preview_equipment != clothing_equipped:
+                if character_preview_avatar.has_method("apply_equipment"):
+                    character_preview_avatar.call("apply_equipment", clothing_equipped)
+                character_preview_equipment = clothing_equipped.duplicate(true)
             return
         character_preview_viewport.remove_child(character_preview_avatar)
         character_preview_avatar.queue_free()
