@@ -2248,6 +2248,8 @@ func build_ui() -> void:
     for item_id in WARDROBE.available_item_ids():
         if WARDROBE.full_set(item_id) and item_id.ends_with("_bottom"):
             continue
+        if item_id.begins_with("female_") and not WARDROBE.FEMALE.ITEMS.has(item_id):
+            continue
         var gear_data: Dictionary = CLOTHING_CATALOG[item_id]
         var price: int = WARDROBE.shop_price(item_id)
         var wardrobe_buy: Button = btn("%s\n%d เหรียญ" % [str(gear_data["name"]), price], _request_shop_buy.bind("clothing", item_id))
@@ -2448,6 +2450,9 @@ func build_ui() -> void:
     var test_outfit := btn("ลองชุดถัดไป", gm_cycle_outfit, Color("#627566"))
     test_outfit.name = "GMOutfit"
     gm_panel.add_child(test_outfit)
+    var grant := btn("รับ Black_Red + Pink", gm_grant_female_gear, Color("#627566"))
+    grant.name = "GMFemaleGear"
+    gm_panel.add_child(grant)
     # Asset chooser is separate from the small existing GM currency panel.
     gm_build_panel = panel(Color("#f4efe9"))
     gm_build_panel.name = "GMConstructionPanel"
@@ -2856,7 +2861,7 @@ func update_sizes() -> void:
     set_box(gm_header_art, 7, 3, gm_width-14.0, 54.0)
     set_box(gm_title, 14.0, 12.0, gm_width-108.0, 34.0)
     set_box(gm_panel.get_node("GMClose"), gm_width-83.0, 9.0, 73.0, 37.0)
-    var gm_row: float = (gm_height - 120.0) / 5.0
+    var gm_row: float = (gm_height - 120.0) / 6.0
     var half: float = (gm_width-30.0)/2.0
     set_box(gm_coin_input, 13, 60, half, gm_row-4)
     set_box(gm_panel.get_node("GMSetMoney"), 17+half, 60, half, gm_row-4)
@@ -2868,6 +2873,7 @@ func update_sizes() -> void:
     set_box(gm_panel.get_node("GMMax"), 17+half, 60+3*gm_row, half, gm_row-4)
     set_box(gm_panel.get_node("GMMale"), 13, 60+4*gm_row, half, gm_row-4)
     set_box(gm_panel.get_node("GMFemale"), 17+half, 60+4*gm_row, half, gm_row-4)
+    set_box(gm_panel.get_node("GMFemaleGear"), 13, 60+5*gm_row, gm_width-26, gm_row-4)
     set_box(gm_build_open_button, 13, gm_height-46.0, half, 35.0)
     set_box(gm_panel.get_node("GMOutfit"), 17+half, gm_height-46.0, half, 35.0)
     var construct_w: float = minf(w-24.0, 720.0)
@@ -3196,6 +3202,12 @@ func _real_equipment_thumbnail(item_id: String) -> Texture2D:
         return equipment_thumbnail_cache[item_id] as Texture2D
     if not REAL_CLOTHING_MESH_IDS.has(item_id):
         return null
+    if item_id.begins_with("female_"):
+        var icon_id := "female_" + WARDROBE.mesh_name(item_id).to_lower()
+        var icon_path := "res://assets/ui/wardrobe/" + icon_id + ".png"
+        if ResourceLoader.exists(icon_path):
+            equipment_thumbnail_cache[item_id] = load(icon_path)
+            return equipment_thumbnail_cache[item_id] as Texture2D
     if bag_panel == null:
         return null
     var image_viewport: SubViewport = EQUIPMENT_THUMBNAIL.new()
@@ -3987,11 +3999,21 @@ func refresh_character_panel() -> void:
 
 var gm_outfit_index := 0
 
+func gm_grant_female_gear() -> void:
+    if not GM_TEST_MODE:
+        return
+    for id: String in WARDROBE.FEMALE.ITEMS:
+        clothing_owned[id] = maxi(1, int(clothing_owned.get(id, 0)))
+    refresh_bag_cards()
+    refresh_labels()
+    save_game()
+
 func gm_cycle_outfit() -> void:
     if not GM_TEST_MODE:
         return
-    gm_outfit_index = (gm_outfit_index + 1) % 4
-    var selected: String = ["starter", "villager", "martial", "survivor"][gm_outfit_index]
+    var sets := ["starter", "black_red", "pink"] if avatar_gender == "female" else ["starter", "villager", "martial", "survivor"]
+    gm_outfit_index = (gm_outfit_index + 1) % sets.size()
+    var selected: String = sets[gm_outfit_index]
     clothing_equipped.clear()
     for id in WARDROBE.available_item_ids():
         if not id.begins_with(avatar_gender + "_" + selected + "_"):

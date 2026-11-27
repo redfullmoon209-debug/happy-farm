@@ -15,7 +15,7 @@ func run() -> void:
         var sk := avatar.skeleton
         var body: MeshInstance3D
         for mesh in avatar.find_children("*", "MeshInstance3D", true, false):
-            if "Master_Body" in str(mesh.name):
+            if "Master_Body" in str(mesh.name) or mesh.name == "Starter_shoes":
                 body = mesh
         var skin := body.skin
         var bindings: Array[int] = []

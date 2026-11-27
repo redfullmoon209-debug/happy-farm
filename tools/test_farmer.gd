@@ -519,12 +519,41 @@ func _check() -> void:
         if str(farm.clothing_equipped.get("shoes", "")) != "female_survivor_shoes":
             problems.append("shoe item failed to equip into independent slot")
         else:
-            var boots: MeshInstance3D = farm.farmer_visual.parts.get("Female_Survival_Boots")
+            var boots: MeshInstance3D = farm.farmer_visual.parts.get(farm.WARDROBE.mesh_name("female_survivor_shoes"))
             if boots == null or not boots.visible or boots.skin == null:
                 problems.append("equipped Survival boots missing from rig")
         farm.unequip_clothing("shoes")
         if farm.clothing_equipped.has("shoes"):
             problems.append("unequip did not empty shoe slot")
+    if previous_gender == "female":
+        var old_balance: int = farm.coins
+        var original_avatar: Node = farm.farmer_visual
+        var position_before: Vector3 = original_avatar.global_position
+        farm.GM_TEST_MODE = false
+        farm.gm_grant_female_gear()
+        if int(farm.clothing_owned.get("female_pink_headwear", 0)) != 0:
+            problems.append("GM wardrobe permission")
+        farm.GM_TEST_MODE = true
+        farm.gm_panel.get_node("GMFemaleGear").pressed.emit()
+        for id: String in farm.WARDROBE.FEMALE.ITEMS:
+            if int(farm.clothing_owned.get(id, 0)) != 1:
+                problems.append("GM grant " + id)
+        var mixed := ["female_black_red_top","female_pink_bottom","female_black_red_shoes","female_pink_headwear"]
+        for id: String in mixed:
+            farm.equip_clothing(id)
+            var key: String = farm.WARDROBE.mesh_name(id)
+            if not farm.character_preview_avatar.parts[key].visible or not farm.farmer_visual.parts[key].visible:
+                problems.append("World/preview mismatch " + key)
+        var loaded: Dictionary = farm.SAVE_DATA.load_from(farm.SAVE)
+        if loaded["clothing_equipped"] != farm.clothing_equipped or int(loaded["coins"]) != old_balance:
+            problems.append("GM mixed save round trip")
+        if original_avatar != farm.farmer_visual or position_before != original_avatar.global_position:
+            problems.append("Equipment replaced or moved the farmer")
+        for slot: String in farm.WARDROBE.SLOTS:
+            farm.unequip_clothing(slot)
+        for slot in ["top","bottom","gloves","shoes"]:
+            if not farm.farmer_visual.parts["Starter_"+slot].visible:
+                problems.append("Starter fallback "+slot)
     var money_before_cards: int = farm.coins
     if money_before_cards >= farm.GENDER_CHANGE_CARD_PRICE:
         farm.buy_gender_change_ticket()

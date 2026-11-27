@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b4fwadvoxkwag"
-path="res://.godot/imported/c928635d7089ba2a4520.png-c8761f31f2335b19c40f7584c8b963fd.ctex"
+uid="uid://d28j36e407lx1"
+path="res://.godot/imported/female_pink_headwear.png-194fbf6a652de16fcc3370e126320bda.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/characters/modular/Female/c928635d7089ba2a4520.png"
-dest_files=["res://.godot/imported/c928635d7089ba2a4520.png-c8761f31f2335b19c40f7584c8b963fd.ctex"]
+source_file="res://assets/ui/wardrobe/female_pink_headwear.png"
+dest_files=["res://.godot/imported/female_pink_headwear.png-194fbf6a652de16fcc3370e126320bda.ctex"]
 
 [params]
 
@@ -21,7 +21,7 @@ compress/lossy_quality=0.7
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""
@@ -30,5 +30,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=1024
+process/size_limit=0
 detect_3d/compress_to=1

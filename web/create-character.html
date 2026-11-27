@@ -55,14 +55,15 @@ function updateSkin(){
  const skin=document.getElementById('skinColor').value;
  document.getElementById('skinSwatch').style.background=skin;
  if(!model)return;
- const bodyRoot=model.getObjectByName(sex+'_Master_Body');
+ const bodyRoot=model.getObjectByName(sex==='Female'?'Master_Head':sex+'_Master_Body');
+ const skinParts=sex==='Female'?[bodyRoot,...['top','bottom','shoes','gloves'].map(slot=>model.getObjectByName('Starter_'+slot))]:[bodyRoot];
  let body;bodyRoot?.traverse(o=>{if(!body && o.isMesh)body=o});
  if(!body||!body.isMesh)return;
  const src=body.userData.originalBodyMaterial||(body.userData.originalBodyMaterial=body.material);
  // The original texture and PBR materials MUST remain untouched for the default tone.
  if(skin.toLowerCase()==='#e2b49d'){
    if(body.userData.skinPreview){body.userData.skinPreview.map?.dispose();body.userData.skinPreview.dispose();body.userData.skinPreview=null;}
-   bodyRoot.traverse(o=>{if(o.isMesh)o.material=o.userData.baseSkinMaterial||o.material});return;
+   skinParts.forEach(part=>part?.traverse(o=>{if(o.isMesh)o.material=o.userData.baseSkinMaterial||o.material}));return;
  }
  const base=Array.isArray(src)?src[0]:src;
  const tex=base?.map;
@@ -83,7 +84,7 @@ function updateSkin(){
  }
  cx.putImageData(dest,0,0);
  if(body.userData.skinPreview){body.userData.skinPreview.map.dispose();body.userData.skinPreview.dispose()}
- const mat=base.clone(),clone=tex.clone();clone.image=c;clone.needsUpdate=true;mat.map=clone;bodyRoot.traverse(o=>{if(o.isMesh){o.userData.baseSkinMaterial ||= o.material;o.material=mat}});body.userData.skinPreview=mat;
+ const mat=base.clone(),clone=tex.clone();clone.image=c;clone.needsUpdate=true;mat.map=clone;skinParts.forEach(part=>part?.traverse(o=>{if(o.isMesh){o.userData.baseSkinMaterial ||= o.material;o.material=mat}}));body.userData.skinPreview=mat;
 }
 function normalize(root){const box=new THREE.Box3().setFromObject(root);const size=box.getSize(new THREE.Vector3());let h=size.y||1;const factor=2.5/h;root.scale.multiplyScalar(factor);root.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(root);const center=b.getCenter(new THREE.Vector3());root.position.x-=center.x;root.position.z-=center.z;root.position.y-=b.min.y;root.updateMatrixWorld(true);controls.target.set(0,1.3,0);camera.position.set(0,1.4,5.5);controls.update()}
 
@@ -115,6 +116,7 @@ async function loadSex(){
     modelRoot=gltf.scene;
     scene.add(modelRoot);
     model=modelRoot;
+    document.getElementById("face").disabled = !gltf.scene.getObjectsByProperty("isMesh", true).some(m=>m.morphTargetInfluences?.length);
     normalize(modelRoot);
     mixer=new THREE.AnimationMixer(modelRoot);if(gltf.animations.length)mixer.clipAction(gltf.animations[0]).play();
     updateHair();updateFace();updateSkin();

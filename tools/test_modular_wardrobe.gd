@@ -29,8 +29,29 @@ func check() -> void:
             for i in v.original_surfaces.size():
                 if v.master_body.get_surface_override_material(i) == v.hidden_skin:
                     masked += 1
-            if masked == 0: problems.append(sex+" "+set_id+" body mask")
+            if sex == "male" and masked == 0: problems.append(sex+" "+set_id+" body mask")
             print("EQUIPMENT ",sex," ",set_id," surfaces hidden ",masked,"/",v.original_surfaces.size())
+        if sex == "female":
+            for style in ["black_red", "pink"]:
+                var items := {}
+                for slot in Catalog.SLOTS:
+                    var id := Catalog.item_id(sex, style, slot)
+                    items = Catalog.wear(items, id, slot)
+                v.apply_equipment(items)
+                for slot in Catalog.SLOTS:
+                    if not v.parts[Catalog.mesh_name(items[slot])].visible:
+                        problems.append("Missing "+items[slot])
+                for slot in Catalog.SLOTS:
+                    items = Catalog.wear(items, "", slot)
+                    v.apply_equipment(items)
+                    if slot != "headwear" and not v.parts["Starter_"+slot].visible:
+                        problems.append("Missing starter "+slot)
+            var mixed := {"top":"female_black_red_top", "bottom":"female_pink_bottom", "shoes":"female_black_red_shoes", "headwear":"female_pink_headwear"}
+            v.apply_equipment(mixed)
+            for name in ["Black_Red_top","Pink_bottom","Starter_gloves","Black_Red_shoes","Pink_headwear"]:
+                if not v.parts[name].visible: problems.append(name)
+            if not v.master_body.visible or not v.find_child("Female_Hair_03", true, false).visible:
+                problems.append("Missing head or selected hair")
         var full := sex+"_martial_top"
         var worn := Catalog.wear({"top":sex+"_survivor_top","bottom":sex+"_survivor_bottom"},full,"top")
         if worn.get("top") != full or worn.get("bottom") != full or not Catalog.wear(worn,"","bottom").is_empty():

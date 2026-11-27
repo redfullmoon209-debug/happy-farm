@@ -36,7 +36,7 @@ func _initialize() -> void:
         "legacy free shoes do not bypass the new farm-coin shop")
     check(int(updated.get("clothing_owned", {}).get("female_villager_gloves", -1)) == 0,
         "no invented free clothing is granted")
-    check(SAVES.WARDROBE.available_item_ids().size() == 26 and not SAVES.WARDROBE.available_item_ids().has("female_villager_gloves"),
+    check(SAVES.WARDROBE.available_item_ids().size() == 36 and not SAVES.WARDROBE.available_item_ids().has("female_villager_gloves"),
         "real equipment and previously owned full-set aliases resolve for both genders")
     check(SAVES.WARDROBE.shop_price("male_martial_top") > 0,
         "male modular shirt requires earned farm coins")

@@ -1,6 +1,7 @@
 extends RefCounted
 # Shared FarmFlex wardrobe catalog. Starter is the existing embedded BaseBody,
 # while Villager / Martial / Survival are independent equipment sets.
+const FEMALE = preload("res://scripts/FemaleWardrobe.gd")
 const SLOTS: Array[String] = ["headwear", "top", "gloves", "bottom", "shoes"]
 const SETS: Dictionary = {
     "villager": {"th": "ชาวบ้าน", "en": "Villager"},
@@ -33,6 +34,7 @@ static func all_items() -> Dictionary:
                     "name": "%s%s (%s)" % [("ชุดเต็มตัว" if full_set(id) else str(PARTS[slot]["th"])), str(SETS[set_id]["th"]), "หญิง" if gender == "female" else "ชาย"],
                     "slot": slot, "gender": gender, "set": set_id
                 }
+    items.merge(FEMALE.ITEMS)
     return items
 
 const SET_BASE_PRICES: Dictionary = {"villager": 60, "martial": 125, "survivor": 155}
@@ -46,11 +48,16 @@ static func full_set(id: String) -> bool:
     return parts.size() == 3 and parts[1] in ["villager", "martial"] and parts[2] in ["top", "bottom"]
 
 static func mesh_name(id: String) -> String:
+    if FEMALE.ITEMS.has(id):
+        return FEMALE.ITEMS[id]["mesh"]
     var parts := id.split("_")
     if parts.size() != 3 or not SET_NAMES.has(parts[1]) or not PART_NAMES.has(parts[2]):
         return ""
     if parts[1] == "villager" and parts[2] in ["headwear", "gloves"]:
         return ""
+    if parts[0] == "female":
+        # Saved legacy items keep their identity, quantity and full-set occupancy.
+        return ("Pink_" if parts[1] == "martial" else "Black_Red_") + parts[2]
     var part: String = "Full_Set" if full_set(id) else PART_NAMES[parts[2]]
     return "%s_%s_%s" % [parts[0].capitalize(), SET_NAMES[parts[1]], part]
 
@@ -99,6 +106,8 @@ static func migrate_inventory(old: Dictionary) -> Dictionary:
     return result
 
 static func shop_price(item_id: String) -> int:
+    if FEMALE.ITEMS.has(item_id):
+        return FEMALE.ITEMS[item_id]["price"]
     var parts: PackedStringArray = item_id.split("_")
     if parts.size() != 3 or parts[0] not in ["female", "male"]:
         return -1

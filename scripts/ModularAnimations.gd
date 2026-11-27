@@ -132,7 +132,7 @@ func _sole_probes() -> Dictionary:
         for direction in 8:
             var angle := TAU * direction / 8.0
             directions.append(Vector3(sin(tilt)*cos(angle), cos(tilt), sin(tilt)*sin(angle)))
-    for node in host.find_children("*Master_Body*", "MeshInstance3D", true, false):
+    for node in host.find_children("Starter_shoes" if host.get("model_gender") == "female" else "*Master_Body*", "MeshInstance3D", true, false):
         var mesh := node as MeshInstance3D
         var skin := mesh.skin
         for surface in mesh.mesh.get_surface_count():

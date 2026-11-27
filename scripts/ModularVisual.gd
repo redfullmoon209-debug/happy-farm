@@ -64,6 +64,10 @@ func initialize(gender: String, appearance: Dictionary = {}) -> bool:
         var mesh_name: String = str(mesh_node.name)
         if mesh_name.contains("_Hair_"):
             mesh_node.visible = mesh_name.ends_with("_Hair_" + hair_id)
+        elif gender == "female" and mesh_name == "Master_Head":
+            master_body = mesh_node
+            mesh_node.visible = true
+            _apply_skin_tone(mesh_node, str(appearance.get("skin_color", DEFAULT_SKIN)), gender)
         elif mesh_name.contains("_Master_Body"):
             master_body = mesh_node
             _apply_skin_tone(mesh_node, str(appearance.get("skin_color", DEFAULT_SKIN)), gender)
@@ -75,6 +79,16 @@ func initialize(gender: String, appearance: Dictionary = {}) -> bool:
             _tint_hair(mesh_node, str(appearance.get("hair_color", "#78513d")))
     if master_body == null:
         return false
+    if gender == "female" and master_body.get_surface_override_material(0) != null:
+        var base := master_body.mesh.surface_get_material(0) as StandardMaterial3D
+        var tinted := master_body.get_surface_override_material(0) as StandardMaterial3D
+        for piece: MeshInstance3D in parts.values():
+            for index in piece.mesh.get_surface_count():
+                var material := piece.mesh.surface_get_material(index) as StandardMaterial3D
+                if material != null and material.albedo_texture == base.albedo_texture:
+                    var copy := material.duplicate() as StandardMaterial3D
+                    copy.albedo_texture = tinted.albedo_texture
+                    piece.set_surface_override_material(index, copy)
     var keys := parts.keys()
     keys.sort()
     for i in keys.size():
@@ -197,6 +211,19 @@ func _apply_skin_tone(body: MeshInstance3D, hex_color: String, gender: String) -
 
 func apply_equipment(equipped: Dictionary) -> void:
     if master_body == null:
+        return
+    if model_gender == "female":
+        for mesh_node: MeshInstance3D in parts.values():
+            mesh_node.visible = false
+        for slot: String in WARDROBE.SLOTS:
+            var id := str(equipped.get(slot, ""))
+            var mesh_name := WARDROBE.mesh_name(id)
+            if WARDROBE.full_set(id) and slot in ["top", "bottom"]:
+                mesh_name = mesh_name.rsplit("_", true, 1)[0] + "_" + slot
+            if not parts.has(mesh_name):
+                mesh_name = "Starter_" + slot
+            if parts.has(mesh_name):
+                (parts[mesh_name] as MeshInstance3D).visible = true
         return
     var active := {}
     var prefix := model_gender.capitalize() + "_Starter_"
