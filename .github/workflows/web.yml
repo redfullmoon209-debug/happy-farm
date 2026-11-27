@@ -118,7 +118,7 @@ jobs:
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|Invalid call|Invalid access|ERROR:' /tmp/runtime.log; then exit 1; fi
       - name: Verify modular wardrobes in the game engine
         run: |
-          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_modular_wardrobe.gd
+          XDG_DATA_HOME="$(mktemp -d)" ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_modular_wardrobe.gd
       - name: Export web
         run: |
           set -o pipefail
@@ -207,64 +207,64 @@ jobs:
       - name: Verify original male and female animation sources
         run: |
           set -o pipefail
-          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_uploaded_mixamo.gd 2>&1 | tee /tmp/source-mixamo-tests.log
+          XDG_DATA_HOME="$(mktemp -d)" ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_uploaded_mixamo.gd 2>&1 | tee /tmp/source-mixamo-tests.log
           grep -q 'ORIGINAL MIXAMO IMPORTS PASS' /tmp/source-mixamo-tests.log
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:' /tmp/source-mixamo-tests.log; then exit 1; fi
       - name: Post-deployment test - source animations must keep player upright
         run: |
           set -o pipefail
-          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_farmer.gd 2>&1 | tee /tmp/early-farmer-test.log
+          XDG_DATA_HOME="$(mktemp -d)" ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_farmer.gd 2>&1 | tee /tmp/early-farmer-test.log
           grep -q 'FARMER TESTS PASS' /tmp/early-farmer-test.log
           if grep -E 'FARMER TEST FAIL:|SCRIPT ERROR:|Parse Error:' /tmp/early-farmer-test.log; then exit 1; fi
       - name: Check skinned sole contact across all eight clips
-        run: ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_skinned_poses.gd
+        run: XDG_DATA_HOME="$(mktemp -d)" ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_skinned_poses.gd
       - name: PC WASD and transparent PNG UI layers
         run: |
           set -o pipefail
-          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_wasd_ui.gd 2>&1 | tee /tmp/wasd-ui-tests.log
+          XDG_DATA_HOME="$(mktemp -d)" ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_wasd_ui.gd 2>&1 | tee /tmp/wasd-ui-tests.log
           grep -q 'WASD UI TESTS PASS' /tmp/wasd-ui-tests.log
           if grep -E 'WASD UI FAIL:|SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/wasd-ui-tests.log; then exit 1; fi
       - name: Save backup regression tests
         run: |
           set -o pipefail
-          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_saves.gd 2>&1 | tee /tmp/save-tests.log
+          XDG_DATA_HOME="$(mktemp -d)" ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_saves.gd 2>&1 | tee /tmp/save-tests.log
           grep -q 'SAVE TESTS PASS' /tmp/save-tests.log
       - name: Farm expansion and pig-purchase tests
         run: |
           set -o pipefail
-          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_farm.gd 2>&1 | tee /tmp/farm-tests.log
+          XDG_DATA_HOME="$(mktemp -d)" ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_farm.gd 2>&1 | tee /tmp/farm-tests.log
           grep -q 'FARM TESTS PASS' /tmp/farm-tests.log
       - name: Farm levels, plot locks and EXP progression
         run: |
           set -o pipefail
-          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_levels.gd 2>&1 | tee /tmp/level-tests.log
+          XDG_DATA_HOME="$(mktemp -d)" ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_levels.gd 2>&1 | tee /tmp/level-tests.log
           grep -q 'LEVEL TESTS PASS' /tmp/level-tests.log
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/level-tests.log; then exit 1; fi
       - name: Free-form plot building, tree shopping and chopping
         run: |
           set -o pipefail
-          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_landscaping.gd 2>&1 | tee /tmp/landscaping-tests.log
+          XDG_DATA_HOME="$(mktemp -d)" ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_landscaping.gd 2>&1 | tee /tmp/landscaping-tests.log
           grep -q 'LANDSCAPING TESTS PASS' /tmp/landscaping-tests.log
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/landscaping-tests.log; then exit 1; fi
       - name: Large world, land expansion, decoration shop and GM tests
         run: |
           set -o pipefail
-          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_world.gd 2>&1 | tee /tmp/world-tests.log
+          XDG_DATA_HOME="$(mktemp -d)" ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_world.gd 2>&1 | tee /tmp/world-tests.log
           grep -q 'WORLD TESTS PASS' /tmp/world-tests.log
           if grep -E 'WORLD TEST FAIL:|SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/world-tests.log; then exit 1; fi
       - name: Character movement and animations
         run: |
           set -o pipefail
-          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_farmer.gd 2>&1 | tee /tmp/farmer-test.log
+          XDG_DATA_HOME="$(mktemp -d)" ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_farmer.gd 2>&1 | tee /tmp/farmer-test.log
           grep -q 'FARMER TESTS PASS' /tmp/farmer-test.log
       - name: Happy Farm audio integration checks
         run: |
           set -o pipefail
-          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_audio.gd 2>&1 | tee /tmp/audio-tests.log
+          XDG_DATA_HOME="$(mktemp -d)" ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_audio.gd 2>&1 | tee /tmp/audio-tests.log
           grep -q 'AUDIO TESTS PASS' /tmp/audio-tests.log
       - name: Camera and multitouch regression tests
         run: |
           set -o pipefail
-          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_camera.gd 2>&1 | tee /tmp/camera-tests.log
+          XDG_DATA_HOME="$(mktemp -d)" ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_camera.gd 2>&1 | tee /tmp/camera-tests.log
           grep -q 'CAMERA TESTS PASS' /tmp/camera-tests.log
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/camera-tests.log; then exit 1; fi
