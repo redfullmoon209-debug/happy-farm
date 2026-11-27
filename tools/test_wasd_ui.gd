@@ -89,8 +89,8 @@ func _run() -> void:
         "farming button captions stay readable")
     check(farm.status_label.autowrap_mode == TextServer.AUTOWRAP_WORD_SMART,
         "status text can use two readable Thai lines")
-    check(farm.shop_plot_button.text.contains("\n") and farm.shop_plot_button.custom_minimum_size.y >= 50.0,
-        "shop item names and prices have their own lines")
+    check(farm.shop_plot_button.icon != null and farm.shop_plot_button.tooltip_text.contains("75"),
+        "plot shop card exposes its artwork and price")
     check(farm.shop_button.get_theme_stylebox("normal") is StyleBoxTexture, "buttons use imported PNG style texture")
     var shop_skin: StyleBoxTexture = farm.shop_button.get_theme_stylebox("normal") as StyleBoxTexture
     check(shop_skin != null and shop_skin.region_rect == Rect2(Vector2.ZERO, farm.UI_BUTTON.get_size()) and shop_skin.texture == farm.UI_BUTTON,
@@ -127,7 +127,7 @@ func _run() -> void:
         "money text is dark enough for the new cream HUD")
     check(farm.status_label.get_theme_font_size("font_size") >= 16,
         "farm HUD status is at least 16px")
-    check(farm.shop_panel.get_theme_stylebox("panel") is StyleBoxTexture, "shop window uses imported PNG skin")
+    check(farm.shop_panel.get_theme_stylebox("panel") is StyleBoxFlat and not farm.shop_header_art.visible, "flat shop window and hidden header stay intact")
     check(farm.bag_panel.get_theme_stylebox("panel") is StyleBoxTexture, "inventory window uses imported PNG skin")
     check(farm.shop_header_art.texture != null and farm.bag_header_art.texture != null, "heading art independent layer")
     check(farm.gm_button.visible, "GM playtest button remains available")

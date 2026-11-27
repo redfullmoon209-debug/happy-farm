@@ -36,8 +36,8 @@ func _initialize() -> void:
         "legacy free shoes do not bypass the new farm-coin shop")
     check(int(updated.get("clothing_owned", {}).get("female_villager_gloves", -1)) == 0,
         "no invented free clothing is granted")
-    check(SAVES.WARDROBE.available_item_ids().size() == 30,
-        "three outfit collections and five separate pieces exist for both genders")
+    check(SAVES.WARDROBE.available_item_ids().size() == 26 and not SAVES.WARDROBE.available_item_ids().has("female_villager_gloves"),
+        "real equipment and previously owned full-set aliases resolve for both genders")
     check(SAVES.WARDROBE.shop_price("male_martial_top") > 0,
         "male modular shirt requires earned farm coins")
     check(SAVES.WARDROBE.shop_price("female_survivor_bottom") > 0,
@@ -78,7 +78,7 @@ func _initialize() -> void:
         "top": "female_villager_top",
         "gloves": "female_martial_gloves"
     }
-    check(SAVES.normalize(purchased_mixed).get("clothing_equipped", {}).size() == 2,
+    check(SAVES.normalize(purchased_mixed).get("clothing_equipped", {}) == {"top":"female_villager_top","bottom":"female_villager_top","gloves":"female_martial_gloves"},
         "save preserves independently equipped purchased top and gloves")
     var purchased_male: Dictionary = farm.duplicate(true)
     purchased_male["avatar_gender"] = "male"

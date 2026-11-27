@@ -248,7 +248,7 @@ func _check() -> void:
     if farm.run_toggle == initial_running:
         problems.append("run button did not toggle sprint")
     farm.run_button.pressed.emit()
-    if ResourceLoader.exists("res://assets/characters/Female_Character_Complete.glb"):
+    if ResourceLoader.exists("res://assets/characters/modular/Female/Female_Modular.gltf"):
         if farm.farmer_visual == null or not farm.farmer_visual.is_model_ready():
             problems.append("real Codex GLB character failed to load into the farm")
         elif farm.farmer_visual.display_height < 0.87 or farm.farmer_visual.display_height > 0.93:
@@ -315,47 +315,10 @@ func _check() -> void:
                         problems.append("Idle animation still T-pose: hand not lowered")
                 else:
                     problems.append("cannot locate left arm/hand for T-pose regression")
-    elif ResourceLoader.exists("res://assets/characters/femalefarmer.fbx"):
-        var meshes: Array[MeshInstance3D] = []
-        _log_model_nodes(farm.farmer_visual, meshes)
-        print("MODEL DIAGNOSTIC: mesh count=", meshes.size())
-        if meshes.is_empty():
-            problems.append("imported avatar has no renderable meshes")
-        if farm.farmer_visual != null:
-            print("MODEL DIAGNOSTIC: local visual=", farm.farmer_visual.transform)
-            print("MODEL DIAGNOSTIC: parent farmer=", farm.farmer.position)
-            print("MODEL DIAGNOSTIC: rig skeleton=", farm.farmer_visual.skeleton)
-            print("MODEL DIAGNOSTIC: fitted height=", farm.farmer_visual.display_height,
-                " auto_scale=", farm.farmer_visual.visual_scale)
-            if farm.farmer_visual.display_height < 1.5 or farm.farmer_visual.display_height > 2.4:
-                problems.append("imported model not scaled to human height")
-        for obj in meshes:
-            var aabb: AABB = obj.get_aabb()
-            var transform: Transform3D = obj.global_transform
-            var bound_world: AABB = transform * aabb
-            print("MODEL DIAGNOSTIC: mesh path=", obj.get_path(), " visible=", obj.is_visible_in_tree(), " material=", obj.material_override, " aabb=", aabb, " world=", bound_world, " transform=", transform)
-            if not obj.is_visible_in_tree():
-                problems.append("avatar mesh hidden")
-            if bound_world.size.y < 1.4 or bound_world.size.y > 2.6:
-                problems.append("avatar mesh too small or too tall for farm")
-            if absf(bound_world.position.y-farm.farmer.position.y) > 1.5:
-                problems.append("avatar outside standing ground height")
-        if farm.farmer_visual == null or not farm.farmer_visual.is_model_ready():
-            problems.append("rigged female FBX not loaded")
-        else:
-            # The original FBX faces +Z and a Godot actor moves along -Z.
-            # Check actual world-space visual heading after a sideways walk.
-            var desired: Vector3 = Vector3(0.8, 0.0, -0.6)
-            farm.move_actor(desired, 2.0, 0.12)
-            var visual_axis: Vector3 = farm.farmer_visual.imported_character.global_basis * Vector3.BACK
-            visual_axis.y = 0.0
-            if visual_axis.normalized().dot(desired) < 0.97:
-                problems.append("Mixamo character visually faces away from travel direction")
-            for state in ["Idle", "Walk", "Run", "Jump"]:
-                if not farm.farmer_visual.anim_player.has_animation("Farm/" + state):
-                    problems.append("missing Mixamo motion " + state)
+    else:
+        problems.append("missing female modular character")
     # Male and female must BOTH leave T-pose and remain upright.
-    if ResourceLoader.exists("res://assets/characters/Male_Character_Complete.glb"):
+    if ResourceLoader.exists("res://assets/characters/modular/Male/Male_Modular.gltf"):
         var male_script: GDScript = load("res://scripts/ModularVisual.gd") as GDScript
         var male_avatar: Node3D = male_script.new() as Node3D
         farm.farmer.add_child(male_avatar)
@@ -556,14 +519,9 @@ func _check() -> void:
         if str(farm.clothing_equipped.get("shoes", "")) != "female_survivor_shoes":
             problems.append("shoe item failed to equip into independent slot")
         else:
-            var visual_skeleton: Skeleton3D = farm.farmer_visual.skeleton
-            var worn_pieces: int = 0
-            if visual_skeleton != null:
-                for child in visual_skeleton.get_children():
-                    if child.name.begins_with("FarmFlexWardrobe_female_survivor_shoes"):
-                        worn_pieces += 1
-            if worn_pieces != 2:
-                problems.append("wearing shoes did not attach both modular 3D shoe meshes")
+            var boots: MeshInstance3D = farm.farmer_visual.parts.get("Female_Survival_Boots")
+            if boots == null or not boots.visible or boots.skin == null:
+                problems.append("equipped Survival boots missing from rig")
         farm.unequip_clothing("shoes")
         if farm.clothing_equipped.has("shoes"):
             problems.append("unequip did not empty shoe slot")

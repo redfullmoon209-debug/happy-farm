@@ -73,38 +73,10 @@ This is a clean, separate project. No previous game scripts or FBX models are us
 - `scripts/BadgeIcon.gd`: vector icons.
 - `scenes/Main.tscn`: clean scene.
 
-## Install the supplied Mixamo farmer (one time)
+## Modular characters
 
-The supplied avatar and animation files are binary, so they are distributed
-as a standalone downloadable ZIP to the owner. No avatar source files are
-required for the fallback model and CI to work.
+The game loads male and female skinned characters from `assets/characters/modular`. Each has a shared Mixamo rig, a Starter body and three hairstyles. Villager and Martial occupy both the top and bottom equipment slots. The character creation page loads a lighter Starter preview with an idle animation. Existing wardrobe purchases are restored by item ID.
 
-1. Download `HappyFarm_Mixamo_Farmer.zip` from the ChatGPT conversation.
-2. Open the Happy Farm GitHub Codespaces workspace; in the VS Code file
-   explorer, upload that ZIP to the root of the repository.
-3. In Codespaces Terminal execute:
-
-```bash
-git pull --ff-only origin main
-bash tools/install_farmer.sh
-```
-
-The installer unpacks the 5 skinned Mixamo FBX scenes and optimized color,
-normal, roughness and metallic maps to `assets/characters/`, commits
-and pushes them to the GitHub repository. After GitHub Actions publishes,
-the avatar loads with idle, walk, run and jump motions. The same avatar is
-controlled by WASD/Shift/Space on PCs and the multitouch joystick/Run/Jump
-on mobile browsers. Tap plots to walk to farming tasks.
-
-## Animations and visuals
-
-- `scripts/FarmerVisual.gd`: imports one Mixamo skeleton and copies
-  animation tracks from matched FBX clips to its skeleton.
-- The color texture is extracted from the user's second, non-rigged
-  `femalefarmer(1).fbx` and optimized for mobile.
-- The original Mixamo rig has 41 model nodes and 34 skin clusters.
-- In case assets are missing or fail to import, the game keeps the existing
-  procedural farmer instead of crashing.
 - The joystick does not consume right-hand touches; a second finger can
   interact with the camera and independent buttons.
 

@@ -145,8 +145,7 @@ const CLOTHING_SLOT_NAMES: Dictionary = {
     "bottom": "กางเกง/กระโปรง", "shoes": "รองเท้า"
 }
 var CLOTHING_CATALOG: Dictionary = WARDROBE.all_items()
-# 3D garments for both sexes are created by FarmFlexGarments.gd, using the
-# same geometry for equipment and inventory thumbnails.
+# Equipment IDs resolve to the skinned wardrobe in each imported model.
 var REAL_CLOTHING_MESH_IDS: Array[String] = WARDROBE.available_item_ids()
 var gender_change_tickets: int = 0
 var clothing_owned: Dictionary = WARDROBE.starter_inventory()
@@ -189,12 +188,6 @@ var selected_seed: int = 0
 var tool_mode: String = "plant"
 var farmer: Node3D
 var farmer_visual: Variant = null
-var arm_l: Node3D
-var arm_r: Node3D
-var leg_l: Node3D
-var leg_r: Node3D
-var hoe: Node3D
-var can: Node3D
 var camera: Camera3D
 var camera_yaw: float = 0.65
 var camera_pitch: float = -0.79
@@ -1176,53 +1169,12 @@ func build_farmer() -> void:
     farmer = Node3D.new()
     farmer.position = Vector3(-1,0,7.8)
     add_child(farmer)
-    ball(farmer,Vector3(0,1.48,0),Vector3(0.76 if avatar_gender == "male" else 0.70,0.91,0.52),Color("#4d9ca5") if avatar_gender == "male" else Color("#c17991"))
-    ball(farmer,Vector3(0,2.11,0),Vector3(0.54,0.61,0.53),Color("#edba91"))
-    stalk(farmer,Vector3(0,2.42,0),0.13,0.52,Color("#d4ab67"))
-    stalk(farmer,Vector3(0,2.53,0),0.22,0.30,Color("#ae824c"))
-    if avatar_gender == "female":
-        ball(farmer,Vector3(0,1.95,0.27),Vector3(0.55,0.78,0.30),Color("#694735"))
-    for side in [-1.0,1.0]:
-        ball(farmer,Vector3(side*0.17,2.11,-0.257),Vector3(0.055,0.06,0.06),Color("#403d38"))
-    arm_l = Node3D.new()
-    arm_l.position = Vector3(-0.48,1.79,0)
-    farmer.add_child(arm_l)
-    arm_r = Node3D.new()
-    arm_r.position = Vector3(0.48,1.79,0)
-    farmer.add_child(arm_r)
-    cube(arm_l,Vector3(0,-0.35,0),Vector3(0.24,0.73,0.26),Color("#e5b38f"))
-    cube(arm_r,Vector3(0,-0.35,0),Vector3(0.24,0.73,0.26),Color("#e5b38f"))
-    leg_l = Node3D.new()
-    leg_l.position = Vector3(-0.19,1.06,0)
-    farmer.add_child(leg_l)
-    leg_r = Node3D.new()
-    leg_r.position = Vector3(0.19,1.06,0)
-    farmer.add_child(leg_r)
-    cube(leg_l,Vector3(0,-0.46,0),Vector3(0.26,0.85,0.30),Color("#5e7696"))
-    cube(leg_r,Vector3(0,-0.46,0),Vector3(0.26,0.85,0.30),Color("#5e7696"))
-    hoe = Node3D.new()
-    arm_r.add_child(hoe)
-    stalk(hoe,Vector3(0,-0.80,-0.16),1.32,0.05,Color("#af9264"))
-    cube(hoe,Vector3(0,-1.39,-0.16),Vector3(0.47,0.08,0.24),Color("#a4a9a2"))
-    can = Node3D.new()
-    arm_r.add_child(can)
-    stalk(can,Vector3(0,-0.85,-0.2),0.48,0.23,Color("#79b7c5"))
-    var nozzle: MeshInstance3D = stalk(can,Vector3(-0.27,-0.85,-0.2),0.4,0.06,Color("#79b7c5"))
-    nozzle.rotation.z = 1.05
-    hoe.visible = false
-    can.visible = false
-
-    # Player appearance: actual male/female GLBs from the Codex modular export.
-    # Keep the original actor only as a safe fallback on missing assets.
     var chosen_model: Node3D = MODULAR_VISUAL.new()
     chosen_model.name = "FarmFlexModularPlayer"
     farmer.add_child(chosen_model)
     if chosen_model.initialize(avatar_gender, character_profile) and chosen_model.has_visible_avatar():
         farmer_visual = chosen_model
         chosen_model.apply_equipment(clothing_equipped)
-        for old_part in farmer.get_children():
-            if old_part != farmer_visual:
-                old_part.visible = false
         return
     chosen_model.queue_free()
 
@@ -1400,8 +1352,6 @@ func finish_work() -> void:
     work_plot = -1
     if gain_farm_xp(gained_xp):
         message = "ฟาร์ม Lv.%d! ปลดล็อกแปลงผักเพิ่ม 5 แปลง" % farm_level
-    hoe.visible = false
-    can.visible = false
     refresh_plants()
     refresh_labels()
     save_game()
@@ -1446,12 +1396,8 @@ func _process(delta: float) -> void:
                 refresh_labels()
         else:
             work_time = 0.95 if tool_mode != "water" else 1.30
-            hoe.visible = tool_mode == "till"
-            can.visible = tool_mode == "water"
     elif work_time > 0.0:
         work_time -= delta
-        arm_r.rotation.x = -0.75+sin(elapsed*11)*0.42
-        arm_l.rotation.x = 0.28
         # Tiny skinned avatars must stay on the ground during field work.
         farmer.position.y = 0.0 if (farmer_visual != null and farmer_visual.is_model_ready()) else absf(sin(elapsed*5))*0.035
         if work_time <= 0:
@@ -1472,13 +1418,7 @@ func _process(delta: float) -> void:
             var travel: Vector3 = (side.normalized()*input_dir.x-front.normalized()*input_dir.y).normalized()
             move_actor(travel,(7.5 if running else 4.25)*minf(1,input_dir.length()),delta)
         else:
-            leg_l.rotation.x = lerpf(leg_l.rotation.x,0.0,delta*10)
-            leg_r.rotation.x = lerpf(leg_r.rotation.x,0.0,delta*10)
-            arm_l.rotation.x = lerpf(arm_l.rotation.x,0.0,delta*10)
-            arm_r.rotation.x = lerpf(arm_r.rotation.x,0.0,delta*10)
             farmer.position.y = jumping
-        hoe.visible = false
-        can.visible = false
     if farmer.position.distance_to(previous_position) > 0.01:
         footstep_timer -= delta
         if footstep_timer <= 0.0 and farm_audio != null:
@@ -1528,11 +1468,6 @@ func move_actor(direction: Vector3, speed: float, delta: float) -> void:
     # characters visibly float above the ground.
     farmer.position.y = jumping if (farmer_visual != null and farmer_visual.is_model_ready()) else jumping+absf(sin(elapsed*12))*0.035
     farmer.rotation.y = atan2(-direction.x,-direction.z)
-    var wave: float = sin(elapsed*(16 if running else 10))
-    leg_l.rotation.x = wave*0.60
-    leg_r.rotation.x = -wave*0.60
-    arm_l.rotation.x = -wave*0.36
-    arm_r.rotation.x = wave*0.36
 
 func land_path_owned(from: Vector3, to: Vector3) -> bool:
     var steps: int = maxi(1, ceili(from.distance_to(to)/0.25))
@@ -2311,6 +2246,8 @@ func build_ui() -> void:
     # body/face/hair remain untouched.
     shop_buy_information.text = "แตะช่องสินค้าเพื่อซื้อ • เสื้อผ้าซื้อแยกชิ้น"
     for item_id in WARDROBE.available_item_ids():
+        if WARDROBE.full_set(item_id) and item_id.ends_with("_bottom"):
+            continue
         var gear_data: Dictionary = CLOTHING_CATALOG[item_id]
         var price: int = WARDROBE.shop_price(item_id)
         var wardrobe_buy: Button = btn("%s\n%d เหรียญ" % [str(gear_data["name"]), price], _request_shop_buy.bind("clothing", item_id))
@@ -2508,6 +2445,9 @@ func build_ui() -> void:
     gm_build_open_button = btn("ปลูกสร้าง • FBX", toggle_gm_construction, Color("#89745c"))
     gm_build_open_button.name = "GMConstruction"
     gm_panel.add_child(gm_build_open_button)
+    var test_outfit := btn("ลองชุดถัดไป", gm_cycle_outfit, Color("#627566"))
+    test_outfit.name = "GMOutfit"
+    gm_panel.add_child(test_outfit)
     # Asset chooser is separate from the small existing GM currency panel.
     gm_build_panel = panel(Color("#f4efe9"))
     gm_build_panel.name = "GMConstructionPanel"
@@ -2928,7 +2868,8 @@ func update_sizes() -> void:
     set_box(gm_panel.get_node("GMMax"), 17+half, 60+3*gm_row, half, gm_row-4)
     set_box(gm_panel.get_node("GMMale"), 13, 60+4*gm_row, half, gm_row-4)
     set_box(gm_panel.get_node("GMFemale"), 17+half, 60+4*gm_row, half, gm_row-4)
-    set_box(gm_build_open_button, 13, gm_height-46.0, gm_width-26.0, 35.0)
+    set_box(gm_build_open_button, 13, gm_height-46.0, half, 35.0)
+    set_box(gm_panel.get_node("GMOutfit"), 17+half, gm_height-46.0, half, 35.0)
     var construct_w: float = minf(w-24.0, 720.0)
     var construct_h: float = minf(h-24.0, 590.0)
     set_box(gm_build_panel, (w-construct_w)*0.5, (h-construct_h)*0.5, construct_w, construct_h)
@@ -3025,9 +2966,9 @@ func update_sizes() -> void:
         set_box(inventory_detail_panel, inventory_x+7.0, 89.0, details_width, 171.0)
         set_box(inventory_detail_name, 11.0, 8.0, details_width-22.0, 28.0)
         set_box(inventory_detail_description, 11.0, 41.0, details_width-22.0, 63.0)
-        var action_width: float = (details_width-31.0)*0.5
-        set_box(inventory_equip_button, 10.0, 117.0, action_width, 42.0)
-        set_box(inventory_detail_close, 21.0+action_width, 117.0, action_width, 42.0)
+        var detail_button_width: float = (details_width-31.0)*0.5
+        set_box(inventory_equip_button, 10.0, 117.0, detail_button_width, 42.0)
+        set_box(inventory_detail_close, 21.0+detail_button_width, 117.0, detail_button_width, 42.0)
     set_box(bag_save_status, inventory_x+5.0, bag_height-57.0, inventory_w-10.0, 20.0)
     var backup_button_width: float = maxf(60.0, (inventory_w-18.0)*0.5)
     set_box(bag_export_button, inventory_x+4.0, bag_height-34.0, backup_button_width, 29.0)
@@ -3201,11 +3142,12 @@ func refresh_labels() -> void:
 func _inventory_contents() -> Array[Dictionary]:
     var out: Array[Dictionary] = []
     # Purchased 3D garments appear in the right-hand MMORPG inventory only.
-    for id in REAL_CLOTHING_MESH_IDS:
+    for id: String in CLOTHING_CATALOG:
         var item: Dictionary = CLOTHING_CATALOG[id]
-        if str(item.get("gender", "")) == avatar_gender and int(clothing_owned.get(id, 0)) > 0:
+        var bag_count := int(clothing_owned.get(id, 0)) - int(id in clothing_equipped.values())
+        if str(item.get("gender", "")) == avatar_gender and bag_count > 0:
             out.append({"kind": "clothing", "item_id": id,
-                "name": str(item["name"]), "count": int(clothing_owned[id])})
+                "name": str(item["name"]), "count": bag_count})
     for i in range(CROPS.size()):
         if int(seeds[i]) > 0:
             out.append({"kind": "seed", "index": i, "name": str(CROPS[i]["name"]), "count": int(seeds[i])})
@@ -3874,10 +3816,12 @@ func on_equipment_slot_pressed(slot_name: String) -> void:
         if str(inventory_entries[i].get("item_id", "")) == worn_id:
             inventory_slot_pressed(i)
             return
-    message = "กำลังสวม%s" % str(CLOTHING_CATALOG.get(worn_id, {}).get("name", "ไอเทม"))
-    refresh_labels()
+    _show_inventory_item_details({"item_id": worn_id})
+
+var detail_item_id: String = ""
 
 func _close_inventory_item_details() -> void:
+    detail_item_id = ""
     if inventory_detail_panel != null:
         inventory_detail_panel.visible = false
 
@@ -3888,6 +3832,7 @@ func _show_inventory_item_details(entry: Dictionary) -> void:
     var data: Dictionary = CLOTHING_CATALOG.get(item_id, {})
     if data.is_empty():
         return
+    detail_item_id = item_id
     var part: String = str(data.get("slot", ""))
     var equipped: bool = str(clothing_equipped.get(part, "")) == item_id
     var set_id: String = str(data.get("set", ""))
@@ -3904,12 +3849,8 @@ func _show_inventory_item_details(entry: Dictionary) -> void:
 
 func _equip_selected_inventory_item() -> void:
     # Clicking an inventory slot never equips. Only this explicit action can.
-    if inventory_selected_index < 0 or inventory_selected_index >= inventory_entries.size():
-        return
-    var entry: Dictionary = inventory_entries[inventory_selected_index]
-    if str(entry.get("kind", "")) != "clothing":
-        return
-    var item_id: String = str(entry.get("item_id", ""))
+    var item_id := detail_item_id
+    var entry := {"item_id":item_id}
     if not CLOTHING_CATALOG.has(item_id) or int(clothing_owned.get(item_id, 0)) < 1:
         return
     var part: String = str(CLOTHING_CATALOG[item_id].get("slot", ""))
@@ -4044,6 +3985,27 @@ func refresh_character_panel() -> void:
     character_slot_list.add_child(note)
     refresh_character_preview()
 
+var gm_outfit_index := 0
+
+func gm_cycle_outfit() -> void:
+    if not GM_TEST_MODE:
+        return
+    gm_outfit_index = (gm_outfit_index + 1) % 4
+    var selected: String = ["starter", "villager", "martial", "survivor"][gm_outfit_index]
+    clothing_equipped.clear()
+    for id in WARDROBE.available_item_ids():
+        if not id.begins_with(avatar_gender + "_" + selected + "_"):
+            continue
+        if WARDROBE.full_set(id) and id.ends_with("_bottom"):
+            continue
+        clothing_owned[id] = maxi(1, int(clothing_owned.get(id, 0)))
+        clothing_equipped = WARDROBE.wear(clothing_equipped, id, str(CLOTHING_CATALOG[id]["slot"]))
+    if farmer_visual != null:
+        farmer_visual.apply_equipment(clothing_equipped)
+    refresh_character_preview()
+    refresh_labels()
+    save_game()
+
 func equip_clothing(item_id: String) -> void:
     if not CLOTHING_CATALOG.has(item_id) or int(clothing_owned.get(item_id, 0)) < 1:
         return
@@ -4057,7 +4019,7 @@ func equip_clothing(item_id: String) -> void:
         refresh_labels()
         return
     var slot: String = str(data["slot"])
-    clothing_equipped[slot] = item_id
+    clothing_equipped = WARDROBE.wear(clothing_equipped, item_id, slot)
     _close_inventory_item_details()
     if farmer_visual != null and farmer_visual.has_method("apply_equipment"):
         farmer_visual.apply_equipment(clothing_equipped)
@@ -4070,7 +4032,7 @@ func equip_clothing(item_id: String) -> void:
 func unequip_clothing(slot: String) -> void:
     if not CLOTHING_SLOTS.has(slot) or not clothing_equipped.has(slot):
         return
-    clothing_equipped.erase(slot)
+    clothing_equipped = WARDROBE.wear(clothing_equipped, "", slot)
     _close_inventory_item_details()
     if farmer_visual != null and farmer_visual.has_method("apply_equipment"):
         farmer_visual.apply_equipment(clothing_equipped)
@@ -4572,7 +4534,7 @@ func _apply_snapshot(state: Dictionary) -> void:
     character_profile = state.get("character_profile", {}).duplicate(true)
     gender_change_tickets = int(state.get("gender_change_tickets", 0))
     clothing_owned = WARDROBE.migrate_inventory(state.get("clothing_owned", {}))
-    clothing_equipped = state.get("clothing_equipped", {}).duplicate(true)
+    clothing_equipped = WARDROBE.restore_equipped(state.get("clothing_equipped", {}), clothing_owned, restored_gender)
     if farmer != null:
         if previous_gender != restored_gender:
             var old_position: Vector3 = farmer.position

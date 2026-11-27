@@ -2,7 +2,7 @@
 <html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"><title>FarmFlex — สร้างตัวละคร</title>
 <style>
 :root{color-scheme:dark;font-family:system-ui,"Noto Sans Thai",sans-serif}*{box-sizing:border-box}body{margin:0;color:#f1ede8;background:#10171b;overflow:hidden}#scene{position:fixed;inset:0}#panel{position:fixed;top:14px;left:14px;width:min(355px,calc(100vw - 28px));max-height:calc(100dvh - 28px);overflow:auto;background:#152027eb;backdrop-filter:blur(14px);border:1px solid #73837a44;border-radius:17px;padding:18px;box-shadow:0 12px 48px #0008}h1{font-size:24px;margin:0 0 4px;letter-spacing:-.8px}p{font-size:12px;color:#afc3c1;line-height:1.6}.brand{font-size:11px;letter-spacing:2px;color:#bfe6b7}.section{font-size:11px;color:#b8c7c4;letter-spacing:1.5px;text-transform:uppercase;margin:14px 0 7px;border-top:1px solid #ffffff20;padding-top:12px}select,input[type=file],button{width:100%;min-height:38px;background:#22323a;border:1px solid #64757866;color:white;border-radius:9px;padding:8px 10px;font:inherit;font-size:13px}button{cursor:pointer}button:hover{background:#34505b}button:disabled{opacity:.36;cursor:not-allowed}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}.active{background:#426958!important;border-color:#acd8b5!important}.foot{font-size:11px;color:#a7b8b8;line-height:1.55}.note{border-left:2px solid #c6bd79;padding:7px 10px;background:#ffffff0a;font-size:12px;color:#e3dbbc}.tag{font-size:11px;color:#c7dbc6;margin:8px 0}input[type=color]{height:35px;width:100%;background:transparent;border:0}#status{background:#0005;padding:8px;border-radius:8px;font-size:12px;white-space:pre-line}#tip{position:fixed;bottom:16px;right:16px;background:#12222bbd;padding:9px 13px;border-radius:9px;font-size:12px;color:#b9cccc}#toggle{position:fixed;top:14px;right:14px;z-index:3;width:auto;background:#26373e}
-#previewPoster{position:fixed;left:calc(50% + 170px);top:49%;transform:translate(-50%,-50%);width:230px;height:350px;background-image:url('./characters/character_atlas.jpg');background-size:690px 700px;background-repeat:no-repeat;background-position:0 0;z-index:1;pointer-events:none;filter:drop-shadow(0 18px 22px #0008)}
+#previewPoster{position:fixed;left:calc(50% + 170px);top:49%;transform:translate(-50%,-50%);width:230px;height:350px;background-image:url('./characters/character_atlas.png');background-size:690px 700px;background-repeat:no-repeat;background-position:0 0;z-index:1;pointer-events:none;filter:drop-shadow(0 18px 22px #0008)}
 @media(min-width:1000px){#previewPoster{left:calc(50% + 100px)}}
 @media(max-width:700px){#panel{top:auto;bottom:8px;left:8px;width:calc(100% - 16px);max-height:48dvh;padding:13px;border-radius:14px}#previewPoster{left:50%;top:26%;transform:translate(-50%,-50%) scale(.62)}#tip{bottom:auto;top:15px;left:10px;right:auto;max-width:60%;font-size:10px}h1{font-size:18px}}
 </style>
@@ -48,20 +48,21 @@ function showStatus(s){status.textContent=s}
 function setActive(group,value,key){document.querySelectorAll(group).forEach(b=>b.classList.toggle('active',b.dataset[key]===value))}
 function findNode(name){return model?.getObjectByName(name)}
 function updateHair(){if(!model)return;const selected=document.getElementById('hair').value;for(let i=1;i<=3;i++){const n=findNode(sex+'_Hair_0'+i);if(n)n.visible=String(i).padStart(2,'0')===selected;}setHairColor()}
-function setHairColor(){if(!model)return;const color=new THREE.Color(document.getElementById('haircolor').value);const active=findNode(sex+'_Hair_'+document.getElementById('hair').value);if(!active)return;active.traverse(o=>{if(!o.isMesh)return;if(!materialCopies.has(o))materialCopies.set(o,o.material);if(!o.userData.previewMaterial){o.userData.previewMaterial=Array.isArray(o.material)?o.material.map(m=>m.clone()):o.material.clone()}o.material=o.userData.previewMaterial;const mats=Array.isArray(o.material)?o.material:[o.material];for(const m of mats){if(m.color)m.color.copy(color)}})}
+function setHairColor(){if(!model)return;const color=new THREE.Color(document.getElementById('haircolor').value);const active=findNode(sex+'_Hair_'+document.getElementById('hair').value);if(!active)return;active.traverse(o=>{if(!o.isMesh)return;if(!materialCopies.has(o))materialCopies.set(o,o.material);if(!o.userData.previewMaterial){o.userData.previewMaterial=Array.isArray(o.material)?o.material.map(m=>m.clone()):o.material.clone()}o.material=o.userData.previewMaterial;const mats=Array.isArray(o.material)?o.material:[o.material];for(const m of mats){if(m.color)m.color.copy(document.getElementById("haircolor").value.toLowerCase()==="#78513d"?new THREE.Color(1,1,1):color)}})}
 function updateFace(){if(!model)return;const i=Number(document.getElementById('face').value);model.traverse(o=>{if(o.isMesh&&o.morphTargetInfluences&&o.morphTargetInfluences.length){for(let j=0;j<Math.min(3,o.morphTargetInfluences.length);j++)o.morphTargetInfluences[j]=(i===j+1)?1:0}})}
-function updateOutfit(){if(!model)return;model.traverse(o=>{if(o.isMesh&&o.name.includes('_Outfit_'))o.visible=false})}
+
 function updateSkin(){
  const skin=document.getElementById('skinColor').value;
  document.getElementById('skinSwatch').style.background=skin;
  if(!model)return;
- const body=model.getObjectByName(sex+'_BaseBody');
+ const bodyRoot=model.getObjectByName(sex+'_Master_Body');
+ let body;bodyRoot?.traverse(o=>{if(!body && o.isMesh)body=o});
  if(!body||!body.isMesh)return;
  const src=body.userData.originalBodyMaterial||(body.userData.originalBodyMaterial=body.material);
  // The original texture and PBR materials MUST remain untouched for the default tone.
  if(skin.toLowerCase()==='#e2b49d'){
    if(body.userData.skinPreview){body.userData.skinPreview.map?.dispose();body.userData.skinPreview.dispose();body.userData.skinPreview=null;}
-   body.material=src;return;
+   bodyRoot.traverse(o=>{if(o.isMesh)o.material=o.userData.baseSkinMaterial||o.material});return;
  }
  const base=Array.isArray(src)?src[0]:src;
  const tex=base?.map;
@@ -82,11 +83,11 @@ function updateSkin(){
  }
  cx.putImageData(dest,0,0);
  if(body.userData.skinPreview){body.userData.skinPreview.map.dispose();body.userData.skinPreview.dispose()}
- const mat=base.clone(),clone=tex.clone();clone.image=c;clone.needsUpdate=true;mat.map=clone;body.material=mat;body.userData.skinPreview=mat;
+ const mat=base.clone(),clone=tex.clone();clone.image=c;clone.needsUpdate=true;mat.map=clone;bodyRoot.traverse(o=>{if(o.isMesh){o.userData.baseSkinMaterial ||= o.material;o.material=mat}});body.userData.skinPreview=mat;
 }
 function normalize(root){const box=new THREE.Box3().setFromObject(root);const size=box.getSize(new THREE.Vector3());let h=size.y||1;const factor=2.5/h;root.scale.multiplyScalar(factor);root.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(root);const center=b.getCenter(new THREE.Vector3());root.position.x-=center.x;root.position.z-=center.z;root.position.y-=b.min.y;root.updateMatrixWorld(true);controls.target.set(0,1.3,0);camera.position.set(0,1.4,5.5);controls.update()}
 
-let loadSeq=0;
+let loadSeq=0, mixer=null;const clock=new THREE.Clock();
 function updatePoster(){
   const img=document.getElementById('previewPoster');
   const hair=Math.max(1,Math.min(3,Number(document.getElementById('hair').value)||1));
@@ -98,7 +99,8 @@ async function loadSex(){
   img.style.display='block';
   updatePoster();
   showStatus('กำลังโหลดโมเดล '+(currentSex==='Male'?'ผู้ชาย':'ผู้หญิง')+' จากเกม...');
-  const url='./characters/'+currentSex+'_Character_Complete.glb';
+  const base='./characters/';
+  const url=base+currentSex+'_Creator.glb';
   try{
     if(!master[currentSex]){
       const response=await fetch(url,{cache:'force-cache'});
@@ -106,7 +108,7 @@ async function loadSex(){
       master[currentSex]=await response.arrayBuffer();
     }
     if(serial!==loadSeq)return;
-    const gltf=await new GLTFLoader().parseAsync(master[currentSex],'');
+    const gltf=await new GLTFLoader().parseAsync(master[currentSex],base);
     if(serial!==loadSeq)return;
     if(modelRoot)scene.remove(modelRoot);
     materialCopies.clear();
@@ -114,7 +116,8 @@ async function loadSex(){
     scene.add(modelRoot);
     model=modelRoot;
     normalize(modelRoot);
-    updateHair();updateFace();updateOutfit();updateSkin();
+    mixer=new THREE.AnimationMixer(modelRoot);if(gltf.animations.length)mixer.clipAction(gltf.animations[0]).play();
+    updateHair();updateFace();updateSkin();
     img.style.display='none';
     showStatus('โมเดล '+(currentSex==='Male'?'ผู้ชาย':'ผู้หญิง')+' พร้อมแล้ว · หมุนและซูมดูได้');
     confirmBtn.disabled=false;
@@ -150,5 +153,5 @@ function lockScreen(saved){const b=document.querySelector('[data-sex="'+(saved.s
 confirmBtn.addEventListener('click',()=>{try{let saved=JSON.parse(localStorage.getItem(PROFILE_KEY)||'null');if(!saved||saved.locked!==true){saved=makeProfile();localStorage.setItem(PROFILE_KEY,JSON.stringify(saved));lockScreen(saved)}else if(!saved.skin_color){saved.skin_color=document.getElementById('skinColor').value;localStorage.setItem(PROFILE_KEY,JSON.stringify(saved))}window.location.assign('./index.html')}catch(e){statusCreation.textContent='ไม่สามารถบันทึกการเลือกในเบราว์เซอร์นี้: '+e.message}});
 (async()=>{try{const saved=JSON.parse(localStorage.getItem(PROFILE_KEY)||'null');if(saved&&saved.locked===true)lockScreen(saved)}catch(e){console.warn(e)}await loadSex()})();
 
-renderer.setAnimationLoop(()=>{controls.update();renderer.render(scene,camera)});
+renderer.setAnimationLoop(()=>{mixer?.update(Math.min(clock.getDelta(),0.1));controls.update();renderer.render(scene,camera)});
 </script></body></html>

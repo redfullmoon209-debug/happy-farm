@@ -15,16 +15,20 @@ func run() -> void:
         var sk := avatar.skeleton
         var body: MeshInstance3D
         for mesh in avatar.find_children("*", "MeshInstance3D", true, false):
-            if "BaseBody" in str(mesh.name):
+            if "Master_Body" in str(mesh.name):
                 body = mesh
         var skin := body.skin
         var bindings: Array[int] = []
         for i in skin.get_bind_count():
             bindings.append(sk.find_bone(skin.get_bind_name(i)))
-        var arrays := body.mesh.surface_get_arrays(0)
-        var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-        var bones: PackedInt32Array = arrays[Mesh.ARRAY_BONES]
-        var weights: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS]
+        var verts := PackedVector3Array()
+        var bones := PackedInt32Array()
+        var weights := PackedFloat32Array()
+        for surface in body.mesh.get_surface_count():
+            var arrays := body.mesh.surface_get_arrays(surface)
+            verts.append_array(arrays[Mesh.ARRAY_VERTEX])
+            bones.append_array(arrays[Mesh.ARRAY_BONES])
+            weights.append_array(arrays[Mesh.ARRAY_WEIGHTS])
         var influences := bones.size() / verts.size()
         var feet: Array[int] = []
         for i in verts.size():

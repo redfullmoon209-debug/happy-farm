@@ -2,9 +2,9 @@ extends Node3D
 # FarmFlex: identical Codex-authored male/female GLB models, including skeleton, hair and face morphs.
 # Animation binding can be added when matching Mixamo clips are provided.
 const ANIMATION_CONTROLLER = preload("res://scripts/ModularAnimations.gd")
-const GARMENTS = preload("res://scripts/FarmFlexGarments.gd")
-const FEMALE_PATH = "res://assets/characters/Female_Character_Complete.glb"
-const MALE_PATH = "res://assets/characters/Male_Character_Complete.glb"
+const WARDROBE = preload("res://scripts/WardrobeCatalog.gd")
+const FEMALE_PATH = "res://assets/characters/modular/Female/Female_Modular.gltf"
+const MALE_PATH = "res://assets/characters/modular/Male/Male_Modular.gltf"
 # Player-requested 0.90 scene height; scale the imported GLB uniformly without editing the source model.
 # This scales ONLY the scene instance, never modifies the source GLB vertices.
 const TARGET_HEIGHT = 0.90
@@ -19,6 +19,11 @@ var motion_controller: Node = null
 var anim_player: AnimationPlayer = null
 var can_prop: Node3D = null
 var hoe_prop: Node3D = null
+var parts: Dictionary = {}
+var mask_bits: Dictionary = {}
+var master_body: MeshInstance3D
+var original_surfaces: Array[Material] = []
+var hidden_skin: ShaderMaterial
 var model_gender: String = "female"
 
 func _find_meshes(node: Node, out: Array[MeshInstance3D]) -> void:
@@ -59,15 +64,28 @@ func initialize(gender: String, appearance: Dictionary = {}) -> bool:
         var mesh_name: String = str(mesh_node.name)
         if mesh_name.contains("_Hair_"):
             mesh_node.visible = mesh_name.ends_with("_Hair_" + hair_id)
-        elif mesh_name.contains("_Outfit_"):
+        elif mesh_name.contains("_Master_Body"):
+            master_body = mesh_node
+            _apply_skin_tone(mesh_node, str(appearance.get("skin_color", DEFAULT_SKIN)), gender)
+        else:
+            parts[mesh_name] = mesh_node
             # Default player appearance uses the starter body, no extra shoes.
             mesh_node.visible = false
-        elif mesh_name.contains("BaseBody"):
-            if face_index > 0 and mesh_node.mesh.get_blend_shape_count() >= face_index:
-                mesh_node.set_blend_shape_value(face_index - 1, 1.0)
-            _apply_skin_tone(mesh_node, str(appearance.get("skin_color", DEFAULT_SKIN)), gender)
         if mesh_name.contains("_Hair_") and mesh_node.visible:
             _tint_hair(mesh_node, str(appearance.get("hair_color", "#78513d")))
+    if master_body == null:
+        return false
+    var keys := parts.keys()
+    keys.sort()
+    for i in keys.size():
+        mask_bits[keys[i]] = 1 << i
+    for i in master_body.mesh.get_surface_count():
+        original_surfaces.append(master_body.get_active_material(i))
+    var shader := Shader.new()
+    shader.code = "shader_type spatial; void fragment(){discard;}"
+    hidden_skin = ShaderMaterial.new()
+    hidden_skin.shader = shader
+    apply_equipment({})
     var low: Vector3 = Vector3(INF, INF, INF)
     var high: Vector3 = Vector3(-INF, -INF, -INF)
     var inverse_root: Transform3D = imported_character.global_transform.affine_inverse()
@@ -115,7 +133,7 @@ func initialize(gender: String, appearance: Dictionary = {}) -> bool:
     return has_visible_avatar() and anim_player != null
 
 func _tint_hair(mesh_node: MeshInstance3D, hex_color: String) -> void:
-    if not Color.html_is_valid(hex_color):
+    if not Color.html_is_valid(hex_color) or hex_color.to_lower() == "#78513d":
         return
     var tint: Color = Color(hex_color)
     for surface_index in range(mesh_node.mesh.get_surface_count()):
@@ -135,6 +153,7 @@ func _apply_skin_tone(body: MeshInstance3D, hex_color: String, gender: String) -
     var reference: Vector3 = Vector3(201.0, 155.0, 132.0) if gender == "male" else Vector3(207.0, 163.0, 140.0)
     var target: Vector3 = Vector3(desired.r * 255.0, desired.g * 255.0, desired.b * 255.0)
     var gains: Vector3 = Vector3(target.x / reference.x, target.y / reference.y, target.z / reference.z)
+    var recolored: Texture2D
     for idx in range(body.mesh.get_surface_count()):
         var surface: Material = body.get_active_material(idx)
         if not (surface is StandardMaterial3D):
@@ -142,6 +161,11 @@ func _apply_skin_tone(body: MeshInstance3D, hex_color: String, gender: String) -
         var original: StandardMaterial3D = surface as StandardMaterial3D
         var texture: Texture2D = original.albedo_texture
         if texture == null:
+            continue
+        if recolored != null:
+            var cached := original.duplicate() as StandardMaterial3D
+            cached.albedo_texture = recolored
+            body.set_surface_override_material(idx, cached)
             continue
         var pixels: Image = texture.get_image()
         if pixels == null or pixels.is_empty():
@@ -167,24 +191,34 @@ func _apply_skin_tone(body: MeshInstance3D, hex_color: String, gender: String) -
             changed[at + 2] = clampi(roundi(lerpf(blue, blue * gains.z, mask)), 0, 255)
         var result_image: Image = Image.create_from_data(pixels.get_width(), pixels.get_height(), false, Image.FORMAT_RGBA8, changed)
         var material_copy: StandardMaterial3D = original.duplicate() as StandardMaterial3D
-        material_copy.albedo_texture = ImageTexture.create_from_image(result_image)
+        recolored = ImageTexture.create_from_image(result_image)
+        material_copy.albedo_texture = recolored
         body.set_surface_override_material(idx, material_copy)
 
-# 3D modular garment prototypes follow the existing Mixamo bones.
-# The original GLB shoes are hidden here to prevent double-rendering.
-# Each part is individually purchased and can be mixed across collections.
 func apply_equipment(equipped: Dictionary) -> void:
-    if imported_character == null or skeleton == null:
+    if master_body == null:
         return
-    var meshes: Array[MeshInstance3D] = []
-    _find_meshes(imported_character, meshes)
-    for part in meshes:
-        if str(part.name).contains("_Outfit_"):
-            part.visible = false
-    GARMENTS.build_worn(skeleton, equipped, model_gender)
+    var active := {}
+    var prefix := model_gender.capitalize() + "_Starter_"
+    if not equipped.has("top"):
+        active[prefix + "Top"] = true
+    if not equipped.has("bottom"):
+        active[prefix + "Pants"] = true
+    for id in equipped.values():
+        active[WARDROBE.mesh_name(str(id))] = true
+    var bits := 0
+    for key in parts:
+        var enabled: bool = active.has(key)
+        (parts[key] as MeshInstance3D).visible = enabled
+        if enabled:
+            bits |= int(mask_bits[key])
+    for i in original_surfaces.size():
+        var source := master_body.mesh.surface_get_material(i)
+        var mask := source.resource_name.get_slice("_Skin_", 1).hex_to_int()
+        master_body.set_surface_override_material(i, hidden_skin if (bits & mask) != 0 else original_surfaces[i])
 
 func has_equipment_mesh(item_id: String) -> bool:
-    return skeleton != null and GARMENTS.valid_id(item_id) and item_id.begins_with(model_gender + "_")
+    return parts.has(WARDROBE.mesh_name(item_id))
 
 func has_visible_avatar() -> bool:
     return imported_character != null and mesh_count > 0 and display_height >= 0.85 and display_height <= 0.95

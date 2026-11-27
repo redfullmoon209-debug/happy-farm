@@ -377,7 +377,7 @@ static func normalize(raw: Variant) -> Dictionary:
         "gender_change_tickets": safe_tokens,
         "wardrobe_market_v1": true,
         "clothing_owned": safe_clothing,
-        "clothing_equipped": safe_equipment,
+        "clothing_equipped": WARDROBE.restore_equipped(safe_equipment, safe_clothing, gender),
         "feed": stock,
         "pigs": animal_count,
         "pens": pen_count,

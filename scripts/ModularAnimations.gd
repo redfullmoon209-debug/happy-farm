@@ -42,10 +42,27 @@ func initialize(target_host: Node3D, target_skeleton: Skeleton3D, selected_gende
                 return false
             source_files[state] = path
             print("ORIGINAL MIXAMO PLAYBACK: ", gender, " ", state, " <- ", path)
-        # These gameplay actions have no source clip. Keep the planted idle
-        # pose while the existing controller moves the actor and hand tools.
-        for state in ["Jump", "Water", "Dig"]:
-            library.add_animation(state, library.get_animation("Idle").duplicate())
+        if not _retarget_original(library, "Jump", "res://assets/characters/Jump.fbx", probes):
+            return false
+        for state in ["Water", "Dig"]:
+            var action := library.get_animation("Idle").duplicate() as Animation
+            for track in action.get_track_count():
+                if action.track_get_type(track) != Animation.TYPE_ROTATION_3D:
+                    continue
+                var name_text := str(action.track_get_path(track)).to_lower()
+                var angle := 0.0
+                if name_text.ends_with("rightarm"):
+                    angle = -0.9 if state == "Dig" else -0.52
+                elif name_text.ends_with("rightforearm"):
+                    angle = 0.55 if state == "Dig" else 0.95
+                elif name_text.ends_with("spine1"):
+                    angle = 0.36 if state == "Dig" else 0.12
+                if angle != 0:
+                    for k in action.track_get_key_count(track):
+                        var phase := action.track_get_key_time(track,k) / action.length
+                        var pose: Quaternion = action.track_get_key_value(track,k)
+                        action.track_set_key_value(track,k, pose * Quaternion(Vector3.RIGHT,angle*(0.5-0.5*cos(TAU*phase))))
+            library.add_animation(state, action)
         libraries_by_gender[gender] = library
         paths_by_gender[gender] = source_files.duplicate()
     if player.add_animation_library("Farm", library) != OK:
@@ -115,41 +132,42 @@ func _sole_probes() -> Dictionary:
         for direction in 8:
             var angle := TAU * direction / 8.0
             directions.append(Vector3(sin(tilt)*cos(angle), cos(tilt), sin(tilt)*sin(angle)))
-    for node in host.find_children("*BaseBody*", "MeshInstance3D", true, false):
+    for node in host.find_children("*Master_Body*", "MeshInstance3D", true, false):
         var mesh := node as MeshInstance3D
         var skin := mesh.skin
-        var arrays := mesh.mesh.surface_get_arrays(0)
-        var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-        var bones: PackedInt32Array = arrays[Mesh.ARRAY_BONES]
-        var weights: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS]
-        var stride := bones.size() / vertices.size()
-        for i in vertices.size():
-            var strongest := i * stride
-            for k in range(1,stride):
-                if weights[i*stride+k] > weights[strongest]:
-                    strongest = i*stride+k
-            var bind := bones[strongest]
-            var id := skeleton.find_bone(skin.get_bind_name(bind))
-            if id < 0:
-                id = skin.get_bind_bone(bind)
-            var name_lower := str(skeleton.get_bone_name(id)).to_lower()
-            if not ("foot" in name_lower or "toe" in name_lower):
-                continue
-            var local_point := skin.get_bind_pose(bind) * vertices[i]
-            var rest := host.to_local(skeleton.to_global(skeleton.get_bone_global_rest(id) * local_point))
-            if not probes.has(id):
-                var samples := PackedVector3Array()
-                samples.resize(directions.size())
-                probes[id] = samples
-                var distances := PackedFloat32Array()
-                distances.resize(directions.size())
-                distances.fill(INF)
-                lowest[id] = distances
-            for j in directions.size():
-                var height := rest.dot(directions[j])
-                if height < lowest[id][j]:
-                    lowest[id][j] = height
-                    probes[id][j] = local_point
+        for surface in mesh.mesh.get_surface_count():
+            var arrays := mesh.mesh.surface_get_arrays(surface)
+            var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+            var bones: PackedInt32Array = arrays[Mesh.ARRAY_BONES]
+            var weights: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS]
+            var stride := bones.size() / vertices.size()
+            for i in vertices.size():
+                var strongest := i * stride
+                for k in range(1,stride):
+                    if weights[i*stride+k] > weights[strongest]:
+                        strongest = i*stride+k
+                var bind := bones[strongest]
+                var id := skeleton.find_bone(skin.get_bind_name(bind))
+                if id < 0:
+                    id = skin.get_bind_bone(bind)
+                var name_lower := str(skeleton.get_bone_name(id)).to_lower()
+                if not ("foot" in name_lower or "toe" in name_lower):
+                    continue
+                var local_point := skin.get_bind_pose(bind) * vertices[i]
+                var rest := host.to_local(skeleton.to_global(skeleton.get_bone_global_rest(id) * local_point))
+                if not probes.has(id):
+                    var samples := PackedVector3Array()
+                    samples.resize(directions.size())
+                    probes[id] = samples
+                    var distances := PackedFloat32Array()
+                    distances.resize(directions.size())
+                    distances.fill(INF)
+                    lowest[id] = distances
+                for j in directions.size():
+                    var height := rest.dot(directions[j])
+                    if height < lowest[id][j]:
+                        lowest[id][j] = height
+                        probes[id][j] = local_point
     return probes
 
 func _retarget_original(library: AnimationLibrary, state: String, filename: String, supports: Dictionary) -> bool:

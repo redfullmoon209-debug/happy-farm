@@ -25,16 +25,6 @@ jobs:
         run: bash tools/prepare_audio.sh
       # Audio generation remains part of this build, but never pushes a second
       # commit while the same branch is being exported/deployed.
-      - name: Restore exact Codex male and female GLB assets
-        run: |
-          set -euo pipefail
-          cat web/character_assets/pack_*.b64 | base64 -d > /tmp/farmflex-character-source.zip
-          echo "7b9a38c0b8d08f3a1ad2751c8e42af01714c50e9780786f760c71f13772113a5  /tmp/farmflex-character-source.zip" | sha256sum -c -
-          mkdir -p assets/characters
-          unzip -jo /tmp/farmflex-character-source.zip "*/Female_Character_Complete.glb" "*/Male_Character_Complete.glb" "*/character_manifest.json" "*/appearance_presets.json" -d assets/characters
-          test -s assets/characters/Female_Character_Complete.glb
-          test -s assets/characters/Male_Character_Complete.glb
-          echo "EXACT CODEX SOURCE MODEL ASSETS RESTORED"
       - name: Restore the eight original user-supplied Mixamo FBX files
         run: |
           python3 - <<'PY'
@@ -126,6 +116,9 @@ jobs:
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script' /tmp/import.log; then exit 1; fi
           ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --quit-after 15 2>&1 | tee /tmp/runtime.log
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|Invalid call|Invalid access|ERROR:' /tmp/runtime.log; then exit 1; fi
+      - name: Verify modular wardrobes in the game engine
+        run: |
+          ./Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_modular_wardrobe.gd
       - name: Export web
         run: |
           set -o pipefail
@@ -146,15 +139,11 @@ jobs:
 
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/export.log; then exit 1; fi
           test -s build/web/index.html
-          # Character Lab is archived at web/character-preview.html but NOT deployed.
-          # Keep first-run creation screen and the actual FarmFlex game available.
           cp web/create-character.html build/web/create-character.html
           mkdir -p build/web/characters
-          cp assets/characters/Female_Character_Complete.glb build/web/characters/
-          cp assets/characters/Male_Character_Complete.glb build/web/characters/
-          cp web/character_assets/character_atlas.jpg build/web/characters/
-          test -s build/web/characters/Female_Character_Complete.glb
-          test -s build/web/characters/Male_Character_Complete.glb
+          cp web/characters/* build/web/characters/
+          test -s build/web/characters/Female_Creator.glb
+          test -s build/web/characters/Male_Creator.glb
           echo 'ONLINE CHARACTER FILES:'
           ls -lh build/web/characters/
 
@@ -182,7 +171,7 @@ jobs:
           echo "PAGES CONFIGURATION (published URL / source):"
           gh api "repos/$GITHUB_REPOSITORY/pages" --jq '{html_url, build_type, source, status}' || true
           echo "PUBLIC URL CHECKS:"
-          for path in index.html create-character.html characters/Female_Character_Complete.glb characters/Male_Character_Complete.glb character-preview.html farmflex-characters-v2.html; do
+          for path in index.html create-character.html characters/Female_Creator.glb characters/Male_Creator.glb character-preview.html farmflex-characters-v2.html; do
             URL="https://redfullmoon209-debug.github.io/happy-farm/$path?probe=$GITHUB_SHA"
             CODE=$(curl -L -sS --connect-timeout 6 --max-time 20 -o /dev/null -w "%{http_code}" "$URL" || true)
             echo "$path => HTTP $CODE"
