@@ -32,7 +32,7 @@ func check() -> void:
             if sex == "male" and masked == 0: problems.append(sex+" "+set_id+" body mask")
             print("EQUIPMENT ",sex," ",set_id," surfaces hidden ",masked,"/",v.original_surfaces.size())
         if sex == "female":
-            for style in ["black_red", "pink", "kungfu"]:
+            for style in ["black_red", "pink", "kungfu", "orange"]:
                 var items := {}
                 for slot in Catalog.SLOTS:
                     var id := Catalog.item_id(sex, style, slot)
