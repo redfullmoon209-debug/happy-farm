@@ -3536,7 +3536,7 @@ func _update_shop_trade_preview() -> void:
     match mode:
         "buy":
             var max_count: int = _shop_buy_capacity(str(pending["kind"]), pending["item"])
-            valid = quantity <= max_count and coins >= amount and unit_price > 0
+            valid = quantity <= max_count and coins >= amount and unit_price >= 0
             shop_trade_details.text = "%s\n%s\nจำนวน %d × %d เหรียญ\nรวมจ่าย %d เหรียญ\nเงินคงเหลือ %d เหรียญ" % [
                 str(pending["name"]), str(pending["description"]), quantity, unit_price, amount, coins - amount
             ]
