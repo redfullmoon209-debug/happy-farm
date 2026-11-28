@@ -2,7 +2,7 @@ name: Import KungFu outfit on test branch
 on:
   push:
     branches: [kungfu-import-test]
-    paths: [Female_KungFu.zip]
+    paths: [Female_KungFu.zip, tools/import_kungfu.py, .github/workflows/import-kungfu.yml]
   workflow_dispatch:
 permissions:
   contents: write
@@ -19,7 +19,8 @@ jobs:
       - name: Install Blender
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y blender
+          sudo apt-get install -y blender python3-numpy
+          blender --background --python-expr 'import numpy; print(numpy.__version__)' --python-exit-code 1
       - name: Append outfit and transfer weights
         run: blender --background --python-exit-code 1 --python tools/import_kungfu.py -- /tmp/Female_KungFu.fbx
       - name: Add KungFu to modular wardrobe regression test
