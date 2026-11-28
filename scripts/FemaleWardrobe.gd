@@ -1,6 +1,11 @@
 extends RefCounted
 
 const ITEMS = {
+    "female_kungfu_headwear": {"gender": "female", "set": "kungfu", "slot": "headwear", "mesh": "Female_KungFu_Head", "name": "KungFu Mask", "price": 0},
+    "female_kungfu_top": {"gender": "female", "set": "kungfu", "slot": "top", "mesh": "Female_KungFu_Shirt", "name": "KungFu Shirt", "price": 0},
+    "female_kungfu_gloves": {"gender": "female", "set": "kungfu", "slot": "gloves", "mesh": "Female_KungFu_Gloves", "name": "KungFu Gloves", "price": 0},
+    "female_kungfu_bottom": {"gender": "female", "set": "kungfu", "slot": "bottom", "mesh": "Female_KungFu_Skirt", "name": "KungFu Skirt", "price": 0},
+    "female_kungfu_shoes": {"gender": "female", "set": "kungfu", "slot": "shoes", "mesh": "Female_KungFu_Boots", "name": "KungFu Boots", "price": 0},
     "female_black_red_shoes": {
         "gender": "female",
         "set": "black_red",
