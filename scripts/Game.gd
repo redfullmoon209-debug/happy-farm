@@ -1175,6 +1175,9 @@ func animate_pigs() -> void:
 
 func build_farmer() -> void:
     farmer = Node3D.new()
+    # Double the world avatar uniformly, including modular clothing and hair.
+    # Keep source model normalization, wardrobe preview and movement unchanged.
+    farmer.scale = Vector3.ONE * 2.0
     farmer.position = Vector3(-1,0,7.8)
     add_child(farmer)
     var chosen_model: Node3D = MODULAR_VISUAL.new()

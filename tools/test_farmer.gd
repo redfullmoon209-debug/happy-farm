@@ -252,7 +252,9 @@ func _check() -> void:
         if farm.farmer_visual == null or not farm.farmer_visual.is_model_ready():
             problems.append("real Codex GLB character failed to load into the farm")
         elif farm.farmer_visual.display_height < 0.87 or farm.farmer_visual.display_height > 0.93:
-            problems.append("real Codex GLB model is not at the 0.90-height garden scale")
+            problems.append("real Codex GLB model is not at the 0.90-height local normalization")
+        elif not farm.farmer.scale.is_equal_approx(Vector3.ONE * 2.0) or not is_equal_approx(farm.farmer_visual.display_height * farm.farmer.scale.y, 1.80):
+            problems.append("world avatar must be twice its normalized height")
         elif farm.farmer_visual.mesh_count < 2:
             problems.append("hair or body mesh missing from real Codex model")
         elif farm.farmer_visual.anim_player == null:
