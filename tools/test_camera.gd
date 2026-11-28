@@ -67,6 +67,7 @@ func reset() -> void:
     farm.camera_yaw = 0.65
     farm.camera_pitch = -0.79
     farm.set_camera_zoom(39.0)
+    farm.update_camera()
     farm.plot_taps = 0
     farm.jumping = 0.0
     farm.jump_velocity = 0.0
@@ -117,11 +118,12 @@ func _check() -> void:
         touch(2, a)
         touch(11, b)
         var distance: float = farm.camera_distance
-        var size_before: float = farm.camera.size
+        var distance_before: float = farm.camera.position.distance_to(farm.camera_focus)
         yaw = farm.camera_yaw
         var pitch: float = farm.camera_pitch
         drag(11, b + Vector2(100, 0))
-        expect(farm.camera_distance < distance and farm.camera.size < size_before, "spread must zoom in the orthographic view")
+        farm.update_camera(1.0 / 60.0)
+        expect(farm.camera_distance < distance and farm.camera.position.distance_to(farm.camera_focus) < distance_before, "spread must smoothly move the perspective camera closer")
         var closer: float = farm.camera_distance
         drag(11, b)
         expect(farm.camera_distance > closer and is_equal_approx(farm.camera_distance, distance), "huddle must zoom out proportionally")
@@ -271,7 +273,7 @@ func _check() -> void:
     reset()
     for target: float in [-100.0, 10000.0, NAN, INF]:
         farm.set_camera_zoom(target)
-        expect(is_finite(farm.camera.size) and farm.camera_distance >= 6.0 and farm.camera_distance <= 78.0, "invalid/extreme zoom values must stay finite and bounded")
+        expect(is_finite(farm.camera_distance) and farm.camera_distance >= 6.0 and farm.camera_distance <= 78.0, "invalid/extreme zoom values must stay finite and bounded")
     for zoom_inward: bool in [true, false]:
         farm.set_camera_zoom(6.0 if zoom_inward else 78.0)
         touch(2, a)
@@ -303,7 +305,7 @@ func _check() -> void:
     expect(is_equal_approx(farm.camera_yaw, yaw - 20.0 * 0.007) and not farm.drag_camera, "PC right-mouse orbit must be preserved")
     farm.camera_pitch = farm.CAMERA_PITCH_MAX
     farm.update_camera()
-    expect((-farm.camera.global_basis.z).y > 0.98 and farm.camera.position.y >= 0.8, "sky view looks upward without going below ground")
+    expect((-farm.camera.global_basis.z).y > 0.98 and farm.camera.position.y >= farm.CAMERA_GROUND_CLEARANCE - 0.0001, "sky view looks upward without going below ground")
     farm.camera_pitch = farm.CAMERA_PITCH_MIN
     farm.update_camera()
     expect((-farm.camera.global_basis.z).y < -0.99, "top view looks almost straight down")
@@ -321,6 +323,29 @@ func _check() -> void:
     mouse(MOUSE_BUTTON_LEFT, false, a)
     expect(farm.plot_taps == 1, "real PC mouse plot click must be preserved")
 
+    # Cross the previous projection-switch angle in both directions and at
+    # multiple distances. The same world camera and FOV must survive.
+    reset()
+    var world_camera: Camera3D = farm.camera
+    for zoom: float in [6.0, 39.0, 78.0]:
+        farm.set_camera_zoom(zoom)
+        farm.camera_pitch = -0.05
+        farm.update_camera()
+        for pitch: float in [-0.02, -0.016, -0.014, 0.0, 0.014, 0.016, 0.02, 0.0, -0.02]:
+            var before: Vector3 = farm.camera.position
+            farm.camera_pitch = pitch
+            farm.update_camera(1.0 / 60.0)
+            expect(farm.camera == world_camera and root.get_camera_3d() == world_camera and world_camera.projection == Camera3D.PROJECTION_PERSPECTIVE and is_equal_approx(world_camera.fov, 60.0), "world camera and projection stay constant across horizon")
+            expect(before.distance_to(world_camera.position) < 2.0, "no sudden position jump across horizon")
+        farm.camera_pitch = 0.0
+        farm.update_camera()
+        var previous: float = farm.camera.position.distance_to(farm.camera_focus)
+        farm.set_camera_zoom(6.0 if zoom > 6.0 else 78.0)
+        farm.update_camera(1.0 / 60.0)
+        var next: float = farm.camera.position.distance_to(farm.camera_focus)
+        expect((next < previous if zoom > 6.0 else next > previous) and not is_equal_approx(farm.camera_render_distance, farm.camera_distance), "zoom moves progressively rather than snapping")
+    reset()
+
     # Following must work at close, intermediate, default and maximum zoom,
     # including free walking and the automatic approach to a farming task.
     reset()
@@ -328,6 +353,7 @@ func _check() -> void:
     for zoom: float in [6.0, 18.0, 39.0, 78.0]:
         farm.farmer.position = starting_position
         farm.set_camera_zoom(zoom)
+        farm.update_camera()
         var camera_before: Vector3 = farm.camera.position
         var focus_before: Vector3 = farm.camera_focus
         var subject_before: Vector2 = farm.camera.unproject_position(Vector3(farm.farmer.position.x, 1.0, farm.farmer.position.z))
@@ -362,6 +388,7 @@ func _check() -> void:
         await process_frame
         farm.update_sizes()
         farm.set_camera_zoom(78.0)
+        farm.update_camera()
         var viewport_rect: Rect2 = root.get_visible_rect()
         var all_visible: bool = true
         # Custom purchased beds can be anywhere in the open grass. The original
@@ -370,9 +397,10 @@ func _check() -> void:
             for corner: Vector3 in [Vector3(-1.08, 0.22, -1.08), Vector3(1.08, 0.22, 1.08), Vector3(-1.08, 0.22, 1.08), Vector3(1.08, 0.22, -1.08)]:
                 all_visible = all_visible and viewport_rect.has_point(farm.camera.unproject_position(plot + corner))
         expect(all_visible and farm.plot_places.size() >= 50, "all 50 original bed bounds must fit at maximum zoom: " + str(viewport_size))
-        var far_size: float = farm.camera.size
+        var far_distance: float = farm.camera.position.distance_to(farm.camera_focus)
         farm.set_camera_zoom(6.0)
-        expect(farm.camera.size < far_size and farm.camera.size >= 3.6, "close orthographic zoom must remain usable: " + str(viewport_size))
+        farm.update_camera()
+        expect(farm.camera.position.distance_to(farm.camera_focus) < far_distance and farm.camera.position.distance_to(farm.camera_focus) >= 3.0, "close perspective zoom must remain usable: " + str(viewport_size))
         reset()
         var local_a: Vector2 = Vector2(viewport_size) * Vector2(0.38, 0.50)
         var local_b: Vector2 = Vector2(viewport_size) * Vector2(0.68, 0.50)

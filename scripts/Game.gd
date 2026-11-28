@@ -107,7 +107,7 @@ const DECOR_RADII = [1.1, 0.7, 0.9, 0.9, 2.1, 1.0, 0.7, 1.1, 1.8, 1.6, 1.1, 0.9,
 # Never use a URL parameter as authentication on a production shared server.
 var GM_TEST_MODE: bool = not OS.has_feature("web") or str(JavaScriptBridge.eval("(new URLSearchParams(window.location.search)).get('gmtest')", true)) == "1"
 # Close enough to inspect the farmer; wide enough for all 10 x 5 beds.
-# Every zoom input uses the same limits (orthographic size is derived below).
+# Every zoom input uses the same limits; the camera stays perspective.
 const CAMERA_ZOOM_MIN: float = 6.0
 const CAMERA_ZOOM_MAX: float = 78.0
 const CAMERA_TAP_SLOP: float = 9.0
@@ -115,6 +115,9 @@ const CAMERA_PINCH_MIN_GAP: float = 10.0
 const CAMERA_PITCH_MIN: float = -1.56206968 # -89.5 degrees: ground
 const CAMERA_PITCH_MAX: float = 1.56206968 # +89.5 degrees: sky
 const CAMERA_PITCH_SENSITIVITY: float = 0.014
+const CAMERA_SMOOTH_SPEED: float = 16.0
+const CAMERA_GROUND_CLEARANCE: float = 0.15
+const CAMERA_GROUND_BLEND: float = 0.25
 var materials: Dictionary = {}
 var plot_places: Array[Vector3] = []
 var plant_roots: Array[Node3D] = []
@@ -193,6 +196,9 @@ var camera_yaw: float = 0.65
 var camera_pitch: float = -0.79
 var camera_distance: float = 39.0
 var camera_focus: Vector3 = Vector3.ZERO
+var camera_render_yaw: float = 0.65
+var camera_render_pitch: float = -0.79
+var camera_render_distance: float = 39.0
 var actor_goal: Vector3 = Vector3.ZERO
 var work_plot: int = -1
 var work_time: float = 0.0
@@ -594,7 +600,9 @@ func build_scene() -> void:
     sun.shadow_enabled = true
     add_child(sun)
     camera = Camera3D.new()
-    camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+    camera.projection = Camera3D.PROJECTION_PERSPECTIVE
+    camera.fov = 60.0
+    camera.near = 0.05
     camera.current = true
     add_child(camera)
 
@@ -1426,8 +1434,8 @@ func _process(delta: float) -> void:
             footstep_timer = 0.29 if running else 0.46
     else:
         footstep_timer = minf(footstep_timer, 0.15)
-    # Follow after every movement source, at every zoom distance.
-    update_camera()
+    # Follow the farmer immediately; smooth only orbit and zoom once per frame.
+    update_camera(delta)
     # Keep the skeleton animation aligned to actual movement, not just inputs:
     # keyboard, touchscreen stick and automatic farm work share this state.
     if farmer_visual != null and farmer_visual.is_model_ready():
@@ -1490,11 +1498,10 @@ func zoom_out() -> void:
     set_camera_zoom(camera_distance * 1.35)
 
 func set_camera_zoom(target_distance: float) -> void:
-    # Orthographic projection changes size too, so this must change both.
+    # Inputs set targets; the rendered camera catches up in _process.
     if not is_finite(target_distance):
         return
     camera_distance = clampf(target_distance, CAMERA_ZOOM_MIN, CAMERA_ZOOM_MAX)
-    update_camera()
 
 func _camera_overlay_at(pos: Vector2) -> bool:
     return (shop_panel != null and shop_panel.visible
@@ -1636,7 +1643,6 @@ func _camera_drag(event: InputEventScreenDrag) -> void:
     if cam_dragged:
         camera_yaw -= delta_screen.x * 0.006
         camera_pitch = clampf(camera_pitch + delta_screen.y * CAMERA_PITCH_SENSITIVITY, CAMERA_PITCH_MIN, CAMERA_PITCH_MAX)
-        update_camera()
 
 func _input(event: InputEvent) -> void:
     if event is InputEventKey:
@@ -1704,7 +1710,6 @@ func _input(event: InputEvent) -> void:
         elif drag_camera:
             camera_yaw -= event.relative.x * 0.007
             camera_pitch = clampf(camera_pitch + event.relative.y * CAMERA_PITCH_SENSITIVITY, CAMERA_PITCH_MIN, CAMERA_PITCH_MAX)
-            update_camera()
         else:
             _update_placement_preview(event.position)
 
@@ -1744,31 +1749,33 @@ func click_plot(pixel: Vector2) -> void:
             best = i
     if best >= 0: work_on(best)
 
-func update_camera() -> void:
+func update_camera(delta: float = -1.0) -> void:
     if camera == null:
         return
-    var screen: Vector2 = get_viewport().get_visible_rect().size
-    var aspect: float = screen.x / maxf(1.0, screen.y)
-    # Orbit around the farmer at every zoom, with a steady ground-height
-    # focus so jumping and the walking bob do not shake the camera.
+    # A negative delta initializes/synchronizes the camera explicitly.
+    # Runtime input never snaps; smoothing is independent of frame rate.
+    var weight: float = 1.0 if delta < 0.0 else 1.0 - exp(-CAMERA_SMOOTH_SPEED * delta)
+    camera_render_yaw = lerpf(camera_render_yaw, camera_yaw, weight)
+    camera_render_pitch = lerpf(camera_render_pitch, camera_pitch, weight)
+    camera_render_distance = lerpf(camera_render_distance, camera_distance, weight)
+    # Follow on the ground plane: jump and animation bob cannot shake the view.
     camera_focus = CENTER
     if farmer != null:
         camera_focus = Vector3(farmer.position.x, 1.0, farmer.position.z)
-    # Explicit orientation avoids look_at degeneracy at exactly +/-90 degrees.
-    var orbit_basis: Basis = Basis(Vector3.UP, camera_yaw) * Basis(Vector3.RIGHT, camera_pitch)
-    var offset: Vector3 = orbit_basis.z
-    camera.position = camera_focus + offset * camera_distance
-    # An upward view would otherwise put the orbit camera underground.
-    # Keep its eye above ground, while preserving the requested view angle.
-    camera.position.y = maxf(0.8, camera.position.y)
+    var orbit_basis: Basis = Basis(Vector3.UP, camera_render_yaw) * Basis(Vector3.RIGHT, camera_render_pitch)
+    # Keep the existing zoom input range while retaining useful close framing.
+    # At wide zoom the full farm remains visible; FOV never changes.
+    var zoom_factor: float = lerpf(0.55, 1.0, smoothstep(CAMERA_ZOOM_MIN, CAMERA_ZOOM_MAX, camera_render_distance))
+    var orbit_distance: float = camera_render_distance * zoom_factor
+    var eye: Vector3 = camera_focus + orbit_basis.z * orbit_distance
+    # Smoothly approach the floor instead of abruptly changing the orbit.
+    # Above the blend band the orbit is unmodified; below it the eye stays
+    # above ground while the player can still tilt all the way toward the sky.
+    if eye.y < CAMERA_GROUND_CLEARANCE + CAMERA_GROUND_BLEND:
+        var floor_t: float = clampf((eye.y - CAMERA_GROUND_CLEARANCE) / CAMERA_GROUND_BLEND, 0.0, 1.0)
+        eye.y = CAMERA_GROUND_CLEARANCE + CAMERA_GROUND_BLEND * floor_t * floor_t * (2.0 - floor_t)
+    camera.position = eye
     camera.basis = orbit_basis
-    # Perspective sky mode makes the horizon and sky visible even when the
-    # camera is looking almost straight up. Keep farm framing orthographic.
-    camera.projection = Camera3D.PROJECTION_PERSPECTIVE if -offset.y > 0.015 else Camera3D.PROJECTION_ORTHOGONAL
-    camera.fov = 60.0
-    var factor: float = 0.82 if aspect > 1.3 else (1.07 if aspect > 0.82 else 1.40)
-    var close_factor: float = lerpf(0.75, 1.0, smoothstep(12.0, 30.0, camera_distance))
-    camera.size = clampf(camera_distance * factor * close_factor, 3.6, 120.0)
 
 func text_label(txt: String, font_size: int, color: Color = Color("#284c3a")) -> Label:
     var label: Label = Label.new()
@@ -2981,7 +2988,7 @@ func update_sizes() -> void:
     set_box(bag_import_button, inventory_x+13.0+backup_button_width, bag_height-34.0, backup_button_width, 29.0)
     bag_grid.columns = 10 if inventory_w >= 390.0 else (8 if inventory_w >= 315.0 else (6 if inventory_w >= 260.0 else 4))
     _fit_all_ui_text()
-    update_camera()
+    update_camera(0.0)
 func point_on_ui(pos: Vector2) -> bool:
     if _camera_overlay_at(pos):
         return true
