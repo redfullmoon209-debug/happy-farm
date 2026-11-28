@@ -1,6 +1,11 @@
 extends RefCounted
 
 const ITEMS = {
+    "female_orange_headwear": {"gender": "female", "set": "orange", "slot": "headwear", "mesh": "Female_Orange_Mic", "name": "Orange Mic", "price": 0},
+    "female_orange_top": {"gender": "female", "set": "orange", "slot": "top", "mesh": "Female_Orange_Shirt", "name": "Orange Shirt", "price": 0},
+    "female_orange_gloves": {"gender": "female", "set": "orange", "slot": "gloves", "mesh": "Female_Orange_Gloves", "name": "Orange Gloves", "price": 0},
+    "female_orange_bottom": {"gender": "female", "set": "orange", "slot": "bottom", "mesh": "Female_Orange_Skirt", "name": "Orange Skirt", "price": 0},
+    "female_orange_shoes": {"gender": "female", "set": "orange", "slot": "shoes", "mesh": "Female_Orange_Boots", "name": "Orange Boots", "price": 0},
     "female_kungfu_headwear": {"gender": "female", "set": "kungfu", "slot": "headwear", "mesh": "Female_KungFu_Head", "name": "KungFu Mask", "price": 0},
     "female_kungfu_top": {"gender": "female", "set": "kungfu", "slot": "top", "mesh": "Female_KungFu_Shirt", "name": "KungFu Shirt", "price": 0},
     "female_kungfu_gloves": {"gender": "female", "set": "kungfu", "slot": "gloves", "mesh": "Female_KungFu_Gloves", "name": "KungFu Gloves", "price": 0},
