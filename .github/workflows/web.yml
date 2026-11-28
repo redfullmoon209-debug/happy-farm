@@ -129,12 +129,20 @@ jobs:
           # First visit: show character creation, never the existing Character Lab.
           python3 - <<'PY'
           from pathlib import Path
+          import os
           index = Path("build/web/index.html")
           html = index.read_text(encoding="utf-8")
           selector = """<script>(function(){try{var p=JSON.parse(localStorage.getItem('farmflex_character_v1')||'null');if(!p||p.locked!==true){location.replace('./create-character.html');}}catch(e){console.warn('Character selection redirect:',e);}})();</script>"""
           if "</head>" not in html:
               raise SystemExit("No </head> in Godot export")
-          index.write_text(html.replace("</head>",selector+"</head>",1),encoding="utf-8")
+          sha = os.environ["GITHUB_SHA"]
+          build = int(os.environ["GITHUB_RUN_NUMBER"])
+          stamp = f'<small id="farmflex-build" data-revision="{sha}" style="position:fixed;right:max(5px,env(safe-area-inset-right));bottom:max(2px,env(safe-area-inset-bottom));z-index:2;pointer-events:none;user-select:none;background:#171b19b8;color:#fff;padding:1px 4px;border-radius:3px;font:10px/1.25 system-ui">Build {build} · {sha[:8]}</small>'
+          if "</body>" not in html:
+              raise SystemExit("Missing game body in exported HTML")
+          game = html.replace("</body>", stamp + "</body>", 1)
+          (index.parent / f"farmflex-{sha[:8]}.html").write_text(game, encoding="utf-8")
+          index.write_text(game.replace("</head>", selector + "</head>", 1), encoding="utf-8")
           PY
 
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:' /tmp/export.log; then exit 1; fi
