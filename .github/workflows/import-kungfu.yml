@@ -18,9 +18,10 @@ jobs:
           echo '4f10f198cc133e5d588d440f7702e68a6b40ff5c867cd1fce40c72d2c1f60a78  /tmp/Female_KungFu.fbx' | sha256sum -c
       - name: Install Blender
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y blender python3-numpy
-          blender --background --python-expr 'import numpy; print(numpy.__version__)' --python-exit-code 1
+          curl -fLsS --retry 3 https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz -o /tmp/blender.tar.xz
+          tar -xJf /tmp/blender.tar.xz -C /tmp
+          echo /tmp/blender-4.2.0-linux-x64 >> "$GITHUB_PATH"
+          /tmp/blender-4.2.0-linux-x64/blender --background --python-exit-code 1 --python-expr 'import numpy; print(numpy.__version__)'
       - name: Append outfit and transfer weights
         run: blender --background --python-exit-code 1 --python tools/import_kungfu.py -- /tmp/Female_KungFu.fbx
       - name: Add KungFu to modular wardrobe regression test
