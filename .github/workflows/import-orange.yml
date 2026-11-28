@@ -1,0 +1,53 @@
+name: Import Orange outfit on test branch
+on:
+  push:
+    branches: [orange-import-test]
+    paths: [Female_Orange.fbx.part1, Female_Orange.fbx.part2]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import:
+    if: github.ref == 'refs/heads/orange-import-test'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify and unpack exact user asset
+        run: |
+          cat Female_Orange.fbx.part1 Female_Orange.fbx.part2 > /tmp/Female_Orange.fbx
+          echo 'e947c7797a973558bea13599086c41529b4d3b75ded54287cff6fa24a75858d4  /tmp/Female_Orange.fbx' | sha256sum -c
+      - name: Install Blender
+        run: |
+          curl -fLsS --retry 3 https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz -o /tmp/blender.tar.xz
+          tar -xJf /tmp/blender.tar.xz -C /tmp
+          echo /tmp/blender-4.2.0-linux-x64 >> "$GITHUB_PATH"
+          /tmp/blender-4.2.0-linux-x64/blender --background --python-exit-code 1 --python-expr 'import numpy; print(numpy.__version__)'
+      - name: Append outfit and transfer weights
+        run: blender --background --python-exit-code 1 --python tools/import_orange.py -- /tmp/Female_Orange.fbx
+      - name: Add Orange to modular wardrobe regression test
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('tools/test_modular_wardrobe.gd')
+          s = p.read_text()
+          assert '["black_red", "pink", "kungfu"]' in s
+          p.write_text(s.replace('["black_red", "pink", "kungfu"]', '["black_red", "pink", "kungfu", "orange"]', 1))
+          PY
+      - name: Download Godot and validate
+        run: |
+          curl -fLsS --retry 3 https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp
+          chmod +x /tmp/Godot_v4.4.1-stable_linux.x86_64
+          set -o pipefail
+          /tmp/Godot_v4.4.1-stable_linux.x86_64 --headless --path . --editor --quit 2>&1 | tee /tmp/import.log
+          if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script' /tmp/import.log; then exit 1; fi
+          /tmp/Godot_v4.4.1-stable_linux.x86_64 --headless --path . --script res://tools/test_modular_wardrobe.gd 2>&1 | tee /tmp/test.log
+          grep -F 'MODULAR CHECK []' /tmp/test.log
+          if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Invalid call|Invalid access' /tmp/test.log; then exit 1; fi
+      - name: Commit validated assets to isolated branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/characters/modular/Female scripts/FemaleWardrobe.gd tools/test_modular_wardrobe.gd
+          git commit -m 'Import Orange wardrobe and validate five slots'
+          git push origin HEAD:orange-import-test
